@@ -1,0 +1,18 @@
+/home/byron/Android/Sdk/cmake/3.22.1/bin/cmake \
+  -H/home/byron/StudioProjects/vr_construction_quest/app/src/main/cpp \
+  -DCMAKE_SYSTEM_NAME=Android \
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+  -DCMAKE_SYSTEM_VERSION=29 \
+  -DANDROID_PLATFORM=android-29 \
+  -DANDROID_ABI=arm64-v8a \
+  -DCMAKE_ANDROID_ARCH_ABI=arm64-v8a \
+  -DANDROID_NDK=/home/byron/Android/Sdk/ndk/28.2.13676358 \
+  -DCMAKE_ANDROID_NDK=/home/byron/Android/Sdk/ndk/28.2.13676358 \
+  -DCMAKE_TOOLCHAIN_FILE=/home/byron/Android/Sdk/ndk/28.2.13676358/build/cmake/android.toolchain.cmake \
+  -DCMAKE_MAKE_PROGRAM=/home/byron/Android/Sdk/cmake/3.22.1/bin/ninja \
+  -DCMAKE_CXX_FLAGS=-std=c++17 \
+  -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=/home/byron/StudioProjects/vr_construction_quest/app/build/intermediates/cxx/Debug/1j4g3314/obj/arm64-v8a \
+  -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=/home/byron/StudioProjects/vr_construction_quest/app/build/intermediates/cxx/Debug/1j4g3314/obj/arm64-v8a \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -B/home/byron/StudioProjects/vr_construction_quest/app/.cxx/Debug/1j4g3314/arm64-v8a \
+  -GNinja

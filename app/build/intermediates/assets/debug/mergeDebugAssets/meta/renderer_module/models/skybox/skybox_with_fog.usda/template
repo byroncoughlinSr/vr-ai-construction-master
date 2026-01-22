@@ -1,0 +1,116 @@
+{
+    "version": 5,
+    "entities": [
+        {
+            "id": "216e4be5-a5f2-1981-0ce6-684a6e7935a8",
+            "name": "skybox_with_fog",
+            "components": [
+                {
+                    "data": {
+                        "class": "horizon::platform_api::TransformPlatformComponent",
+                        "version": 2,
+                        "data": {}
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                }
+            ],
+            "attributes": []
+        },
+        {
+            "id": "18a5fdd0-eb05-747f-f625-82f43f05368d",
+            "name": "SkyboxWithFog_Mesh",
+            "components": [
+                {
+                    "data": {
+                        "class": "horizon::platform_api::TransformPlatformComponent",
+                        "version": 2,
+                        "data": {}
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                },
+                {
+                    "data": {
+                        "class": "horizon::platform_api::MeshPlatformComponent",
+                        "version": 11,
+                        "data": {
+                            "mesh": {
+                                "packageOrRemoteId": "30952996677677480",
+                                "ingestionId": "18380676710364948515",
+                                "targetId": 4292569031
+                            }
+                        }
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                },
+                {
+                    "data": {
+                        "class": "horizon::platform_api::PhysicsBodyPlatformComponent",
+                        "version": 2,
+                        "data": {
+                            "type": "StaticCollision"
+                        }
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                },
+                {
+                    "data": {
+                        "class": "horizon::platform_api::ColliderMeshPlatformComponent",
+                        "version": 1,
+                        "data": {
+                            "meshAsset": {
+                                "packageOrRemoteId": "30952996677677480",
+                                "ingestionId": "18380676710364948515",
+                                "targetId": 2326350370
+                            }
+                        }
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                },
+                {
+                    "data": {
+                        "class": "horizon::platform_api::MaterialPlatformComponent",
+                        "version": 1,
+                        "data": {
+                            "materials": [
+                                {
+                                    "packageOrRemoteId": "30952996677677480",
+                                    "ingestionId": "18360081879382449152",
+                                    "targetId": 157013062
+                                }
+                            ]
+                        }
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                }
+            ],
+            "attributes": []
+        },
+        {
+            "id": "22c5744a-1d9d-db62-41ee-ce440b03308b",
+            "name": "materials",
+            "components": [
+                {
+                    "data": {
+                        "class": "horizon::platform_api::TransformPlatformComponent",
+                        "version": 2,
+                        "data": {}
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                }
+            ],
+            "attributes": []
+        }
+    ],
+    "relationships": [
+        {
+            "relationshipType": "RelationChildOf",
+            "source": "18a5fdd0-eb05-747f-f625-82f43f05368d",
+            "destination": "216e4be5-a5f2-1981-0ce6-684a6e7935a8"
+        },
+        {
+            "relationshipType": "RelationChildOf",
+            "source": "22c5744a-1d9d-db62-41ee-ce440b03308b",
+            "destination": "216e4be5-a5f2-1981-0ce6-684a6e7935a8"
+        }
+    ]
+}

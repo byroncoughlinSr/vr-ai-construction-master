@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ComponentSchema packageName="com.meta.spatial.toolkit">
+    <Component name="Panel">
+        <Description>
+    Panel is a component that can be attached to a scene object to indicate that it is a panel.
+    @param panelRegistrationId The id of the panel. This is used to identify the @PanelRegistration when creating the panel.
+    @param hittable hit test type for the panel, @see MeshCollision
+        </Description>
+    <IntAttribute
+      name="panelRegistrationId"
+      customStringName="panel"
+      defaultValue="0"
+      description="panelRegistrationId The id of the panel. This is used to identify the @PanelRegistration when creating the panel."
+    />
+    <EnumAttribute
+      name="hittable"
+      defaultValue="MeshCollision.LineTest"
+      description="hittable hit test type for the panel, @see MeshCollision"
+      customId="R.id.mesh_hittable"
+    />
+    </Component>
+</ComponentSchema>

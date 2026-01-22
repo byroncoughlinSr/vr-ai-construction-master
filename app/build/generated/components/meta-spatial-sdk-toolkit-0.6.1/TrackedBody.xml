@@ -1,0 +1,9 @@
+<ComponentSchema packageName="com.meta.spatial.toolkit">
+  <Component name="TrackedBody">
+    <ExperimentalMapAttribute
+      name="jointPoses"
+      keyType="Int"
+      valueType="Pose"
+    />
+  </Component>
+</ComponentSchema>

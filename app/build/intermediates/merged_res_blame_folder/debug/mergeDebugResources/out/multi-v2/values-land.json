@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.byroncoughlin.vr_construction_quest.app-mergeDebugResources-52:/values-land/values-land.xml",
+            "map": [
+                {
+                    "source": "/home/byron/.gradle/caches/9.1.0/transforms/cf98e0d01e8d7dd7bf2503b26b5cf12b/transformed/appcompat-1.6.1/res/values-land/values-land.xml",
+                    "from": {
+                        "startLines": "2,3,4",
+                        "startColumns": "4,4,4",
+                        "startOffsets": "55,125,196",
+                        "endColumns": "69,70,67",
+                        "endOffsets": "120,191,259"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,34 @@
+[
+    {
+        "merged": "com.byroncoughlin.vr_construction_quest.app-debug-54:/drawable_button_bg.xml.flat",
+        "source": "com.byroncoughlin.vr_construction_quest.app-main-56:/drawable/button_bg.xml"
+    },
+    {
+        "merged": "com.byroncoughlin.vr_construction_quest.app-debug-54:/drawable_hello_world.png.flat",
+        "source": "com.byroncoughlin.vr_construction_quest.app-main-56:/drawable/hello_world.png"
+    },
+    {
+        "merged": "com.byroncoughlin.vr_construction_quest.app-debug-54:/drawable_skydome.jpg.flat",
+        "source": "com.byroncoughlin.vr_construction_quest.app-main-56:/drawable/skydome.jpg"
+    },
+    {
+        "merged": "com.byroncoughlin.vr_construction_quest.app-debug-54:/layout_ui_panel.xml.flat",
+        "source": "com.byroncoughlin.vr_construction_quest.app-main-56:/layout/ui_panel.xml"
+    },
+    {
+        "merged": "com.byroncoughlin.vr_construction_quest.app-debug-54:/drawable_button_bg_hover.xml.flat",
+        "source": "com.byroncoughlin.vr_construction_quest.app-main-56:/drawable/button_bg_hover.xml"
+    },
+    {
+        "merged": "com.byroncoughlin.vr_construction_quest.app-debug-54:/drawable_layout_bg.xml.flat",
+        "source": "com.byroncoughlin.vr_construction_quest.app-main-56:/drawable/layout_bg.xml"
+    },
+    {
+        "merged": "com.byroncoughlin.vr_construction_quest.app-debug-54:/layout_ui_example.xml.flat",
+        "source": "com.byroncoughlin.vr_construction_quest.app-main-56:/layout/ui_example.xml"
+    },
+    {
+        "merged": "com.byroncoughlin.vr_construction_quest.app-debug-54:/drawable_button_bg_normal.xml.flat",
+        "source": "com.byroncoughlin.vr_construction_quest.app-main-56:/drawable/button_bg_normal.xml"
+    }
+]

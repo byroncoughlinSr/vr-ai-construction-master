@@ -1,0 +1,17 @@
+<ComponentSchema packageName="com.meta.spatial.toolkit">
+  <Component name="Quad">
+    <Description>
+A Quad is a 2D shape that can be used to represent a 2D surface in 3D space. It is defined by its
+minimum and maximum coordinates.
+
+@param min The minimum coordinates of the Quad.
+@param max The maximum coordinates of the Quad.
+@property min The minimum coordinates of the Quad.
+@property max The maximum coordinates of the Quad.
+@constructor Creates a new Quad with the given minimum and maximum coordinates.
+    </Description>
+    <Dependent name="Mesh" />
+    <Vector2Attribute name="min" defaultValue="0f, 0f" />
+    <Vector2Attribute name="max" defaultValue="0f, 0f" />
+  </Component>
+</ComponentSchema>

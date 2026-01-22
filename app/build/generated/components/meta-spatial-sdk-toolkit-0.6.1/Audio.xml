@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ComponentSchema packageName="com.meta.spatial.toolkit">
+    <Component
+    name="Audio"
+    description="
+Audio component that can be attached to an entity.
+This component will play audio spatially from the entity.\n
+@param file The Uri String of the audio file to be used\n
+@param volume The volume of the audio to be played, default is 1.0f\n
+@property audio The Uri String of the audio file to be used\n
+@property volume The volume of the audio to be played, default is 1.0f
+"
+  >
+        <StringAttribute
+      name="audio"
+      defaultValue=""
+      description="The Uri String of the audio file to be used"
+    />
+        <FloatAttribute name="volume" defaultValue="1.0f" />
+    </Component>
+</ComponentSchema>

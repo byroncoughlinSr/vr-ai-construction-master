@@ -1,0 +1,4 @@
+/home/byron/Android/Sdk/cmake/3.22.1/bin/ninja \
+  -C \
+  /home/byron/StudioProjects/vr_construction_quest/app/.cxx/Debug/347250mg/arm64-v8a \
+  vr_construction_quest

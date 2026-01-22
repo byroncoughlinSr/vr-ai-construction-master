@@ -1,0 +1,17 @@
+<ComponentSchema packageName="com.meta.spatial.toolkit">
+  <Component name="Hittable">
+    <Description>
+ Defines whether an object is hittable or not.
+
+ @param hittable The type of behavior the object can be hit using
+ @property hittable The type of behavior the object can be hit using
+
+    </Description>
+    <EnumAttribute
+      name="hittable"
+      defaultValue="MeshCollision.LineTest"
+      customId="R.id.mesh_hittable"
+      description="The type of behavior the object can be hit using."
+    />
+  </Component>
+</ComponentSchema>

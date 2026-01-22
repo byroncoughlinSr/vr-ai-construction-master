@@ -1,0 +1,18 @@
+<ComponentSchema packageName="com.meta.spatial.toolkit">
+  <Component name="Sphere">
+    <Description>
+The component that defines the dimensions of a sphere by the radius. To be used with the
+`mesh://sphere` `Mesh` URI.
+
+@param radius The radius of the sphere in meters
+@property radius The radius of the sphere in meters
+@constructor Creates a sphere with the given radius
+    </Description>
+    <FloatAttribute
+      name="radius"
+      defaultValue="0.0f"
+      description="The radius of the sphere in meters"
+    />
+    <Dependent name="Mesh" />
+  </Component>
+</ComponentSchema>

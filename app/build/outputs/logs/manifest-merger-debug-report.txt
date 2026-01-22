@@ -1,0 +1,426 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:2:1-34:12
+INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:2:1-34:12
+INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:2:1-34:12
+INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:2:1-34:12
+MERGED from [androidx.databinding:viewbinding:9.0.0] /home/byron/.gradle/caches/9.1.0/transforms/e8b20270f341afa6781d5f7182ed09bd/transformed/jetified-viewbinding-9.0.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/byron/.gradle/caches/9.1.0/transforms/439c0490a9d7e4ac3d15940a4f5222df/transformed/jetified-appcompat-resources-1.6.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/byron/.gradle/caches/9.1.0/transforms/cf98e0d01e8d7dd7bf2503b26b5cf12b/transformed/appcompat-1.6.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/b2df738e9d3ba7712da6b35a2c8a6b67/transformed/drawerlayout-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.fragment:fragment:1.3.6] /home/byron/.gradle/caches/9.1.0/transforms/ed464bc58171fde2d9ac68f137ec0b40/transformed/fragment-1.3.6/AndroidManifest.xml:17:1-24:12
+MERGED from [com.meta.spatial:meta-spatial-sdk-compose:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/318017001fdd73e4a78b41bf289e20eb/transformed/jetified-meta-spatial-sdk-compose-0.9.2/AndroidManifest.xml:2:1-11:12
+MERGED from [androidx.compose.material3:material3-android:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/b6f1cf24ab4cf56eb08019e1b1fa9270/transformed/jetified-material3-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.material:material-ripple-android:1.7.3] /home/byron/.gradle/caches/9.1.0/transforms/7e7ba752f9c8a772e20f01e306df0bb4/transformed/jetified-material-ripple-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.animation:animation-core-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/8a84f5b26562b0c3e055c72c137c59a2/transformed/jetified-animation-core-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.animation:animation-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/132913830f169bcbeb4b46f9f266921b/transformed/jetified-animation-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/09733a0f92e404d80cc3201bf971bf54/transformed/jetified-foundation-layout-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.foundation:foundation-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/3acc4b12b00f65f6a03d2bea0a0a337d/transformed/jetified-foundation-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-util-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/927713dc300a9149c4878ebc941670f9/transformed/jetified-ui-util-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-unit-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/346d75fb5608810871cdc3b9ec88d19a/transformed/jetified-ui-unit-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-text-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/d72001429ae5eab14e005a6bbf62e435/transformed/jetified-ui-text-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-geometry-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/7fd4ad9b16bb0bbb1cddb429d9c47b61/transformed/jetified-ui-geometry-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/e1b788a936d24f97df7d4cc5b015fbdb/transformed/jetified-ui-tooling-preview-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.ui:ui-graphics-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/e40ffcb6fbe083855073aee859e430da/transformed/jetified-ui-graphics-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.material:material-icons-core-android:1.7.3] /home/byron/.gradle/caches/9.1.0/transforms/1f42f0ec2d2d9f393889239f50c2d165/transformed/jetified-material-icons-core-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.ui:ui-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/89cff642425b583b7aceceb14336d8a6/transformed/jetified-ui-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.activity:activity-ktx:1.9.2] /home/byron/.gradle/caches/9.1.0/transforms/56b50a2044685f8db9167e7c380d5a6f/transformed/jetified-activity-ktx-1.9.2/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.activity:activity-compose:1.9.2] /home/byron/.gradle/caches/9.1.0/transforms/32e4dbd55e82a11d1d44f163f5d8bf7e/transformed/jetified-activity-compose-1.9.2/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.activity:activity:1.9.2] /home/byron/.gradle/caches/9.1.0/transforms/ee26acd5bf66d83f45893565e2a92e5e/transformed/jetified-activity-1.9.2/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/byron/.gradle/caches/9.1.0/transforms/cf4e7c84de495b269f57d8a38842c624/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/byron/.gradle/caches/9.1.0/transforms/eb8f824fa351e73bb00b3bcd2d521188/transformed/vectordrawable-1.1.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/54e0045b2c79c6b9095a26a3e4512b17/transformed/viewpager-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.customview:customview:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/0781516e733702909f1129c37190b330/transformed/customview-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.loader:loader:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/8945783c25c5173eb4660b3fe1cc36bf/transformed/loader-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.autofill:autofill:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/9f00b5a295ca523e559d0d118d222a7b/transformed/jetified-autofill-1.0.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.graphics:graphics-path:1.0.1] /home/byron/.gradle/caches/9.1.0/transforms/e3d998596cd37d6ae93d00f7ce693ab5/transformed/jetified-graphics-path-1.0.1/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.emoji2:emoji2-views-helper:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/3b914e2c92a3b89903f71553d3abdea8/transformed/jetified-emoji2-views-helper-1.3.0/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:17:1-30:12
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /home/byron/.gradle/caches/9.1.0/transforms/c1be9033f9e44a7fea6ba7f7dc0c00b3/transformed/jetified-savedstate-ktx-1.2.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.savedstate:savedstate:1.2.1] /home/byron/.gradle/caches/9.1.0/transforms/5be0e3f94fa6dfe973ccd92a6f15915c/transformed/jetified-savedstate-1.2.1/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/8ccd3d190bcfb75972bf2b4c8bbcef09/transformed/jetified-lifecycle-process-2.8.6/AndroidManifest.xml:17:1-35:12
+MERGED from [androidx.lifecycle:lifecycle-livedata-core-ktx:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/a602c80b4bb34e586cf17d65658a48bd/transformed/jetified-lifecycle-livedata-core-ktx-2.8.6/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-runtime-compose-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/2eb86c3f61a1141fc5320c8a977c6e38/transformed/jetified-lifecycle-runtime-compose-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/cfaaf65498a149487b495686e2d657ca/transformed/lifecycle-viewmodel-2.8.6/AndroidManifest.xml:2:1-5:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/9f65f8d60f4c51d867e2d400c7402dee/transformed/jetified-lifecycle-viewmodel-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-runtime-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/1c7dcddfe9e0af799733214f8fd7edba/transformed/jetified-lifecycle-runtime-release/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/07e3d4e1b277488ec853d62e9af0fed3/transformed/lifecycle-livedata-2.8.6/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/3c528b0418cb2b76341db667c670cb96/transformed/jetified-lifecycle-viewmodel-ktx-2.8.6/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/4509851e3d7a95a883fa3e24257ef995/transformed/lifecycle-livedata-core-2.8.6/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/bd1de859190b7069d3e5b801e6ace113/transformed/jetified-lifecycle-runtime-ktx-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/ec4b81da755064288eab1c376168fed9/transformed/jetified-lifecycle-viewmodel-savedstate-2.8.6/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/75cd138536a7da09ffaef09e2f1dce46/transformed/jetified-customview-poolingcontainer-1.0.0/AndroidManifest.xml:17:1-23:12
+MERGED from [androidx.core:core-ktx:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/40bd6aced65b806ac25d778b639d0235/transformed/jetified-core-ktx-1.13.1/AndroidManifest.xml:2:1-7:12
+MERGED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:2:1-21:12
+MERGED from [com.meta.spatial:meta-spatial-sdk-isdk:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/52749b3d3648b5ed26db524195a37709/transformed/jetified-meta-spatial-sdk-isdk-0.9.2/AndroidManifest.xml:2:1-11:12
+MERGED from [com.meta.spatial:meta-spatial-sdk-vr:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/f4fd9a00dd1f4d67278ac3732d464c02/transformed/jetified-meta-spatial-sdk-vr-0.9.2/AndroidManifest.xml:2:1-11:12
+MERGED from [com.meta.spatial:meta-spatial-sdk-ovrmetrics:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/e8e0573358f07c16c2dde6f683c387b2/transformed/jetified-meta-spatial-sdk-ovrmetrics-0.9.2/AndroidManifest.xml:2:1-11:12
+MERGED from [com.meta.spatial:meta-spatial-sdk-physics:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/880fa8c8c06e9b9da48ebcf9b2911d9f/transformed/jetified-meta-spatial-sdk-physics-0.9.2/AndroidManifest.xml:2:1-11:12
+MERGED from [com.meta.spatial:meta-spatial-sdk-toolkit:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/be5ae5ce825fdd803ed2ceb15c214187/transformed/jetified-meta-spatial-sdk-toolkit-0.9.2/AndroidManifest.xml:2:1-11:12
+MERGED from [com.meta.spatial:meta-spatial-sdk:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/737a36d3155424a99d8f4820d8e90886/transformed/jetified-meta-spatial-sdk-0.9.2/AndroidManifest.xml:7:1-16:12
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/1dd0290e50b8b8b0ad8f694f23f9a5e3/transformed/cursoradapter-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/88de770dab31dc70fcf978ad5b4e94ef/transformed/interpolator-1.0.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/08b540e05bbffc553a89d5f79eeade80/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:17:1-27:12
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:17:1-55:12
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/eb648f081fb49e42f25f940e67f3c776/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:17:1-33:12
+MERGED from [androidx.tracing:tracing:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/1f21d08d8b2d2dafe7f96ddb89c34289/transformed/jetified-tracing-1.0.0/AndroidManifest.xml:17:1-24:12
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /home/byron/.gradle/caches/9.1.0/transforms/9eefcab21787ba028b92a69442119c27/transformed/core-runtime-2.2.0/AndroidManifest.xml:17:1-22:12
+MERGED from [androidx.compose.runtime:runtime-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/4dde6f1bc87b74d3c95e8acc79025a5f/transformed/jetified-runtime-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/b2ac23e2f1a484859845200d038dd77d/transformed/jetified-runtime-saveable-release/AndroidManifest.xml:2:1-7:12
+MERGED from [androidx.annotation:annotation-experimental:1.4.1] /home/byron/.gradle/caches/9.1.0/transforms/21c05bc9ef5fe428dffb8980b1fdaaef/transformed/jetified-annotation-experimental-1.4.1/AndroidManifest.xml:2:1-7:12
+MERGED from [com.facebook.soloader:soloader:0.11.0] /home/byron/.gradle/caches/9.1.0/transforms/268baa9e41bcc1f297f1eea21e7b80b9/transformed/jetified-soloader-0.11.0/AndroidManifest.xml:2:1-17:12
+	package
+		INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml
+	android:versionName
+		INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml
+	android:versionCode
+		INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml
+	xmlns:android
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:2:11-69
+uses-permission#android.permission.INTERNET
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:4:5-67
+MERGED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:12:5-67
+MERGED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:12:5-67
+	android:name
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:4:22-64
+uses-permission#android.permission.RECORD_AUDIO
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:5:5-71
+	android:name
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:5:22-68
+uses-permission#com.oculus.permission.USE_SCENE
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:6:5-71
+	android:name
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:6:22-68
+uses-feature#android.hardware.vr.headtracking
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:8:5-93
+	android:required
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:8:67-90
+	android:name
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:8:19-66
+uses-feature#0x00030001
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:9:5-78
+	android:glEsVersion
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:9:19-51
+	android:required
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:9:52-75
+application
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:11:5-33:19
+INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:11:5-33:19
+MERGED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:28:5-89
+MERGED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:28:5-89
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/8ccd3d190bcfb75972bf2b4c8bbcef09/transformed/jetified-lifecycle-process-2.8.6/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/8ccd3d190bcfb75972bf2b4c8bbcef09/transformed/jetified-lifecycle-process-2.8.6/AndroidManifest.xml:23:5-33:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/08b540e05bbffc553a89d5f79eeade80/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/08b540e05bbffc553a89d5f79eeade80/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:23:5-53:19
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:23:5-53:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/eb648f081fb49e42f25f940e67f3c776/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/eb648f081fb49e42f25f940e67f3c776/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:25:5-31:19
+MERGED from [com.facebook.soloader:soloader:0.11.0] /home/byron/.gradle/caches/9.1.0/transforms/268baa9e41bcc1f297f1eea21e7b80b9/transformed/jetified-soloader-0.11.0/AndroidManifest.xml:11:5-15:19
+MERGED from [com.facebook.soloader:soloader:0.11.0] /home/byron/.gradle/caches/9.1.0/transforms/268baa9e41bcc1f297f1eea21e7b80b9/transformed/jetified-soloader-0.11.0/AndroidManifest.xml:11:5-15:19
+	android:extractNativeLibs
+		INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml
+	android:appComponentFactory
+		ADDED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:28:18-86
+	android:label
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:14:9-40
+	android:icon
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:13:9-45
+	android:allowBackup
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:12:9-35
+	android:theme
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:15:9-59
+activity#com.byroncoughlin.vr_construction_quest.ImmersiveActivity
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:17:9-28:20
+	android:screenOrientation
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:20:13-50
+	android:exported
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:19:13-36
+	android:configChanges
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:21:13-74
+	android:name
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:18:13-46
+intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER+category:name:com.oculus.intent.category.VR
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:23:13-27:29
+action#android.intent.action.MAIN
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:24:17-69
+	android:name
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:24:25-66
+category#android.intent.category.LAUNCHER
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:25:17-77
+	android:name
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:25:27-74
+category#com.oculus.intent.category.VR
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:26:17-74
+	android:name
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:26:27-71
+meta-data#com.oculus.vr.focusaware
+ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:30:9-32:36
+	android:value
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:32:13-33
+	android:name
+		ADDED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:31:13-52
+uses-sdk
+INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml
+INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml
+MERGED from [androidx.databinding:viewbinding:9.0.0] /home/byron/.gradle/caches/9.1.0/transforms/e8b20270f341afa6781d5f7182ed09bd/transformed/jetified-viewbinding-9.0.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.databinding:viewbinding:9.0.0] /home/byron/.gradle/caches/9.1.0/transforms/e8b20270f341afa6781d5f7182ed09bd/transformed/jetified-viewbinding-9.0.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/byron/.gradle/caches/9.1.0/transforms/439c0490a9d7e4ac3d15940a4f5222df/transformed/jetified-appcompat-resources-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat-resources:1.6.1] /home/byron/.gradle/caches/9.1.0/transforms/439c0490a9d7e4ac3d15940a4f5222df/transformed/jetified-appcompat-resources-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/byron/.gradle/caches/9.1.0/transforms/cf98e0d01e8d7dd7bf2503b26b5cf12b/transformed/appcompat-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.appcompat:appcompat:1.6.1] /home/byron/.gradle/caches/9.1.0/transforms/cf98e0d01e8d7dd7bf2503b26b5cf12b/transformed/appcompat-1.6.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/b2df738e9d3ba7712da6b35a2c8a6b67/transformed/drawerlayout-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.drawerlayout:drawerlayout:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/b2df738e9d3ba7712da6b35a2c8a6b67/transformed/drawerlayout-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.fragment:fragment:1.3.6] /home/byron/.gradle/caches/9.1.0/transforms/ed464bc58171fde2d9ac68f137ec0b40/transformed/fragment-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.fragment:fragment:1.3.6] /home/byron/.gradle/caches/9.1.0/transforms/ed464bc58171fde2d9ac68f137ec0b40/transformed/fragment-1.3.6/AndroidManifest.xml:20:5-22:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-compose:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/318017001fdd73e4a78b41bf289e20eb/transformed/jetified-meta-spatial-sdk-compose-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-compose:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/318017001fdd73e4a78b41bf289e20eb/transformed/jetified-meta-spatial-sdk-compose-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [androidx.compose.material3:material3-android:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/b6f1cf24ab4cf56eb08019e1b1fa9270/transformed/jetified-material3-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.material3:material3-android:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/b6f1cf24ab4cf56eb08019e1b1fa9270/transformed/jetified-material3-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.material:material-ripple-android:1.7.3] /home/byron/.gradle/caches/9.1.0/transforms/7e7ba752f9c8a772e20f01e306df0bb4/transformed/jetified-material-ripple-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-ripple-android:1.7.3] /home/byron/.gradle/caches/9.1.0/transforms/7e7ba752f9c8a772e20f01e306df0bb4/transformed/jetified-material-ripple-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-core-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/8a84f5b26562b0c3e055c72c137c59a2/transformed/jetified-animation-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-core-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/8a84f5b26562b0c3e055c72c137c59a2/transformed/jetified-animation-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/132913830f169bcbeb4b46f9f266921b/transformed/jetified-animation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.animation:animation-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/132913830f169bcbeb4b46f9f266921b/transformed/jetified-animation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/09733a0f92e404d80cc3201bf971bf54/transformed/jetified-foundation-layout-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-layout-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/09733a0f92e404d80cc3201bf971bf54/transformed/jetified-foundation-layout-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/3acc4b12b00f65f6a03d2bea0a0a337d/transformed/jetified-foundation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.foundation:foundation-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/3acc4b12b00f65f6a03d2bea0a0a337d/transformed/jetified-foundation-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-util-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/927713dc300a9149c4878ebc941670f9/transformed/jetified-ui-util-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-util-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/927713dc300a9149c4878ebc941670f9/transformed/jetified-ui-util-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-unit-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/346d75fb5608810871cdc3b9ec88d19a/transformed/jetified-ui-unit-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-unit-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/346d75fb5608810871cdc3b9ec88d19a/transformed/jetified-ui-unit-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-text-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/d72001429ae5eab14e005a6bbf62e435/transformed/jetified-ui-text-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-text-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/d72001429ae5eab14e005a6bbf62e435/transformed/jetified-ui-text-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-geometry-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/7fd4ad9b16bb0bbb1cddb429d9c47b61/transformed/jetified-ui-geometry-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-geometry-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/7fd4ad9b16bb0bbb1cddb429d9c47b61/transformed/jetified-ui-geometry-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/e1b788a936d24f97df7d4cc5b015fbdb/transformed/jetified-ui-tooling-preview-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.ui:ui-tooling-preview-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/e1b788a936d24f97df7d4cc5b015fbdb/transformed/jetified-ui-tooling-preview-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.ui:ui-graphics-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/e40ffcb6fbe083855073aee859e430da/transformed/jetified-ui-graphics-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-graphics-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/e40ffcb6fbe083855073aee859e430da/transformed/jetified-ui-graphics-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-core-android:1.7.3] /home/byron/.gradle/caches/9.1.0/transforms/1f42f0ec2d2d9f393889239f50c2d165/transformed/jetified-material-icons-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.material:material-icons-core-android:1.7.3] /home/byron/.gradle/caches/9.1.0/transforms/1f42f0ec2d2d9f393889239f50c2d165/transformed/jetified-material-icons-core-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/89cff642425b583b7aceceb14336d8a6/transformed/jetified-ui-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.ui:ui-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/89cff642425b583b7aceceb14336d8a6/transformed/jetified-ui-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-ktx:1.9.2] /home/byron/.gradle/caches/9.1.0/transforms/56b50a2044685f8db9167e7c380d5a6f/transformed/jetified-activity-ktx-1.9.2/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-ktx:1.9.2] /home/byron/.gradle/caches/9.1.0/transforms/56b50a2044685f8db9167e7c380d5a6f/transformed/jetified-activity-ktx-1.9.2/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-compose:1.9.2] /home/byron/.gradle/caches/9.1.0/transforms/32e4dbd55e82a11d1d44f163f5d8bf7e/transformed/jetified-activity-compose-1.9.2/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity-compose:1.9.2] /home/byron/.gradle/caches/9.1.0/transforms/32e4dbd55e82a11d1d44f163f5d8bf7e/transformed/jetified-activity-compose-1.9.2/AndroidManifest.xml:5:5-44
+MERGED from [androidx.activity:activity:1.9.2] /home/byron/.gradle/caches/9.1.0/transforms/ee26acd5bf66d83f45893565e2a92e5e/transformed/jetified-activity-1.9.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.activity:activity:1.9.2] /home/byron/.gradle/caches/9.1.0/transforms/ee26acd5bf66d83f45893565e2a92e5e/transformed/jetified-activity-1.9.2/AndroidManifest.xml:20:5-44
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/byron/.gradle/caches/9.1.0/transforms/cf4e7c84de495b269f57d8a38842c624/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable-animated:1.1.0] /home/byron/.gradle/caches/9.1.0/transforms/cf4e7c84de495b269f57d8a38842c624/transformed/vectordrawable-animated-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/byron/.gradle/caches/9.1.0/transforms/eb8f824fa351e73bb00b3bcd2d521188/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.vectordrawable:vectordrawable:1.1.0] /home/byron/.gradle/caches/9.1.0/transforms/eb8f824fa351e73bb00b3bcd2d521188/transformed/vectordrawable-1.1.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/54e0045b2c79c6b9095a26a3e4512b17/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.viewpager:viewpager:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/54e0045b2c79c6b9095a26a3e4512b17/transformed/viewpager-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/0781516e733702909f1129c37190b330/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/0781516e733702909f1129c37190b330/transformed/customview-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/8945783c25c5173eb4660b3fe1cc36bf/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.loader:loader:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/8945783c25c5173eb4660b3fe1cc36bf/transformed/loader-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.autofill:autofill:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/9f00b5a295ca523e559d0d118d222a7b/transformed/jetified-autofill-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.autofill:autofill:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/9f00b5a295ca523e559d0d118d222a7b/transformed/jetified-autofill-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.graphics:graphics-path:1.0.1] /home/byron/.gradle/caches/9.1.0/transforms/e3d998596cd37d6ae93d00f7ce693ab5/transformed/jetified-graphics-path-1.0.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.graphics:graphics-path:1.0.1] /home/byron/.gradle/caches/9.1.0/transforms/e3d998596cd37d6ae93d00f7ce693ab5/transformed/jetified-graphics-path-1.0.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2-views-helper:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/3b914e2c92a3b89903f71553d3abdea8/transformed/jetified-emoji2-views-helper-1.3.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2-views-helper:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/3b914e2c92a3b89903f71553d3abdea8/transformed/jetified-emoji2-views-helper-1.3.0/AndroidManifest.xml:5:5-44
+MERGED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:21:5-44
+MERGED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /home/byron/.gradle/caches/9.1.0/transforms/c1be9033f9e44a7fea6ba7f7dc0c00b3/transformed/jetified-savedstate-ktx-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate-ktx:1.2.1] /home/byron/.gradle/caches/9.1.0/transforms/c1be9033f9e44a7fea6ba7f7dc0c00b3/transformed/jetified-savedstate-ktx-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate:1.2.1] /home/byron/.gradle/caches/9.1.0/transforms/5be0e3f94fa6dfe973ccd92a6f15915c/transformed/jetified-savedstate-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.savedstate:savedstate:1.2.1] /home/byron/.gradle/caches/9.1.0/transforms/5be0e3f94fa6dfe973ccd92a6f15915c/transformed/jetified-savedstate-1.2.1/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/8ccd3d190bcfb75972bf2b4c8bbcef09/transformed/jetified-lifecycle-process-2.8.6/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/8ccd3d190bcfb75972bf2b4c8bbcef09/transformed/jetified-lifecycle-process-2.8.6/AndroidManifest.xml:21:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core-ktx:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/a602c80b4bb34e586cf17d65658a48bd/transformed/jetified-lifecycle-livedata-core-ktx-2.8.6/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core-ktx:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/a602c80b4bb34e586cf17d65658a48bd/transformed/jetified-lifecycle-livedata-core-ktx-2.8.6/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-compose-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/2eb86c3f61a1141fc5320c8a977c6e38/transformed/jetified-lifecycle-runtime-compose-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-compose-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/2eb86c3f61a1141fc5320c8a977c6e38/transformed/jetified-lifecycle-runtime-compose-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/cfaaf65498a149487b495686e2d657ca/transformed/lifecycle-viewmodel-2.8.6/AndroidManifest.xml:4:5-43
+MERGED from [androidx.lifecycle:lifecycle-viewmodel:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/cfaaf65498a149487b495686e2d657ca/transformed/lifecycle-viewmodel-2.8.6/AndroidManifest.xml:4:5-43
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/9f65f8d60f4c51d867e2d400c7402dee/transformed/jetified-lifecycle-viewmodel-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/9f65f8d60f4c51d867e2d400c7402dee/transformed/jetified-lifecycle-viewmodel-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/1c7dcddfe9e0af799733214f8fd7edba/transformed/jetified-lifecycle-runtime-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/1c7dcddfe9e0af799733214f8fd7edba/transformed/jetified-lifecycle-runtime-release/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/07e3d4e1b277488ec853d62e9af0fed3/transformed/lifecycle-livedata-2.8.6/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/07e3d4e1b277488ec853d62e9af0fed3/transformed/lifecycle-livedata-2.8.6/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/3c528b0418cb2b76341db667c670cb96/transformed/jetified-lifecycle-viewmodel-ktx-2.8.6/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/3c528b0418cb2b76341db667c670cb96/transformed/jetified-lifecycle-viewmodel-ktx-2.8.6/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/4509851e3d7a95a883fa3e24257ef995/transformed/lifecycle-livedata-core-2.8.6/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-livedata-core:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/4509851e3d7a95a883fa3e24257ef995/transformed/lifecycle-livedata-core-2.8.6/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/bd1de859190b7069d3e5b801e6ace113/transformed/jetified-lifecycle-runtime-ktx-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-runtime-ktx-android:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/bd1de859190b7069d3e5b801e6ace113/transformed/jetified-lifecycle-runtime-ktx-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/ec4b81da755064288eab1c376168fed9/transformed/jetified-lifecycle-viewmodel-savedstate-2.8.6/AndroidManifest.xml:20:5-44
+MERGED from [androidx.lifecycle:lifecycle-viewmodel-savedstate:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/ec4b81da755064288eab1c376168fed9/transformed/jetified-lifecycle-viewmodel-savedstate-2.8.6/AndroidManifest.xml:20:5-44
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/75cd138536a7da09ffaef09e2f1dce46/transformed/jetified-customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
+MERGED from [androidx.customview:customview-poolingcontainer:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/75cd138536a7da09ffaef09e2f1dce46/transformed/jetified-customview-poolingcontainer-1.0.0/AndroidManifest.xml:20:5-21:38
+MERGED from [androidx.core:core-ktx:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/40bd6aced65b806ac25d778b639d0235/transformed/jetified-core-ktx-1.13.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.core:core-ktx:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/40bd6aced65b806ac25d778b639d0235/transformed/jetified-core-ktx-1.13.1/AndroidManifest.xml:5:5-44
+MERGED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-isdk:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/52749b3d3648b5ed26db524195a37709/transformed/jetified-meta-spatial-sdk-isdk-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-isdk:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/52749b3d3648b5ed26db524195a37709/transformed/jetified-meta-spatial-sdk-isdk-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-vr:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/f4fd9a00dd1f4d67278ac3732d464c02/transformed/jetified-meta-spatial-sdk-vr-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-vr:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/f4fd9a00dd1f4d67278ac3732d464c02/transformed/jetified-meta-spatial-sdk-vr-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-ovrmetrics:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/e8e0573358f07c16c2dde6f683c387b2/transformed/jetified-meta-spatial-sdk-ovrmetrics-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-ovrmetrics:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/e8e0573358f07c16c2dde6f683c387b2/transformed/jetified-meta-spatial-sdk-ovrmetrics-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-physics:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/880fa8c8c06e9b9da48ebcf9b2911d9f/transformed/jetified-meta-spatial-sdk-physics-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-physics:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/880fa8c8c06e9b9da48ebcf9b2911d9f/transformed/jetified-meta-spatial-sdk-physics-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-toolkit:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/be5ae5ce825fdd803ed2ceb15c214187/transformed/jetified-meta-spatial-sdk-toolkit-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk-toolkit:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/be5ae5ce825fdd803ed2ceb15c214187/transformed/jetified-meta-spatial-sdk-toolkit-0.9.2/AndroidManifest.xml:7:5-9:41
+MERGED from [com.meta.spatial:meta-spatial-sdk:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/737a36d3155424a99d8f4820d8e90886/transformed/jetified-meta-spatial-sdk-0.9.2/AndroidManifest.xml:12:5-14:41
+MERGED from [com.meta.spatial:meta-spatial-sdk:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/737a36d3155424a99d8f4820d8e90886/transformed/jetified-meta-spatial-sdk-0.9.2/AndroidManifest.xml:12:5-14:41
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/1dd0290e50b8b8b0ad8f694f23f9a5e3/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.cursoradapter:cursoradapter:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/1dd0290e50b8b8b0ad8f694f23f9a5e3/transformed/cursoradapter-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/88de770dab31dc70fcf978ad5b4e94ef/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.interpolator:interpolator:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/88de770dab31dc70fcf978ad5b4e94ef/transformed/interpolator-1.0.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/08b540e05bbffc553a89d5f79eeade80/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/08b540e05bbffc553a89d5f79eeade80/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:21:5-44
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:21:5-44
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/eb648f081fb49e42f25f940e67f3c776/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/eb648f081fb49e42f25f940e67f3c776/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:21:5-23:41
+MERGED from [androidx.tracing:tracing:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/1f21d08d8b2d2dafe7f96ddb89c34289/transformed/jetified-tracing-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.tracing:tracing:1.0.0] /home/byron/.gradle/caches/9.1.0/transforms/1f21d08d8b2d2dafe7f96ddb89c34289/transformed/jetified-tracing-1.0.0/AndroidManifest.xml:20:5-22:41
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /home/byron/.gradle/caches/9.1.0/transforms/9eefcab21787ba028b92a69442119c27/transformed/core-runtime-2.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.arch.core:core-runtime:2.2.0] /home/byron/.gradle/caches/9.1.0/transforms/9eefcab21787ba028b92a69442119c27/transformed/core-runtime-2.2.0/AndroidManifest.xml:20:5-44
+MERGED from [androidx.compose.runtime:runtime-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/4dde6f1bc87b74d3c95e8acc79025a5f/transformed/jetified-runtime-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/4dde6f1bc87b74d3c95e8acc79025a5f/transformed/jetified-runtime-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/b2ac23e2f1a484859845200d038dd77d/transformed/jetified-runtime-saveable-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.compose.runtime:runtime-saveable-android:1.7.5] /home/byron/.gradle/caches/9.1.0/transforms/b2ac23e2f1a484859845200d038dd77d/transformed/jetified-runtime-saveable-release/AndroidManifest.xml:5:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.4.1] /home/byron/.gradle/caches/9.1.0/transforms/21c05bc9ef5fe428dffb8980b1fdaaef/transformed/jetified-annotation-experimental-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [androidx.annotation:annotation-experimental:1.4.1] /home/byron/.gradle/caches/9.1.0/transforms/21c05bc9ef5fe428dffb8980b1fdaaef/transformed/jetified-annotation-experimental-1.4.1/AndroidManifest.xml:5:5-44
+MERGED from [com.facebook.soloader:soloader:0.11.0] /home/byron/.gradle/caches/9.1.0/transforms/268baa9e41bcc1f297f1eea21e7b80b9/transformed/jetified-soloader-0.11.0/AndroidManifest.xml:7:5-9:41
+MERGED from [com.facebook.soloader:soloader:0.11.0] /home/byron/.gradle/caches/9.1.0/transforms/268baa9e41bcc1f297f1eea21e7b80b9/transformed/jetified-soloader-0.11.0/AndroidManifest.xml:7:5-9:41
+	android:targetSdkVersion
+		INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml
+provider#androidx.startup.InitializationProvider
+ADDED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/8ccd3d190bcfb75972bf2b4c8bbcef09/transformed/jetified-lifecycle-process-2.8.6/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.lifecycle:lifecycle-process:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/8ccd3d190bcfb75972bf2b4c8bbcef09/transformed/jetified-lifecycle-process-2.8.6/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:24:9-32:20
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/eb648f081fb49e42f25f940e67f3c776/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+MERGED from [androidx.startup:startup-runtime:1.1.1] /home/byron/.gradle/caches/9.1.0/transforms/eb648f081fb49e42f25f940e67f3c776/transformed/jetified-startup-runtime-1.1.1/AndroidManifest.xml:26:9-30:34
+	tools:node
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:28:13-31
+	android:authorities
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:26:13-68
+	android:exported
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:27:13-37
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:25:13-67
+meta-data#androidx.emoji2.text.EmojiCompatInitializer
+ADDED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.emoji2:emoji2:1.3.0] /home/byron/.gradle/caches/9.1.0/transforms/c054e40e6fd4e88a4abfdc8cee9bf586/transformed/jetified-emoji2-1.3.0/AndroidManifest.xml:30:17-75
+permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:23:9-81
+permission#com.byroncoughlin.vr_construction_quest.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:22:5-24:47
+	android:protectionLevel
+		ADDED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:24:9-44
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:23:9-81
+uses-permission#${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:26:22-94
+uses-permission#com.byroncoughlin.vr_construction_quest.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+ADDED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:26:5-97
+	android:name
+		ADDED from [androidx.core:core:1.13.1] /home/byron/.gradle/caches/9.1.0/transforms/791363c00d65fccc64487e330b546bdd/transformed/core-1.13.1/AndroidManifest.xml:26:22-94
+meta-data#androidx.lifecycle.ProcessLifecycleInitializer
+ADDED from [androidx.lifecycle:lifecycle-process:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/8ccd3d190bcfb75972bf2b4c8bbcef09/transformed/jetified-lifecycle-process-2.8.6/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.lifecycle:lifecycle-process:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/8ccd3d190bcfb75972bf2b4c8bbcef09/transformed/jetified-lifecycle-process-2.8.6/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.lifecycle:lifecycle-process:2.8.6] /home/byron/.gradle/caches/9.1.0/transforms/8ccd3d190bcfb75972bf2b4c8bbcef09/transformed/jetified-lifecycle-process-2.8.6/AndroidManifest.xml:30:17-78
+uses-permission#com.oculus.permission.XRS_STREAM
+ADDED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:11:5-72
+	android:name
+		ADDED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:11:22-69
+uses-permission#com.oculus.permission.WIFI_LOCK
+ADDED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:13:5-71
+	android:name
+		ADDED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:13:22-68
+uses-permission#android.permission.WAKE_LOCK
+ADDED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:14:5-68
+	android:name
+		ADDED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:14:22-65
+uses-permission#android.permission.WRITE_EXTERNAL_STORAGE
+ADDED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:15:5-81
+	android:name
+		ADDED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:15:22-78
+uses-feature#0x00020000
+ADDED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:17:5-19:35
+REJECTED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml
+	android:glEsVersion
+		ADDED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:18:9-41
+	android:required
+		ADDED from [com.meta.spatial:meta-spatial-sdk-castinputforward:0.9.2] /home/byron/.gradle/caches/9.1.0/transforms/08c904ad010e408f37f5d2573dafefa5/transformed/jetified-meta-spatial-sdk-castinputforward-0.9.2/AndroidManifest.xml:19:9-32
+uses-permission#android.permission.READ_EXTERNAL_STORAGE
+IMPLIED from /home/byron/StudioProjects/vr_construction_quest/app/src/main/AndroidManifest.xml:2:1-34:12 reason: com.meta.spatial.castinputforward requested WRITE_EXTERNAL_STORAGE
+meta-data#androidx.profileinstaller.ProfileInstallerInitializer
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:29:13-31:52
+	android:value
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:31:17-49
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:30:17-85
+receiver#androidx.profileinstaller.ProfileInstallReceiver
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:34:9-52:20
+	android:enabled
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:37:13-35
+	android:exported
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:38:13-36
+	android:permission
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:39:13-57
+	android:directBootAware
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:36:13-44
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:35:13-76
+intent-filter#action:name:androidx.profileinstaller.action.INSTALL_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:40:13-42:29
+action#androidx.profileinstaller.action.INSTALL_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:41:17-91
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:41:25-88
+intent-filter#action:name:androidx.profileinstaller.action.SKIP_FILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:43:13-45:29
+action#androidx.profileinstaller.action.SKIP_FILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:44:17-85
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:44:25-82
+intent-filter#action:name:androidx.profileinstaller.action.SAVE_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:46:13-48:29
+action#androidx.profileinstaller.action.SAVE_PROFILE
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:47:17-88
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:47:25-85
+intent-filter#action:name:androidx.profileinstaller.action.BENCHMARK_OPERATION
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:49:13-51:29
+action#androidx.profileinstaller.action.BENCHMARK_OPERATION
+ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:50:17-95
+	android:name
+		ADDED from [androidx.profileinstaller:profileinstaller:1.3.1] /home/byron/.gradle/caches/9.1.0/transforms/c5193e050b0523416a0d2d13c4e3b65e/transformed/jetified-profileinstaller-1.3.1/AndroidManifest.xml:50:25-92
+meta-data#com.facebook.soloader.enabled
+ADDED from [com.facebook.soloader:soloader:0.11.0] /home/byron/.gradle/caches/9.1.0/transforms/268baa9e41bcc1f297f1eea21e7b80b9/transformed/jetified-soloader-0.11.0/AndroidManifest.xml:12:9-14:37
+	android:value
+		ADDED from [com.facebook.soloader:soloader:0.11.0] /home/byron/.gradle/caches/9.1.0/transforms/268baa9e41bcc1f297f1eea21e7b80b9/transformed/jetified-soloader-0.11.0/AndroidManifest.xml:14:13-34
+	android:name
+		ADDED from [com.facebook.soloader:soloader:0.11.0] /home/byron/.gradle/caches/9.1.0/transforms/268baa9e41bcc1f297f1eea21e7b80b9/transformed/jetified-soloader-0.11.0/AndroidManifest.xml:13:13-57

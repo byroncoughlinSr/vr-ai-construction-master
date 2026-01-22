@@ -1,0 +1,63 @@
+<ComponentSchema packageName="com.meta.spatial.toolkit">
+  <Enum name="FollowableType">
+    <EnumValue value="FACE" description="The object faces the target." />
+    <EnumValue
+      value="PIVOT_Y"
+      description="The object will pivot in Y dimension."
+    />
+  </Enum>
+  <Component name="Followable">
+    <Description>
+Followable is a component that enables an entity to stay in front of another entity. Followable
+will track the orientation of the parent and move itself to stay in front.
+
+@param target Target Entity to follow
+@param offset Pose offset to keep from target. Defining a quaternion will rotate the Entity
+@param minAngle Minimum Y angle offset a followable will keep from target, 0 is straight ahead,
+   positive values are up, negative values are down
+@param maxAngle Maximum Y angle offset a followable will keep from target, 0 is straight ahead,
+   positive values are up, negative values are down
+@param type The behavior an object has when following (faces user, pivots on y axis, etc.)
+@param tolerance This is the change in distance needed to start moving
+@param speed How fast followable tracks to its desired location. Float value is a percent of
+   default speed
+@param active Whether entity is actively following or not
+    </Description>
+    <EntityAttribute name="target" description="Target Entity to follow" />
+    <PoseAttribute
+      name="offset"
+      defaultValue="0f, 0f, 3f, 0f, 0f, 1f, 0f"
+      description="Pose offset to keep from target. Defining a quaternion will rotate the Entity"
+    />
+    <FloatAttribute
+      name="minAngle"
+      defaultValue="-90f"
+      description="Minimum Y angle offset a followable will keep from target, 0 is straight ahead, positive values\nare up, negative values are down"
+    />
+    <FloatAttribute
+      name="maxAngle"
+      defaultValue="90f"
+      description="Maximum Y angle offset a followable will keep from target, 0 is straight ahead, positive values\nare up, negative values are down"
+    />
+    <EnumAttribute
+      name="type"
+      defaultValue="FollowableType.FACE"
+      description="The type of behavior an object has when following (faces user, pivots on y axis, etc.)"
+    />
+    <FloatAttribute
+      name="tolerance"
+      defaultValue=".2f"
+      description="This is the change in distance needed to start moving"
+    />
+    <FloatAttribute
+      name="speed"
+      defaultValue="1f"
+      description="How fast followable tracks to its desired location. Float value is a percent of default speed"
+    />
+    <BooleanAttribute
+      name="active"
+      defaultValue="true"
+      description="Whether entity is actively following or not"
+    />
+  </Component>
+</ComponentSchema>

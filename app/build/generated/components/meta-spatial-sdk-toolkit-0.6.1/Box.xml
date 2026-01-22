@@ -1,0 +1,23 @@
+<ComponentSchema packageName="com.meta.spatial.toolkit">
+  <Component name="Box">
+    <Description>
+Defines the dimensions of a box shape by the relative offset of two opposite corners. A box of
+max=Vector3(1,1,1) and min=Vector3(-1,-1,-1) will result in a 2x2x2 box. This is to be used with
+the `mesh://box` `Mesh` URI.
+
+@property min The relative offset of the bottom corner (furthest in the -x, -y, -z direction)
+@property max The relative offset of the top corner (furthest in the +x, +y, +z direction)
+    </Description>
+    <Vector3Attribute
+      name="min"
+      defaultValue="0f, 0f, 0f"
+      description="The relative offset of the bottom corner (furthest in the -x, -y, -z direction) of the box from\nthe center"
+    />
+    <Vector3Attribute
+      name="max"
+      defaultValue="0f, 0f, 0f"
+      description="The relative offset of the top corner (furthest in the +x, +y, +z direction) of the box from\nthe center"
+    />
+    <Dependent name="Mesh" />
+  </Component>
+</ComponentSchema>

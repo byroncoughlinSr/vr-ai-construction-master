@@ -1,0 +1,92 @@
+{
+    "version": 5,
+    "entities": [
+        {
+            "id": "3ce7eeba-4b97-0fa8-17fa-ab1f9b739eb9",
+            "name": "",
+            "components": [
+                {
+                    "data": {
+                        "class": "horizon::platform_api::TransformPlatformComponent",
+                        "version": 2,
+                        "data": {}
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                }
+            ],
+            "attributes": []
+        },
+        {
+            "id": "c28a944c-69e1-d3a3-efbf-12b1f4a97263",
+            "name": "Skybox_Mesh",
+            "components": [
+                {
+                    "data": {
+                        "class": "horizon::platform_api::TransformPlatformComponent",
+                        "version": 2,
+                        "data": {}
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                },
+                {
+                    "data": {
+                        "class": "horizon::platform_api::MeshPlatformComponent",
+                        "version": 11,
+                        "data": {
+                            "mesh": {
+                                "packageOrRemoteId": "30952996677677480",
+                                "ingestionId": "3136021705938421235",
+                                "targetId": 3878936219
+                            }
+                        }
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                },
+                {
+                    "data": {
+                        "class": "horizon::platform_api::MaterialPlatformComponent",
+                        "version": 1,
+                        "data": {
+                            "materials": [
+                                {
+                                    "packageOrRemoteId": "30952996677677480",
+                                    "ingestionId": "3136021705938421235",
+                                    "targetId": 420828715
+                                }
+                            ]
+                        }
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                }
+            ],
+            "attributes": []
+        },
+        {
+            "id": "a578c9ff-04ba-1eda-af8c-9f35f4446181",
+            "name": "materials",
+            "components": [
+                {
+                    "data": {
+                        "class": "horizon::platform_api::TransformPlatformComponent",
+                        "version": 2,
+                        "data": {}
+                    },
+                    "dataType": "horizon::DataDefinitionAsset"
+                }
+            ],
+            "attributes": []
+        }
+    ],
+    "relationships": [
+        {
+            "relationshipType": "RelationChildOf",
+            "source": "c28a944c-69e1-d3a3-efbf-12b1f4a97263",
+            "destination": "3ce7eeba-4b97-0fa8-17fa-ab1f9b739eb9"
+        },
+        {
+            "relationshipType": "RelationChildOf",
+            "source": "a578c9ff-04ba-1eda-af8c-9f35f4446181",
+            "destination": "3ce7eeba-4b97-0fa8-17fa-ab1f9b739eb9"
+        }
+    ]
+}

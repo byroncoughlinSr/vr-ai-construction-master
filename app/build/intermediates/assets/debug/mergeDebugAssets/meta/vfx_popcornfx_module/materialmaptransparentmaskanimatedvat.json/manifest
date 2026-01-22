@@ -1,0 +1,15 @@
+{
+    "moduleManifests": [
+        {
+            "manifestLink": {
+                "packageOrRemoteId": "8225551627135318251",
+                "ingestionId": "7895704550980639276",
+                "targetId": 1438750494
+            },
+            "metaData": {
+                "scriptTarget": "ES2022",
+                "moduleKind": "ES2022"
+            }
+        }
+    ]
+}

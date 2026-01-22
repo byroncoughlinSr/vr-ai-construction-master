@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ComponentSchema packageName="com.meta.spatial.toolkit">
+    <Component
+    name="Animated"
+    description="Plays animation for a glTF asset. Also configures different settings for animation.\n@param startTime World time at which animation started (ms since epoch)\n@param pausedTime Paused location/time (sec) within animation track\n@param playbackState Playback state of the animated entity\n@param playbackType Playback type of the animated entity\n@param track the animation track of the glTF to play"
+  >
+        <LongAttribute
+      name="startTime"
+      defaultValue="-1L"
+      description="World time at which animation started (ms since epoch)"
+    />
+        <FloatAttribute
+      name="pausedTime"
+      defaultValue="0.0f"
+      description="Paused location/time (sec) within animation track"
+    />
+        <EnumAttribute
+      name="playbackState"
+      defaultValue="PlaybackState.PLAYING"
+      description="State of the animation (playing or paused)"
+    />
+        <EnumAttribute
+      name="playbackType"
+      defaultValue="PlaybackType.LOOP"
+      description="The type of animation playback to be used"
+    />
+        <IntAttribute
+      name="track"
+      defaultValue="0"
+      description="which animation track of the glTF to play"
+    />
+    </Component>
+    <Enum
+    name="PlaybackState"
+    description="Playback state of the animation. This is used to determine whether the animation is playing or\npaused."
+  >
+      <EnumValue value="PLAYING" />
+      <EnumValue value="PAUSED" />
+    </Enum>
+    <Enum
+    name="PlaybackType"
+    description="Playback type of the animation. This is used to determine how the animation is played."
+  >
+      <EnumValue
+      value="LOOP"
+      description="Restarts the animation at the beginning when it finishes"
+    />
+          <EnumValue
+      value="CLAMP"
+      description="Plays animation once and then freezes at last keyframe"
+    />
+          <EnumValue
+      value="BOUNCE"
+      description="Starts playing animation forward and then in reverse when it finishes"
+    />
+          <EnumValue
+      value="REVERSE_LOOP"
+      description="Plays animation in reverse forever"
+    />
+    </Enum>
+</ComponentSchema>

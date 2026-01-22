@@ -1,0 +1,8 @@
+<ComponentSchema packageName="com.meta.spatial.toolkit">
+  <Component name="SupportsLocomotion">
+    <Description>
+This component is used to indicate that an entity supports locomotion. When added to an entity
+with a mesh, it allows for default locomotion on the mesh
+    </Description>
+  </Component>
+</ComponentSchema>
