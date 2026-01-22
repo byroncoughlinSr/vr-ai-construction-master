@@ -30,5 +30,9 @@
         <meta-data
             android:name="com.oculus.vr.focusaware"
             android:value="true" />
+
+        <meta-data
+            android:name="com.meta.spatial.sdk.ApplicationType"
+            android:value="SpatialApp" />
     </application>
 </manifest>
