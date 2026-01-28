@@ -1,0 +1,21 @@
+01-26 12:48:05.215  1451  3382 I ActivityManager: Flag disabled. Ignoring finishAttachApplication from uid: 1000. pid: 22453
+01-26 12:48:05.227  1451  3382 I ActivityManager: Killing 21488:com.oculus.linefrequencyservice/1000 (adj 975): empty #17
+01-26 12:48:05.237  1451  3382 I ActivityManager: Killing 21778:com.android.permissioncontroller/u0a11 (adj 985): empty #17
+01-26 12:48:05.237  1451  3382 W ProcessStats: Tracking association SourceState{8059230 com.oculus.ocms/10010 BTop #19100} whose proc state 2 is better than process ProcessState{df12cf3 com.oculus.userserver2/10003 pkg=com.oculus.userserver2} proc state 5 (227 skipped)
+01-26 12:48:05.251  1451  1468 D DisplayManagerService: Drop pending events for gone uid 10011
+01-26 12:48:05.253   977  1041 E libsensortelemetry: imu samples delayed: 16216904ns capture to arrival (ERS limit: 3500000ns)
+01-26 12:48:05.316  1229  1310 E libsensortelemetry: imu_iot samples delayed: 16589196ns capture to arrival (ERS limit: 3500000ns)
+01-26 12:48:09.744     0     0 W healthd : battery l=44 v=3736 t=28.7 h=2 st=2 c=-639648 fc=3758000 cc=3 chg=u
+01-26 12:48:10.734  1229  1310 E libsensortelemetry: imu_iot samples delayed: 17501480ns capture to arrival (ERS limit: 3500000ns)
+01-26 12:48:10.734   977  1041 E libsensortelemetry: imu samples delayed: 17009709ns capture to arrival (ERS limit: 3500000ns)
+01-26 12:48:10.871  1229 21899 D TrackingService: 5435ea6b3e389bb8: isControllerInHand(46372.82s): 0 ctEnabled: 1 btnPress: 0 btnOrTpdTouch: 0 btnOrTpdProx: 0 static(46372.82s): 0 thbstkOffCenter: 0 
+01-26 12:48:10.871  1229 21899 D TrackingService: [HANDTRACKING] Controller 5435ea6b3e389bb8 in hand: N, valid: Y
+01-26 12:48:10.872  2139 21850 D ControllerManagement: RemoteService::recordControllerStatusUpdate: device 5435ea6b3e389bb8: status: CONNECTED_ACTIVE tracking: POSITION, errors: --
+01-26 12:48:13.321  1229 21899 D TrackingService: f0f0908efc872ecb: isControllerInHand(46375.27s): 0 ctEnabled: 1 btnPress(46357.42s): 0 btnOrTpdTouch(46359.72s): 0 btnOrTpdProx(46359.77s): 0 static(46375.27s): 0 thbstkOffCenter: 0 
+01-26 12:48:13.321  1229 21899 D TrackingService: [HANDTRACKING] Controller f0f0908efc872ecb in hand: N, valid: Y
+01-26 12:48:13.321  2139 21850 D ControllerManagement: RemoteService::recordControllerStatusUpdate: device f0f0908efc872ecb: status: CONNECTED_ACTIVE tracking: POSITION, errors: --
+01-26 12:48:13.523     0     0 W healthd : battery l=44 v=3728 t=28.7 h=2 st=2 c=-715331 fc=3758000 cc=3 chg=u
+01-26 12:48:14.880     0     0 I binder  : 22517:22517 ioctl 40046210 7fc6e31130 returned -22
+01-26 12:48:14.909  1451  3379 I ActivityManager: Force stopping com.byroncoughlin.vr_construction_quest appid=10162 user=0: from pid 22517
+01-26 12:48:14.911  1451  1468 D DisplayManagerService: Drop pending events for gone uid 10162
+01-26 12:48:14.911  1451  3379 I ActivityManager: Killing 22153:com.byroncoughlin.vr_construction_quest/u0a162 (adj 0): stop com.byroncoughlin.vr_construction_quest due to from pid 22517
