@@ -1,7 +1,10 @@
-#pragma once
+#ifndef NETWORK_CLIENT_H
+#define NETWORK_CLIENT_H
+
 #include <string>
 #include <vector>
-#include <nlohmann/json.hpp>
+#include <jni.h>
+#include "nlohmann/json.hpp"
 
 using json = nlohmann::json;
 
@@ -10,13 +13,14 @@ public:
     NetworkClient(const std::string& baseUrl);
     ~NetworkClient();
 
-    // Send audio data for transcription
-    void PostAudio(const std::vector<int16_t>& audioData, int sampleRate);
-
-    // Sync current project state
-    void SyncProject(const json& projectData);
+    // ✅ Updated: Now accepts JNIEnv* instead of attaching/detaching internally
+    void PostAudio(JNIEnv* env, const std::vector<int16_t>& audioData, int sampleRate);
+    
+    // ✅ Updated: Now accepts JNIEnv* instead of attaching/detaching internally
+    void SyncProject(JNIEnv* env, const json& projectData);
 
 private:
     std::string baseUrl;
-    // Future: CURL* handle if using libcurl
 };
+
+#endif // NETWORK_CLIENT_H

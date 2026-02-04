@@ -15,11 +15,11 @@ NetworkClient::NetworkClient(const std::string& baseUrl) : baseUrl(baseUrl) {
 
 NetworkClient::~NetworkClient() {}
 
-void NetworkClient::PostAudio(const std::vector<int16_t>& audioData, int sampleRate) {
+void NetworkClient::PostAudio(JNIEnv* env, const std::vector<int16_t>& audioData, int sampleRate) {
     LOGI("PostAudio called with %zu samples", audioData.size());
 
-    JNIEnv* env;
-    if (g_javaVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+    if (!env) {
+        LOGI("PostAudio: No JNIEnv provided, skipping");
         return;
     }
 
@@ -35,15 +35,15 @@ void NetworkClient::PostAudio(const std::vector<int16_t>& audioData, int sampleR
         env->DeleteLocalRef(jAudioData);
     }
 
-    g_javaVM->DetachCurrentThread();
+    // DO NOT call DetachCurrentThread() here - the JNI runtime manages this thread!
 }
 
-void NetworkClient::SyncProject(const json& projectData) {
+void NetworkClient::SyncProject(JNIEnv* env, const json& projectData) {
     std::string jsonStr = projectData.dump();
     LOGI("SyncProject called with data: %s", jsonStr.c_str());
 
-    JNIEnv* env;
-    if (g_javaVM->AttachCurrentThread(&env, nullptr) != JNI_OK) {
+    if (!env) {
+        LOGI("SyncProject: No JNIEnv provided, skipping");
         return;
     }
 
@@ -56,5 +56,5 @@ void NetworkClient::SyncProject(const json& projectData) {
         env->DeleteLocalRef(jJsonStr);
     }
 
-    g_javaVM->DetachCurrentThread();
+    // DO NOT call DetachCurrentThread() here - the JNI runtime manages this thread!
 }

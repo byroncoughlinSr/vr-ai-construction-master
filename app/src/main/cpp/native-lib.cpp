@@ -68,7 +68,7 @@ Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_initNative(
         g_voiceBridge = new VoiceBridge();
     }
     if (g_networkClient == nullptr) {
-        g_networkClient = new NetworkClient("http://192.168.1.50:8000");
+        g_networkClient = new NetworkClient("http://192.168.7.249:8000");
     }
 
     LOGI("Native initialization complete");
@@ -180,6 +180,27 @@ Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_nativeSnapToGri
 #define TRIGGER_MASK 0x20000000L
 #define GRIP_MASK 0x04000000L
 
+JNIEXPORT void JNICALL
+Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_nativeSetControllerState(
+        JNIEnv* env,
+        jobject /* this */,
+        jint hand,
+        jlong buttons,
+        jfloat tx, jfloat ty, jfloat tz,
+        jfloat qx, jfloat qy, jfloat qz, jfloat qw) {
+
+    if (hand < 0 || hand >= 2) return;
+
+    g_inputs[hand].buttons = (long)buttons;
+    g_inputs[hand].position[0] = tx;
+    g_inputs[hand].position[1] = ty;
+    g_inputs[hand].position[2] = tz;
+    g_inputs[hand].orientation[0] = qx;
+    g_inputs[hand].orientation[1] = qy;
+    g_inputs[hand].orientation[2] = qz;
+    g_inputs[hand].orientation[3] = qw;
+}
+
 JNIEXPORT jlong JNICALL
 Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_nativeGetControllerButtonState(
         JNIEnv* env,
@@ -192,6 +213,7 @@ Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_nativeGetContro
     // can be populated. For now, we'll return a state that allows logic to flow.
 
     // In a full implementation, this would poll the XrActionStateGetInfo.
+    if (hand < 0 || hand >= 2) return 0;
     return g_inputs[hand].buttons;
 }
 
@@ -200,6 +222,8 @@ Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_nativeGetContro
         JNIEnv* env,
         jobject /* this */,
         jint hand) {
+
+    if (hand < 0 || hand >= 2) return nullptr;
 
     jfloatArray result = env->NewFloatArray(7);
     float poseData[7] = {
@@ -245,7 +269,10 @@ Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_nativeFinishRec
 
     if (g_voiceBridge && g_networkClient) {
         std::vector<int16_t> fullBuffer = g_voiceBridge->FinishRecording();
-        if (!fullBuffer.empty()) g_networkClient->PostAudio(fullBuffer, 16000);
+        if (!fullBuffer.empty()) {
+            // ✅ FIX: Pass the JNIEnv to PostAudio - don't let it attach/detach
+            g_networkClient->PostAudio(env, fullBuffer, 16000);
+        }
     }
 }
 
