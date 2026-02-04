@@ -1,0 +1,24 @@
+                 List of relations
+ Schema |         Name          | Type  |  Owner   
+--------+-----------------------+-------+----------
+ public | ai_generations        | table | vr_admin
+ public | alembic_version       | table | vr_admin
+ public | budget_categories     | table | vr_admin
+ public | budget_items          | table | vr_admin
+ public | construction_phases   | table | vr_admin
+ public | design_elements       | table | vr_admin
+ public | designs               | table | vr_admin
+ public | document_comments     | table | vr_admin
+ public | documents             | table | vr_admin
+ public | equipment             | table | vr_admin
+ public | equipment_assignments | table | vr_admin
+ public | inspections           | table | vr_admin
+ public | labor_assignments     | table | vr_admin
+ public | labor_resources       | table | vr_admin
+ public | material_categories   | table | vr_admin
+ public | materials             | table | vr_admin
+ public | permits               | table | vr_admin
+ public | projects              | table | vr_admin
+ public | tasks                 | table | vr_admin
+(19 rows)
+

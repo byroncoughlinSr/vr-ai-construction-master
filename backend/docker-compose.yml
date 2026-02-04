@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: vr_postgres_dev
+    environment:
+      POSTGRES_DB: vr_construction
+      POSTGRES_USER: vr_admin
+      POSTGRES_PASSWORD: SecurePassword123!
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vr_admin -d vr_construction"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - vr_network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: vr_backend_dev
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://vr_admin:SecurePassword123!@postgres:5432/vr_construction
+      OLLAMA_URL: http://host.docker.internal:11434
+      ENVIRONMENT: development
+    volumes:
+      - ./app:/app/app
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      - generated_images:/app/generated_images
+      - exports:/app/exports
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vr_network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  generated_images:
+  exports:
+  uploads:
+
+networks:
+  vr_network:
+    driver: bridge
