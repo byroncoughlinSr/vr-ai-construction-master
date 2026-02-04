@@ -1,0 +1,1306 @@
+--------- beginning of main
+01-25 07:18:13.776 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.789 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.803 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.817 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.831 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.845 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.859 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.873 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.887 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.900 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.914 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.928 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.942 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.956 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.970 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.984 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:13.998 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.012 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.025 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.039 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.053 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.067 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.081 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.095 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.109 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.123 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.151 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.165 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.178 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.192 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.206 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.220 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.234 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.248 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.262 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.276 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.289 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.303 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.317 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.331 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.345 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.359 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.373 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.387 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.401 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.415 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.428 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.442 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.456 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.470 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.481  8219  8219 I memflow : memflow: Event triggered: Ok(())
+01-25 07:18:14.484 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.498 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.512 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.526 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.539 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.553 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.567 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.581 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.595 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.609 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.623 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.637 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.651 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.665 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.679 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.692 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.706 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.720 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.734 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.748 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.762 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.776 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.790 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.803 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.817 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.831 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.845 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.859 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.873 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.887 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.901 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.915 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.928 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.942 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.956 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.970 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.984 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:14.998 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.012 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.026 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.040 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.053 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.067 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.081 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.095 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.109 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.123 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.151 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.165 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.178 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.192 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.206 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.220 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.234 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.248 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.262 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.276 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.290 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.303 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.317 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.331 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.345 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.359 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.373 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.387 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.401 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.415 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.428 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.442 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.456 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.470 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.484 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.498 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.512 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.526 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.540 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.553 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.567 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.581 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.595 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.609 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.623 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.637 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.651 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.665 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.678 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.692 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.706 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.720 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.734 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.748 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.762 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.776 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.789 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.803 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.817 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.831 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.845 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.859 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.873 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.887 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.901 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.915 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.928 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.942 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.956 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.970 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.984 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:15.998 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.012 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.026 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.039 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.053 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.067 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.081 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.095 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.109 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.123 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.151 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.165 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.179 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.192 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.206 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.220 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.234 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.248 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.262 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.276 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.290 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.303 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.317 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.331 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.345 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.359 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.373 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.387 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.401 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.415 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.428 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.442 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.456 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.470 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.484 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.498 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.512 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.526 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.540 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.553 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.567 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.581 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.595 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.609 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.623 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.637 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.651 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.665 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.678 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.692 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.706 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.720 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.734 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.748 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.762 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.776 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.790 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.803 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.817 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.831 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.845 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.859 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.873 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.887 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.901 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.915 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.928 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.942 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.956 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.970 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.984 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:16.998 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.012 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.026 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.040 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.053 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.067 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.081 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.095 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.109 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.123 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.151 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.165 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.178 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.192 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.206 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.220 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.234 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.248 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.262 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.276 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.290 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.304 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.317 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.331 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.345 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.359 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.373 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.387 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.401 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.415 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.428 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.442 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.456 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.470 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.484 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.498 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.512 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.526 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.540 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+--------- beginning of kernel
+01-25 07:18:17.547     0     0 W healthd : battery l=37 v=3849 t=26.7 h=2 st=2 c=302245 fc=3758000 cc=2 chg=u
+01-25 07:18:17.554 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.567 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.581 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.595 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.609 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.623 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.637 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.651 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.665 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.678 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.692 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.706 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.720 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.734 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.748 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.762 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.776 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.790 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.803 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.817 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.831 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.845 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.859 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.873 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.887 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.901 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.915 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.928 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.942 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.956 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.970 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.984 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:17.998 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.012 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.026 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.040 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.054 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.068 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.081 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.095 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.109 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.123 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.151 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.165 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.178 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.192 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.206 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.220 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.234 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.248 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.256     0     0 W healthd : battery l=37 v=3849 t=26.7 h=2 st=2 c=312011 fc=3758000 cc=2 chg=u
+01-25 07:18:18.262 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.276 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.290 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.303 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.317 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.331 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.345 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.359 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.373 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.387 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.401 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.415 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.428 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.442 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.456 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.470 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.484 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.498 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.512 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.526 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.540 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.553 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.567 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.581 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.595 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.609 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.623 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.637 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.651 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.665 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.678 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.692 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.706 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.720 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.734 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.748 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.762 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.776 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.790 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.803 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.817 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.831 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.845 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.859 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.873 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.887 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.901 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.915 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.928 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.942 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.956 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.970 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.984 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:18.998 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.012 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.026 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.040 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.054 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.067 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.081 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.095 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.109 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.123 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.151 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.165 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.179 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.188  3424  6893 I ClientSharedTelemetryStats: App memory usage: PSS=50 MiB, PrivateDirty=39 MiB, PrivateClean=6 MiB, GPU=2.7/4.1 MiB (66% allocated)
+01-25 07:18:19.193 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.206 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.220 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.234 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.248 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.262 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.276 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.290 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.304 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.318 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.332 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.345 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.359 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.373 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.387 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.401 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.415 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.429 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.443 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.457 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.470 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.484 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.498 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.512 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.526 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.540 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.554 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.568 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.582 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.595 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.609 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.623 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.637 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.651 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.665 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.679 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.693 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.707 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.720 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.734 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.748 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.762 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.776 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.790 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.804 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.818 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.832 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.845 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.859 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.873 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.887 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.901 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.915 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.929 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.943 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.957 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.970 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.984 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:19.998 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.012 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.026 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.040 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.054 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.068 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.082 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.095 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.109 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.123 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.151 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.165 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.179 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.193 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.207 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.220 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.234 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.248 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.262 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.276 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.290 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.304 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.318 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.332 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.346 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.359 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.373 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.387 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.401 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.415 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.429 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.440  1171 12113 I healthcounters: healthcounters::hcstore: Starting upload.
+01-25 07:18:20.443 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.456 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.470 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.484 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.498 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.512 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.526 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.540 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.554 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.568 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.582 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.596 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.609 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.623 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.637 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.651 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.665 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.679 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.693 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.702  1171 12113 I healthcounters: healthcounters::hcstore: Health counters successfully uploaded.
+01-25 07:18:20.707 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.721 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.734 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.748 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.762 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.776 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.790 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.804 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.817  1171  1679 V telemetry-statsd: Fetched statsd reports. Config: 2 UID 1000 Initiator: periodic Report size: 21018
+01-25 07:18:20.817  1171  1679 V telemetry-statsd: Fetched statsd reports. Config: 12 UID 1000 Initiator: periodic Report size: 13160
+01-25 07:18:20.817  1171  1679 V telemetry-statsd: Fetched statsd reports. Config: 3 UID 1000 Initiator: periodic Report size: 11531
+01-25 07:18:20.817  1171  1679 V telemetry-statsd: Fetched statsd reports. Config: 5 UID 1000 Initiator: periodic Report size: 11531
+01-25 07:18:20.817  1171  1679 V telemetry-statsd: Fetched statsd reports. Config: 6 UID 1000 Initiator: periodic Report size: 11531
+01-25 07:18:20.817  1171  1679 V telemetry-statsd: Fetched statsd reports. Config: 7 UID 1000 Initiator: periodic Report size: 11531
+01-25 07:18:20.817  1171  1679 V telemetry-statsd: Fetched statsd reports. Config: 8 UID 1000 Initiator: periodic Report size: 11531
+01-25 07:18:20.817  1171  1679 V telemetry-statsd: Fetched statsd reports. Config: 9 UID 1000 Initiator: periodic Report size: 11531
+01-25 07:18:20.818 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.832 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.846 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.859 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.873 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.887 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.901 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.915 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.929 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.943 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.957 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.971 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.984 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:20.998 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.012 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.026 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.040 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.054 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.068 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.082 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.094  1171  1676 D OnDemandManager: Report metadatas size: 1, Atom metadatas size: 0
+01-25 07:18:21.094  1171  1676 D OnDemandManager: Fetching on demand statsd reports for config id: 24 and campaign id -20
+01-25 07:18:21.096 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.098  1171  1676 D OnDemandManager: On demand telemetry statsd fetched 1 statsd reports
+01-25 07:18:21.098  1171  1676 D OnDemandManager: On demand telemetry statsd fetched 0 samples
+01-25 07:18:21.109 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.123 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.151 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.165 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.179 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.193 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.207 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.220 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.234 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.248 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.262 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.276 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.290 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.304 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.318 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.332 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.346 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.360 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.373 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.387 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.401 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.415 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.429 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.443 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.457 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.471 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.484 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.498 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.512 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.526 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.540 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.554 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.568 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.582 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.596 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.609 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.623 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.637 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.651 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.665 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.679 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.693 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.707 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.721 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.734 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.748 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.762 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.776 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.790 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.804 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.818 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.832 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.846 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.859 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.873 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.887 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.901 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.915 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.929 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.943 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.957 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.971 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.985 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:21.998 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.012 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.026 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.040 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.054 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.068 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.082 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.096 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.109 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.123 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.151 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.165 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.180 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.193 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.207 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.221 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.235 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.248 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.262 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.276 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.290 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.304 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.318 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.332 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.346 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.359 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.373 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.387 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.401 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.415 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.429 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.443 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.457 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.471 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.485 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.498 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.512 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.526 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.540 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.554 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.568 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.582 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.596 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.610 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.623 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.637 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.651 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.665 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.679 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.693 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.707 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.721 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.735 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.747  4249  6969 D TrafficStats: tagSocket(100) with statsTag=0xffffffff, statsUid=-1
+01-25 07:18:22.749 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.762 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.776 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.790 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.804 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.818 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.832 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.846 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.860 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.873 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.887 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.901 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.915 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.929 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.943 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.957 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.971 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.985 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:22.998 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.012 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.026 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.040 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.054 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.068 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.082 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.096 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.110 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.123 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.151 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.165 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.179 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.193 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.207 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.221 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.235 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.248 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.262 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.276 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.290 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.304 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.318 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.332 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.346 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.360 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.373 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.387 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.401 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.415 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.429 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.443 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.457 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.471 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.485 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.498 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.512 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.526 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.540 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.554 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.568 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.582 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.596 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.610 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.623 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.637 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.651 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.665 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.679 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.693 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.707 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.721 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.735 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.748 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.763 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.776 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.790 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.804 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.818 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.832 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.846 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.860 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.874 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.887 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.901 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.915 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.929 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.943 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.957 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.971 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.985 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:23.998 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.012 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.026 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.040 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.054 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.068 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.082 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.096 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.110 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.123 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.151 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.165 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.179 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.193 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.207 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.221 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.235 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.248 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.262 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.276 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.290 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.304 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.318 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.332 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.346 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.360 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.373 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.387 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.401 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.415 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.429 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.443 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.457 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.471 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.485 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.498 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.512 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.526 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.540 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.554 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.568 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.582 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.596 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.610 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.623 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.637 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.651 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.665 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.679 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.693 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.707 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.721 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.735 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.748 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.762 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.776 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.790 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.804 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.818 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.832 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.846 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.860 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.874 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.887 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.901 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.915 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.929 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.943 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.957 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.971 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.985 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:24.998 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.012 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.026 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.040 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.054 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.068 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.082 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.096 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.110 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.124 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.137 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.151 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.165 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.179 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.193 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.207 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.221 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.235 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.249 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.262 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.276 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.290 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.304 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.318 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.332 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.346 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.360 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.374 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.387 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.401 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.415 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.429 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.443 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.457 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.471 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.485 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.499 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.512 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.526 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.540 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.554 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.568 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.582 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.596 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.610 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.624 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.638 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.651 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.665 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.679 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.693 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.707 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.715     0     0 W healthd : battery l=37 v=3849 t=26.7 h=2 st=2 c=295410 fc=3758000 cc=2 chg=u
+01-25 07:18:25.721 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.735 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.749 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.763 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.776 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.790 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.804 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.818 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.832 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.846 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.860 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.874 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.887 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.901 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.915 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.929 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.943 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.957 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.971 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.985 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:25.999 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.012 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.026 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.040 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.054 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.068 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.082 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.096 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.110 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.124 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.138 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.151 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.166 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.179 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.193 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.207 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.221 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.235 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.249 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.263 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.276 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.290 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.304 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.318 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.332 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.346 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.360 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.374 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.388 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.401 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.415 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.429 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.443 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.457 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.471 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.485 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.499 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.513 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.526 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.540 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.554 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.568 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.582 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.596 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.608  4051  4350 I [CT]    : TELEMETRY_COLLECTOR: [EVENT] Collected periodic telemetry from 1 aggregators.
+01-25 07:18:26.610 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.624 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.638 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.652 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.665 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.679 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.693 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.707 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.721 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.735 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.749 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.763 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.776 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.790 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.804 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.818 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.832 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.846 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.860 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.874 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.888 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.902 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.915  1171  1646 D telemetry-tokenbucket: Event rate (events per 60 second) exceeds max, rejecting, event: system, rate: 32916 , max: 32001
+01-25 07:18:26.915 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.929 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+--------- beginning of system
+01-25 07:18:26.933  1461  3408 I ActivityManager: Removed pending bringup for ServiceRecord{f58ea93 u0 com.oculus.statscollector/.StatsCollectorJobService} due to service being unbound
+01-25 07:18:26.941  3052  3052 D IdentityManagementJobService: onStartJob - starting async IMS jobs
+01-25 07:18:26.941  3052  3140 D IdentityManagementAsyncTask: doInBackground - working on IMS async tasks
+01-25 07:18:26.942  3052  3140 D IdentityManagementServiceWorkManager: Setup screentime enforcement ad hoc update work.
+01-25 07:18:26.944 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.945  3052  3140 D IdentityManagementServiceWorkManager: Screentime ad hoc update running in online mode
+01-25 07:18:26.945  3052  3140 D IdentityManagementServiceWorkManager: Setup IMS Guardian Work
+01-25 07:18:26.945  3052  3140 D IdentityManagementAsyncTask: doInBackground - async tasks completed
+01-25 07:18:26.946  1461  3408 I ActivityManager: Removed pending bringup for ServiceRecord{11d9cef u0 com.oculus.identitymanagement.service/.job.IdentityManagementJobService} due to service being unbound
+01-25 07:18:26.960 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.974 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:26.988 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.002 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.003  3052  5632 D AccessTokenWorker: doWork fetch accesstoken
+01-25 07:18:27.005  3052  4033 D AccessTokenWorker: doWork fetch accesstoken
+01-25 07:18:27.006  3052  5631 D AccessTokenWorker: doWork fetch accesstoken
+01-25 07:18:27.007  3052  4033 D WorkerLoggerHelper: log success for access_token_worker
+01-25 07:18:27.007  3052  5632 D WorkerLoggerHelper: log success for access_token_worker
+01-25 07:18:27.007  3052  3257 D AccessTokenWorker: doWork fetch accesstoken
+01-25 07:18:27.008  3052  5631 D WorkerLoggerHelper: log success for access_token_worker
+01-25 07:18:27.009  3052  3257 D WorkerLoggerHelper: log success for access_token_worker
+01-25 07:18:27.011  1461  3408 D ConnectivityService: requestNetwork for uid/pid:10096/3052 activeRequest: null callbackRequest: 194 [NetworkRequest [ REQUEST id=195, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10096 RequestorUid: 10096 RequestorPkg: com.oculus.identitymanagement.service UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647
+01-25 07:18:27.012  1461  1575 D WifiNetworkFactory: got request NetworkRequest [ REQUEST id=195, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10096 RequestorUid: 10096 RequestorPkg: com.oculus.identitymanagement.service UnderlyingNetworks: Null] ]
+01-25 07:18:27.012  1461  1575 D UntrustedWifiNetworkFactory: got request NetworkRequest [ REQUEST id=195, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10096 RequestorUid: 10096 RequestorPkg: com.oculus.identitymanagement.service UnderlyingNetworks: Null] ]
+01-25 07:18:27.012  3052  3232 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=61872e14-a1e8-40c3-957b-ecf9c01ae37b, tags={ com.oculus.identitymanagement.service.workers.AccessTokenWorker } ]
+01-25 07:18:27.012  1461  1575 D OemPaidWifiNetworkFactory: got request NetworkRequest [ REQUEST id=195, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10096 RequestorUid: 10096 RequestorPkg: com.oculus.identitymanagement.service UnderlyingNetworks: Null] ]
+01-25 07:18:27.012  1461  1575 D MultiInternetWifiNetworkFactory: got request NetworkRequest [ REQUEST id=195, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10096 RequestorUid: 10096 RequestorPkg: com.oculus.identitymanagement.service UnderlyingNetworks: Null] ]
+01-25 07:18:27.013  1461  1582 D ConnectivityService: NetReassign [195 : null → 100] [c 0] [a 0] [i 1]
+01-25 07:18:27.014  3052  3232 I WM-WorkerWrapper: Setting status to enqueued for 254aae4f-c6eb-4b71-b99d-177921f81265
+01-25 07:18:27.015  3052  3129 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=e842edd0-bf3d-45ce-b801-e525c960e325, tags={ com.oculus.identitymanagement.service.workers.AccessTokenWorker } ]
+01-25 07:18:27.015 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.016  3052  3129 I WM-WorkerWrapper: Setting status to enqueued for 6bc50060-6df6-458c-bdc8-7f2a73fa9ec6
+01-25 07:18:27.017  3052  3129 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=932ff49d-2f93-4015-8ef4-477b3f360525, tags={ com.oculus.identitymanagement.service.workers.AccessTokenWorker } ]
+01-25 07:18:27.017  3052  3129 I WM-WorkerWrapper: Setting status to enqueued for 077d0163-27ae-46c6-9a8b-2fc849549ac2
+01-25 07:18:27.018  3052  3129 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=d8948b92-463c-4499-9100-74b914e2bc0c, tags={ com.oculus.identitymanagement.service.workers.AccessTokenWorker } ]
+01-25 07:18:27.019  3052  3129 I WM-WorkerWrapper: Setting status to enqueued for 2da9ecc5-2921-4b90-80b7-ff9158deb60f
+01-25 07:18:27.020  1461  3408 I ActivityManager: Removed pending bringup for ServiceRecord{d2b33e8 u0 com.oculus.identitymanagement.service/androidx.work.impl.background.systemjob.SystemJobService} due to service being unbound
+01-25 07:18:27.029 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.043 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.057 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.064  1461  3408 D ConnectivityService: requestNetwork for uid/pid:10096/3052 activeRequest: null callbackRequest: 196 [NetworkRequest [ REQUEST id=197, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10096 RequestorUid: 10096 RequestorPkg: com.oculus.identitymanagement.service UnderlyingNetworks: Null] ]] callback flags: 0 order: 2147483647
+01-25 07:18:27.066  1461  1582 D ConnectivityService: NetReassign [197 : null → 100] [c 0] [a 0] [i 2]
+01-25 07:18:27.066  1461  1575 D WifiNetworkFactory: got request NetworkRequest [ REQUEST id=197, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10096 RequestorUid: 10096 RequestorPkg: com.oculus.identitymanagement.service UnderlyingNetworks: Null] ]
+01-25 07:18:27.066  1461  1575 D UntrustedWifiNetworkFactory: got request NetworkRequest [ REQUEST id=197, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10096 RequestorUid: 10096 RequestorPkg: com.oculus.identitymanagement.service UnderlyingNetworks: Null] ]
+01-25 07:18:27.067  1461  1575 D OemPaidWifiNetworkFactory: got request NetworkRequest [ REQUEST id=197, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10096 RequestorUid: 10096 RequestorPkg: com.oculus.identitymanagement.service UnderlyingNetworks: Null] ]
+01-25 07:18:27.067  1461  1575 D MultiInternetWifiNetworkFactory: got request NetworkRequest [ REQUEST id=197, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED Uid: 10096 RequestorUid: 10096 RequestorPkg: com.oculus.identitymanagement.service UnderlyingNetworks: Null] ]
+01-25 07:18:27.068  3052  3052 D SalsaWorker: IMS Guardian worker executed
+01-25 07:18:27.068  3052  3052 D SalsaFetcher: IMS Guardian fetcher executed
+01-25 07:18:27.068  3052  5632 D MVanScreenTimeUploadWorker: doWork MVanScreenTimeUploadWorker
+01-25 07:18:27.069  3052  4033 D MVanScreenTimeEnforcementAdHocUpdateWorker: Executing ad hoc screen time enforcement update.
+01-25 07:18:27.071 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.081  3052  4033 D ScreenTimeLogger: Logging telemetry event screentime_dev_monitoring:oculus_parsu_screentime_adhoc_work_completed
+01-25 07:18:27.082  3052  3210 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=077d0163-27ae-46c6-9a8b-2fc849549ac2, tags={ com.oculus.identitymanagement.service.workers.MVanScreenTimeEnforcementAdHocUpdateWorker } ]
+01-25 07:18:27.083  1461  3408 D IntervalStats: Unable to parse usage stats packages: [234]
+01-25 07:18:27.085 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.098 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.103  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_RECORDING_TIME @T= 7:02:22 AM : null
+01-25 07:18:27.103  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:02:37 AM : android
+01-25 07:18:27.103  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:03:08 AM : android
+01-25 07:18:27.103  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:13:12 AM : android
+01-25 07:18:27.103  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:13:49 AM : android
+01-25 07:18:27.103  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:14:45 AM : android
+01-25 07:18:27.103  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:15:23 AM : android
+01-25 07:18:27.103  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_RECORDING_TIME @T= 7:02:22 AM : null
+01-25 07:18:27.103  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:02:37 AM : android
+01-25 07:18:27.104  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:03:08 AM : android
+01-25 07:18:27.104  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:13:12 AM : android
+01-25 07:18:27.104  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:13:49 AM : android
+01-25 07:18:27.104  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:14:45 AM : android
+01-25 07:18:27.104  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:15:23 AM : android
+01-25 07:18:27.104  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_RECORDING_TIME @T= 7:02:22 AM : null
+01-25 07:18:27.104  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:02:37 AM : android
+01-25 07:18:27.104  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: RESUME_APP @T= 7:02:37 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.104  3052  5632 D ScreenUsageEventParsing: STATE: SPENDING_TIME | EVENT: STOP_INTERACTING @T= 7:03:08 AM : android
+01-25 07:18:27.104  3052  5632 D ScreenUsageEventParsing: EMIT INTERVAL: 31 sec (RESUME_APP @ 7:02:37 AM - PAUSE_APP @ 7:03:08 AM) : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.105  3052 12129 D TrafficStats: tagSocket(89) with statsTag=0xffffffff, statsUid=-1
+01-25 07:18:27.105  3052 12128 D TrafficStats: tagSocket(90) with statsTag=0xffffffff, statsUid=-1
+01-25 07:18:27.106  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE | EVENT: PAUSE_APP @T= 7:03:08 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.106  3052 12124 D TrafficStats: tagSocket(87) with statsTag=0xffffffff, statsUid=-1
+01-25 07:18:27.106  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: STOP_APP @T= 7:03:08 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.106  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:13:12 AM : android
+01-25 07:18:27.106  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: RESUME_APP @T= 7:13:12 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.106  3052  5632 D ScreenUsageEventParsing: STATE: SPENDING_TIME | EVENT: PAUSE_APP @T= 7:13:27 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.106  3052  5632 D ScreenUsageEventParsing: EMIT INTERVAL: 15 sec (RESUME_APP @ 7:13:12 AM - PAUSE_APP @ 7:13:27 AM) : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.106  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_APP @T= 7:13:28 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.107  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:13:49 AM : android
+01-25 07:18:27.107  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:14:45 AM : android
+01-25 07:18:27.107  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: RESUME_APP @T= 7:14:56 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.107  3052  5632 D ScreenUsageEventParsing: STATE: SPENDING_TIME | EVENT: STOP_INTERACTING @T= 7:15:23 AM : android
+01-25 07:18:27.107  3052  5632 D ScreenUsageEventParsing: EMIT INTERVAL: 27 sec (RESUME_APP @ 7:14:56 AM - PAUSE_APP @ 7:15:23 AM) : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.107  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE | EVENT: PAUSE_APP @T= 7:15:23 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.107  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: STOP_APP @T= 7:15:23 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.107  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: RESUME_APP @T= 7:17:29 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.107  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE | EVENT: PAUSE_APP @T= 7:17:30 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.108  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: STOP_APP @T= 7:17:31 AM : com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.108  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_RECORDING_TIME @T= 7:02:22 AM : null
+01-25 07:18:27.108  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:02:37 AM : android
+01-25 07:18:27.108  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:03:08 AM : android
+01-25 07:18:27.108  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:13:12 AM : android
+01-25 07:18:27.108  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:13:49 AM : android
+01-25 07:18:27.108  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:14:45 AM : android
+01-25 07:18:27.108  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:15:23 AM : android
+01-25 07:18:27.108  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_RECORDING_TIME @T= 7:02:22 AM : null
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:02:37 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:03:08 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:13:12 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:13:49 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:14:45 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:15:23 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_RECORDING_TIME @T= 7:02:22 AM : null
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:02:37 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:03:08 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:13:12 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:13:49 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: INACTIVE_IDLE | EVENT: START_INTERACTING @T= 7:14:45 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageEventParsing: STATE: IDLE | EVENT: STOP_INTERACTING @T= 7:15:23 AM : android
+01-25 07:18:27.109  3052  5632 D ScreenUsageIntervals: com.byroncoughlin.vr_construction_quest 7:02:37 AM : 7:03:08 AM
+01-25 07:18:27.110  3052  5632 D ScreenUsageIntervals: com.byroncoughlin.vr_construction_quest 7:13:12 AM : 7:13:27 AM
+01-25 07:18:27.110  3052  5632 D ScreenUsageIntervals: com.byroncoughlin.vr_construction_quest 7:14:56 AM : 7:15:23 AM
+01-25 07:18:27.112  3091  3457 W TrustedCallerVerifier: Could not verify trusted caller for uidPackageNames=[com.oculus.identitymanagement.service] and uidSignature=android.content.pm.Signature@39345f75
+01-25 07:18:27.112 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.116  3091  3457 W AppManagerInternal: Entitlement for packageName=com.byroncoughlin.vr_construction_quest not found, channels=[Store, Q4B]
+01-25 07:18:27.117  3052  5632 W OVRLibrary: null cursor received for query content://com.oculus.ocms.library/apps/com.byroncoughlin.vr_construction_quest
+01-25 07:18:27.121  3052  5632 D MVanScreenTimeUploadWorker: updating latest sync time to 1769354307
+01-25 07:18:27.122  3052 12136 D TrafficStats: tagSocket(101) with statsTag=0xffffffff, statsUid=-1
+01-25 07:18:27.125  3052  5632 D WorkerLoggerHelper: log success for mvan_screen_time_upload_worker
+01-25 07:18:27.126  3052  3232 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=6bc50060-6df6-458c-bdc8-7f2a73fa9ec6, tags={ com.oculus.identitymanagement.service.workers.MVanScreenTimeUploadWorker } ]
+01-25 07:18:27.127 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.140 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.155 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.168 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.182 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.196 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.209 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.223 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.237 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.251 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.265 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.270  3052 12124 D UserIdentityContextWorker: UserAccountQueryResponse onSuccess
+01-25 07:18:27.275  3052 12128 D SalsaFetcher: IMS Guardian Query Success
+01-25 07:18:27.275  3052 12128 D SalsaFetcher: IMS Guardian: false 1 64
+01-25 07:18:27.275  3052 12128 D WorkerLoggerHelper: log success for salsa_worker
+01-25 07:18:27.276  3052  3210 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=2da9ecc5-2921-4b90-80b7-ff9158deb60f, tags={ com.oculus.identitymanagement.service.workers.SalsaWorker } ]
+01-25 07:18:27.279 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.286  3052 12129 D ScreenTimeEnforcementManager: Received screen time restriction SYNCHRONOUS query update
+01-25 07:18:27.287  3052 12129 D ScreenTimeLogger: Logging telemetry event screentime_dev_monitoring:oculus_parsu_screentime_synchronous_update_received
+01-25 07:18:27.287  3052 12129 E ScreenTimeEnforcementManager: Received no control data.  Likely that user is not a supervised user.
+01-25 07:18:27.292  3052 12124 D UserIdentityContextWorker: Update user database entities complete
+01-25 07:18:27.293  3052 12124 D WorkerLoggerHelper: log success for user_identity_context_worker
+01-25 07:18:27.293 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.294  3052  3183 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=254aae4f-c6eb-4b71-b99d-177921f81265, tags={ com.oculus.identitymanagement.service.workers.UserIdentityContextWorker } ]
+01-25 07:18:27.295  3052  3183 I WM-WorkerWrapper: Setting status to enqueued for 204f8bbe-8440-44c9-b207-8f6a26fe6d6e
+01-25 07:18:27.297  1461  3433 I ActivityManager: Removed pending bringup for ServiceRecord{618f48a u0 com.oculus.identitymanagement.service/androidx.work.impl.background.systemjob.SystemJobService} due to service being unbound
+01-25 07:18:27.307 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.322 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.335 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.338  3052 12151 D TrafficStats: tagSocket(104) with statsTag=0xffffffff, statsUid=-1
+01-25 07:18:27.349 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.363 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.376 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.390 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.404 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.418 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.431  3052 12136 D MVanScreenTimeUploadWorker: uploaded screen time bundle successfully
+01-25 07:18:27.432 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.446 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.460 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.474 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.488 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.496  3052 12151 D CapabilitiesQueryWorker: CapabilitiesQueryResponse onSuccess
+01-25 07:18:27.501 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.515 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.524  3052 12151 D WorkerLoggerHelper: log success for capability_query_worker
+01-25 07:18:27.525  3052  3183 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=204f8bbe-8440-44c9-b207-8f6a26fe6d6e, tags={ com.oculus.identitymanagement.service.workers.CapabilitiesQueryWorker } ]
+01-25 07:18:27.526  3052  3183 I WM-WorkerWrapper: Setting status to enqueued for 2a6a0ebc-ebfb-4932-86d1-864d386bbfc4
+01-25 07:18:27.528  1461  3433 I ActivityManager: Removed pending bringup for ServiceRecord{b489a63 u0 com.oculus.identitymanagement.service/androidx.work.impl.background.systemjob.SystemJobService} due to service being unbound
+01-25 07:18:27.530 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.544 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.559 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.560  3052 12155 D TrafficStats: tagSocket(107) with statsTag=0xffffffff, statsUid=-1
+01-25 07:18:27.572 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.585 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.599 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.613 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.627 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.641 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.655 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.668 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.682 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.696 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.710 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.724 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.738 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.738  3052 12155 D UserAccountCapabilitiesQueryWorker: UserAccountCapabilitesQueryResponse onSuccess
+01-25 07:18:27.738  3052 12155 D WorkerLoggerHelper: log success for user_account_capability_query_worker
+01-25 07:18:27.739  3052  3183 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=2a6a0ebc-ebfb-4932-86d1-864d386bbfc4, tags={ com.oculus.identitymanagement.service.workers.UserAccountCapabilitiesQueryWorker } ]
+01-25 07:18:27.740  3052  3183 I WM-WorkerWrapper: Setting status to enqueued for b9092b79-2f2a-49a3-8f22-aba7920ccb82
+01-25 07:18:27.743  1461  3408 I ActivityManager: Removed pending bringup for ServiceRecord{32079bf u0 com.oculus.identitymanagement.service/androidx.work.impl.background.systemjob.SystemJobService} due to service being unbound
+01-25 07:18:27.752 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.766 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.777  3052 12159 D TrafficStats: tagSocket(110) with statsTag=0xffffffff, statsUid=-1
+01-25 07:18:27.780 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.794 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.807 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.821 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.835 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.849 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.863 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.877 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.891 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.904 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.918 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.932 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.946 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.954  1461  1515 I AppsFilter: interaction: PackageSetting{55500e6 com.meta.spatial.samples.customcomponentsstarter/10071} -> PackageSetting{4c45178 com.oculus.identitymanagement.service/10096} BLOCKED
+01-25 07:18:27.954  1461  1515 I AppsFilter: interaction: PackageSetting{edaf39b com.byroncoughlin.vr_construction_quest/10162} -> PackageSetting{4c45178 com.oculus.identitymanagement.service/10096} BLOCKED
+01-25 07:18:27.960 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.968  1461  1560 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS
+01-25 07:18:27.968  2097  2097 V MediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+01-25 07:18:27.968  1461  1488 W Searchables: No global search activity found
+01-25 07:18:27.970  1461  1697 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10011; state: DISABLED
+01-25 07:18:27.970  1461  1697 D CompatibilityChangeReporter: Compat change id reported: 177438394; UID 10011; state: DISABLED
+01-25 07:18:27.970  1461  1697 D CompatibilityChangeReporter: Compat change id reported: 135772972; UID 10011; state: DISABLED
+01-25 07:18:27.970  1461  1549 I RoleService: Granting default roles...
+01-25 07:18:27.970  1461  1697 D CompatibilityChangeReporter: Compat change id reported: 135754954; UID 10011; state: ENABLED
+01-25 07:18:27.971  1461  1490 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10011; state: ENABLED
+01-25 07:18:27.971   948   948 I stub_zygote: forwarding request 17
+01-25 07:18:27.971   948   948 I stub_zygote: --runtime-args
+01-25 07:18:27.971   948   948 I stub_zygote: --setu[..] to partition, index=0, pid=952, socket=zygote
+01-25 07:18:27.972   952   952 D Zygote  : zygote client update, added fd=8
+01-25 07:18:27.974  1461  1488 W VoiceInteractionManager: no available voice recognition services found for user 0
+01-25 07:18:27.974 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.974  3052 12159 D UserAccountCapabilitiesQueryWorker: UserAccountApplicationGroupingCapabilitesQueryResponse onSuccess
+01-25 07:18:27.975  3052 12159 D WorkerLoggerHelper: log success for user_account_application_grouping_capabilities_query_worker
+01-25 07:18:27.976  3052  3232 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=b9092b79-2f2a-49a3-8f22-aba7920ccb82, tags={ com.oculus.identitymanagement.service.workers.UserAccountApplicationGroupingCapabilitiesQueryWorker } ]
+01-25 07:18:27.977  3052  3232 I WM-WorkerWrapper: Setting status to enqueued for 523f386b-7a4d-439e-a019-26041c34bf8e
+01-25 07:18:27.978  1461  3408 I ActivityManager: Removed pending bringup for ServiceRecord{46cf2db u0 com.oculus.identitymanagement.service/androidx.work.impl.background.systemjob.SystemJobService} due to service being unbound
+01-25 07:18:27.986   952   952 D Zygote  : Forked child process 12163
+01-25 07:18:27.988   952   952 D Zygote  : zygote client update, removed fd=8
+01-25 07:18:27.988   948   948 I stub_zygote: zygote partition wrote back 5 bytes, index=0, pid=952
+01-25 07:18:27.989  1461  1490 I ActivityManager: Start proc 12163:com.android.permissioncontroller/u0a11 for service {com.android.permissioncontroller/com.android.permissioncontroller.permission.service.PermissionControllerServiceImpl}
+01-25 07:18:27.989 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:27.992  3052 12170 I SyncPreferencesStoreWorker: caching com.oculus.capability.social.all = true
+01-25 07:18:27.993  3052 12170 I SyncPreferencesStoreWorker: caching com.oculus.capability.system.sideloaded_app = true
+01-25 07:18:27.994  3052 12170 I SyncPreferencesStoreWorker: caching com.oculus.capability.system.oculus_link = true
+01-25 07:18:27.994  3052 12170 D WorkerLoggerHelper: log success for sync_preference_store_worker
+01-25 07:18:27.995  3052  3232 I WM-WorkerWrapper: Worker result SUCCESS for Work [ id=523f386b-7a4d-439e-a019-26041c34bf8e, tags={ com.oculus.identitymanagement.service.workers.SyncPreferencesStoreWorker } ]
+01-25 07:18:27.997 12163 12163 I ssioncontroller: Using CollectorTypeCC GC.
+01-25 07:18:27.999  1461  3007 I ActivityManager: Removed pending bringup for ServiceRecord{6b4c3b9 u0 com.oculus.identitymanagement.service/androidx.work.impl.background.systemjob.SystemJobService} due to service being unbound
+01-25 07:18:28.002 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.006     0     0 I binder  : 12163:12163 ioctl 40046210 7ffe58d110 returned -22
+01-25 07:18:28.010  1461  3408 D CompatibilityChangeReporter: Compat change id reported: 168419799; UID 10011; state: DISABLED
+01-25 07:18:28.010  1461  3408 D CompatibilityChangeReporter: Compat change id reported: 273564678; UID 10011; state: DISABLED
+01-25 07:18:28.012  1461  1534 D CompatibilityChangeReporter: Compat change id reported: 265195908; UID 10011; state: ENABLED
+01-25 07:18:28.013 12163 12163 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10011; state: ENABLED
+01-25 07:18:28.013 12163 12163 D CompatibilityChangeReporter: Compat change id reported: 242716250; UID 10011; state: ENABLED
+01-25 07:18:28.014  1461  3408 D CompatibilityChangeReporter: Compat change id reported: 170503758; UID 10011; state: ENABLED
+01-25 07:18:28.016 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.016 12163 12163 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+01-25 07:18:28.016 12163 12163 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+01-25 07:18:28.017 12163 12163 D nativeloader: Configuring clns-shared-6 for other apk /system/framework/org.apache.http.legacy.jar. target_sdk_version=34, uses_libraries=ALL, library_path=/apex/com.android.permission/priv-app/PermissionController@UP1A.231005.007.A1/lib/arm64:/system/lib64:/system_ext/lib64:/product/lib64:/apex/com.meta.xr/priv-app/VrDriver/VrDriver.apk!/lib/null, permitted_path=/data:/mnt/expand:/data/user_de/0/com.android.permissioncontroller:/apex/com.android.permission/priv-app/PermissionController@UP1A.231005.007.A1:/system/lib64:/system_ext/lib64:/product/lib64
+01-25 07:18:28.017 12163 12163 D nativeloader: Extending system_exposed_libraries: libhzos.meta.so:libhzos_featurejournal.meta.so:libhzos_reportstatsevent.meta.so:libhzos_trackedinput.meta.so:libhzos_trackingclient.meta.so:libaudiotapper.oculus.so:libcalibrationmanager.oculus.so:libheadtracker.oculus.so:libinstsamp.oculus.so:libossdk.oculus.so:libparfait.oculus.so:libripcclient.oculus.so:libripcmanager.oculus.so:libsystemsensoraccess.oculus.so:libappsensoraccess.oculus.so:libOVRMrcLib.oculus.so:libxrstreaminghost.oculus.so
+01-25 07:18:28.022 12163 12163 D nativeloader: Configuring clns-shared-7 for other apk /apex/com.android.permission/priv-app/PermissionController@UP1A.231005.007.A1/PermissionController.apk. target_sdk_version=34, uses_libraries=, library_path=/apex/com.android.permission/priv-app/PermissionController@UP1A.231005.007.A1/lib/arm64:/system/lib64:/system_ext/lib64:/product/lib64:/apex/com.meta.xr/priv-app/VrDriver/VrDriver.apk!/lib/null, permitted_path=/data:/mnt/expand:/data/user_de/0/com.android.permissioncontroller:/apex/com.android.permission/priv-app/PermissionController@UP1A.231005.007.A1:/system/lib64:/system_ext/lib64:/product/lib64
+01-25 07:18:28.024 12163 12163 D nativeloader: InitApexLibraries:
+01-25 07:18:28.024 12163 12163 D nativeloader:   com_android_adservices: libhpke_jni.so:libtflite_support_classifiers_native.so
+01-25 07:18:28.024 12163 12163 D nativeloader:   com_android_appsearch: libicing.so
+01-25 07:18:28.024 12163 12163 D nativeloader:   com_android_art: libartservice.so
+01-25 07:18:28.024 12163 12163 D nativeloader:   com_android_btservices: libbluetooth_jni.so
+01-25 07:18:28.024 12163 12163 D nativeloader:   com_android_conscrypt: libjavacrypto.so
+01-25 07:18:28.024 12163 12163 D nativeloader:   com_android_extservices: libhpke_jni.so:libtflite_support_classifiers_native.so
+01-25 07:18:28.024 12163 12163 D nativeloader:   com_android_os_statsd: libstats_jni.so
+01-25 07:18:28.024 12163 12163 D nativeloader:   com_android_tethering: libcronet.114.0.5735.84.so:libframework-connectivity-jni.so:libframework-connectivity-tiramisu-jni.so:libandroid_net_connectivity_com_android_net_module_util_jni.so:libservice-connectivity.so
+01-25 07:18:28.024 12163 12163 D nativeloader:   com_android_uwb: libuwb_uci_jni_rust.so
+01-25 07:18:28.024 12163 12163 D nativeloader:   com_android_virt: libvirtualizationservice_jni.so:libvirtualmachine_jni.so
+01-25 07:18:28.024 12163 12163 D nativeloader:   com_meta_xr: libmrservice_plugin.so
+01-25 07:18:28.028 12163 12163 V GraphicsEnvironment: Lazy GPU memory allocation for 'com.android.permissioncontroller': false
+01-25 07:18:28.028 12163 12163 V GraphicsEnvironment: Currently set values for:
+01-25 07:18:28.028 12163 12163 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[com.oculus.sdk.vrcubeworldvk, com.oculus.systemdriver, com.oculus.vrshell]
+01-25 07:18:28.028 12163 12163 V GraphicsEnvironment:   angle_gl_driver_selection_values=[angle, angle, angle]
+01-25 07:18:28.028 12163 12163 V GraphicsEnvironment: ANGLE GameManagerService for com.android.permissioncontroller: false
+01-25 07:18:28.028 12163 12163 V GraphicsEnvironment: com.android.permissioncontroller is not listed in per-application setting
+01-25 07:18:28.028 12163 12163 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+01-25 07:18:28.029 12163 12163 D CompatibilityChangeReporter: Compat change id reported: 175409949; UID 10011; state: DISABLED
+01-25 07:18:28.030 12163 12163 D CompatibilityChangeReporter: Compat change id reported: 175409951; UID 10011; state: DISABLED
+01-25 07:18:28.030 12163 12163 D CompatibilityChangeReporter: Compat change id reported: 175409956; UID 10011; state: DISABLED
+01-25 07:18:28.030 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.030 12163 12163 D CompatibilityChangeReporter: Compat change id reported: 175409950; UID 10011; state: DISABLED
+01-25 07:18:28.030 12163 12163 D CompatibilityChangeReporter: Compat change id reported: 175409952; UID 10011; state: DISABLED
+01-25 07:18:28.031 12163 12190 I carui   : CarUi plugin is disabled
+01-25 07:18:28.036 12163 12163 W Role    : Cannot get ApplicationInfo for default holder: com.android.messaging
+01-25 07:18:28.040  1461  3433 I ActivityManager: Flag disabled. Ignoring finishAttachApplication from uid: 10011. pid: 12163
+01-25 07:18:28.042 12163 12186 I PermissionControllerServiceImpl: Updating user sensitive for uid 10096
+01-25 07:18:28.044 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.046 12163 12191 W Role    : Cannot get ApplicationInfo for default holder: com.android.messaging
+01-25 07:18:28.058 11986 12018 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.059 12163 12191 W Role    : Cannot get ApplicationInfo for default holder: com.android.contacts
+01-25 07:18:28.060 12163 12191 W Role    : Cannot get ApplicationInfo for default holder: com.android.settings.intelligence
+01-25 07:18:28.072 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.085 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.099 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.104 12163 12191 W Role    : Cannot get ApplicationInfo for default holder: com.android.gallery3d
+01-25 07:18:28.113 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.126 12163 12191 W Role    : Cannot get ApplicationInfo for default holder: com.oculus.globalsearch
+01-25 07:18:28.127 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.128 12163 12191 W Role    : Cannot get ApplicationInfo for default holder: com.oculus.globalsearch
+01-25 07:18:28.141 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.146 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.accessibility:86c8c709964343f9d803ba4575980b96eec28f9b0ffe579dbbeb82a01c46b110
+01-25 07:18:28.152 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.captis:1bb431fa295ebc9b81ec533685ba9b36f11a942d2c48b944703822740eac8337
+01-25 07:18:28.153 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.panelapp.settings:dc2f834e3c1942378b14f076c82cd1ab59ea6566bff4730b2047e98efc9f9daf
+01-25 07:18:28.154 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.captis:1bb431fa295ebc9b81ec533685ba9b36f11a942d2c48b944703822740eac8337
+01-25 07:18:28.155 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.panelapp.settings:dc2f834e3c1942378b14f076c82cd1ab59ea6566bff4730b2047e98efc9f9daf
+01-25 07:18:28.155 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.157 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.captis:1bb431fa295ebc9b81ec533685ba9b36f11a942d2c48b944703822740eac8337
+01-25 07:18:28.157 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.panelapp.settings:dc2f834e3c1942378b14f076c82cd1ab59ea6566bff4730b2047e98efc9f9daf
+01-25 07:18:28.159 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.captis:1bb431fa295ebc9b81ec533685ba9b36f11a942d2c48b944703822740eac8337
+01-25 07:18:28.159 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.panelapp.settings:dc2f834e3c1942378b14f076c82cd1ab59ea6566bff4730b2047e98efc9f9daf
+01-25 07:18:28.160 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.captis:1bb431fa295ebc9b81ec533685ba9b36f11a942d2c48b944703822740eac8337
+01-25 07:18:28.161 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.panelapp.settings:dc2f834e3c1942378b14f076c82cd1ab59ea6566bff4730b2047e98efc9f9daf
+01-25 07:18:28.162 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.captis:1bb431fa295ebc9b81ec533685ba9b36f11a942d2c48b944703822740eac8337
+01-25 07:18:28.162 12163 12191 W Role    : Default holder doesn't have required signing certificate: com.oculus.panelapp.settings:dc2f834e3c1942378b14f076c82cd1ab59ea6566bff4730b2047e98efc9f9daf
+01-25 07:18:28.168 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.182 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.187 12163 12191 W Role    : Cannot get ApplicationInfo for default holder: com.android.systemui
+01-25 07:18:28.189 12163 12191 W Role    : Cannot get ApplicationInfo for default holder: com.oculus.globalsearch
+01-25 07:18:28.190 12163 12191 W Role    : Cannot get ApplicationInfo for default holder: com.oculus.globalsearch
+01-25 07:18:28.192 12163 12191 W Role    : Cannot get ApplicationInfo for default holder: com.oculus.globalsearch
+01-25 07:18:28.193 12163 12191 W Role    : Cannot get ApplicationInfo for default holder: com.oculus.globalsearch
+01-25 07:18:28.196 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.210 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.224 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.239 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32
+01-25 07:18:28.249     0     0 I logd    : logdr: UID=2000 GID=2000 PID=12200 n tail=0 logMask=10099 pid=0 start=0ns deadline=0ns
+01-25 07:18:28.252 11986 12017 W HorizonStandalone: Renderer: 'updateBegin(frameContext)' = (Result)ErrorNotReady -32

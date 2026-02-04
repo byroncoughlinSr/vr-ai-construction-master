@@ -1,0 +1,11 @@
+01-26 12:47:50.294  1451  1479 I ActivityManager: Start proc 22153:com.byroncoughlin.vr_construction_quest/u0a162 for next-top-activity {com.byroncoughlin.vr_construction_quest/com.byroncoughlin.vr_construction_quest.ImmersiveActivity}
+01-26 12:47:50.300     0     0 I binder  : 22153:22153 ioctl 40046210 7fca4c8420 returned -22
+01-26 12:47:50.777  1451  2448 I ActivityManager: Flag disabled. Ignoring finishAttachApplication from uid: 10162. pid: 22153
+01-26 12:47:51.332     0     0 I binder  : 22153:22264 ioctl 40046210 755a778734 returned -22
+01-26 12:47:51.335     0     0 I binder  : 22153:22264 ioctl 40046210 755a77a314 returned -22
+01-26 12:47:51.746  1451  1467 D VolumetricContentMonitor: Focused window changed to RunningWindowInfo{  pid: 22153, uid: 10162, userId: 0, windowContainerToken: 202467386, windowToken: android.view.IWindow$Stub$Proxy@8073ceb, windowId: com.android.server.wm.WindowState$WindowId@866ba48, displayId: 0, windowType: 1, activity: RunningActivityInfo { rootTask: 3, uid: 10162, pid: 22153, userId: 0, activity: com.byroncoughlin.vr_construction_quest.ImmersiveActivity, windowId: com.android.server.wm.WindowState$WindowId@866ba48, state: ACTIVITY_STATE_VISIBLE}}, from android.view.IWindow$Stub$Proxy@f2ea671
+01-26 12:48:14.911  1451  3379 I ActivityManager: Killing 22153:com.byroncoughlin.vr_construction_quest/u0a162 (adj 0): stop com.byroncoughlin.vr_construction_quest due to from pid 22517
+01-26 12:48:14.946  1451  2109 V ActivityManager: Got obituary of 22153:com.byroncoughlin.vr_construction_quest
+01-26 12:48:15.063  1451  1470 W ActivityManager: setHasOverlayUi called on unknown pid: 22153
+01-26 12:49:26.377  1451  1468 W DisplayManagerService: Failed to notify process 22153 that displays changed, assuming it died.
+01-26 12:49:26.377  1451  1468 D DisplayManagerService: Drop pending events for dead process 22153

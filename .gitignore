@@ -281,3 +281,44 @@ alembic/versions/*.pyc
 # Temporary files
 *.tmp
 *.bak
+=======
+# Built artifacts
+/build
+/*/build
+*.iml
+*.apk
+*.aar
+
+# Gradle
+.gradle
+gradlew
+gradlew.bat
+gradle/wrapper/gradle-wrapper.jar
+/local.properties
+.externalNativeBuild
+.cxx
+
+# IDE - Android Studio / IntelliJ
+.idea/caches
+.idea/libraries
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/modules
+.idea/deploymentTargetDropDown.xml
+*.iws
+*.ipr
+out/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# NDK
+obj/
+libs/
+
+# Generated source files
+/app/src/main/generated/
+
