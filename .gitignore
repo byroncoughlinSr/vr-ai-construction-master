@@ -218,6 +218,9 @@ pids
 # dotenv environment variables file
 .env.local
 
+# local properties
+local.properties
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
