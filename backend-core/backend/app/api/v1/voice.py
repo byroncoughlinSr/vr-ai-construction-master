@@ -239,7 +239,9 @@ async def generate_image_from_prompt(text: str, project_id: Optional[int] = None
         )
 
         if result["success"]:
-            logger.info(f"✅ Image generated: {result['image_url']}")
+            # Get the first (and typically only) image from the results
+            first_image = result["images"][0]
+            logger.info(f"✅ Image generated: {first_image['image_url']}")
 
             # Send completion message to WebSocket clients
             if room_id and user_id:
@@ -249,8 +251,9 @@ async def generate_image_from_prompt(text: str, project_id: Optional[int] = None
                 "success": True,
                 "type": "image_generated",
                 "generation_id": generation_id,
-                "image_url": result["image_url"],
-                "image_data": result.get("image_data"),  # Base64 for immediate display
+                "image_url": first_image["image_url"],
+                "image_data": first_image.get("image_data"),  # Base64 for immediate display
+                "filename": first_image.get("filename"),
                 "message": f"Generated image from: {text}",
                 "metadata": result["metadata"]
             }

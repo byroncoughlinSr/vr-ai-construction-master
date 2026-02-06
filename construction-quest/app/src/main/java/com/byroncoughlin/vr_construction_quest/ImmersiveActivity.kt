@@ -30,6 +30,8 @@ import com.meta.spatial.runtime.NetworkedAssetLoader
 import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.AvatarAttachment
 import com.meta.spatial.toolkit.Controller
+import com.meta.spatial.toolkit.Followable
+import com.meta.spatial.toolkit.FollowableType
 import com.meta.spatial.toolkit.Grabbable
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
@@ -42,8 +44,11 @@ import com.meta.spatial.vr.VRFeature
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -62,10 +67,17 @@ data class ControllerState(
 )
 
 class ImmersiveActivity : AppSystemActivity() {
-    private val activityScope = CoroutineScope(Dispatchers.Main)
+    private val activityJob = Job()
+    private val activityScope = CoroutineScope(Dispatchers.Main + activityJob)
     private val nativeEntities = mutableMapOf<Int, Entity>()
     private var voiceController: VoiceController? = null
-    private val httpClient = OkHttpClient()
+    
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(60, TimeUnit.SECONDS)
+        .readTimeout(900, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .build()
+
     private var currentMaterial = "Wood"
     private var isRecording = false
     private var broadcastReceiver: BroadcastReceiver? = null
@@ -152,15 +164,15 @@ class ImmersiveActivity : AppSystemActivity() {
     fun onNativePostAudio(audioData: ShortArray, sampleRate: Int) {
         Log.i(TAG, "🎙️ onNativePostAudio: Received ${audioData.size} samples at $sampleRate Hz")
 
-        val byteBuffer = ByteBuffer.allocate(audioData.size * 2).order(ByteOrder.LITTLE_ENDIAN)
-        for (sample in audioData) {
-            byteBuffer.putShort(sample)
-        }
-        val pcmBytes = byteBuffer.array()
-        val wavBytes = createWavHeader(pcmBytes, sampleRate)
-
         activityScope.launch(Dispatchers.IO) {
             try {
+                val byteBuffer = ByteBuffer.allocate(audioData.size * 2).order(ByteOrder.LITTLE_ENDIAN)
+                for (sample in audioData) {
+                    byteBuffer.putShort(sample)
+                }
+                val pcmBytes = byteBuffer.array()
+                val wavBytes = createWavHeader(pcmBytes, sampleRate)
+
                 val requestBody = MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
                     .addFormDataPart(
@@ -169,10 +181,11 @@ class ImmersiveActivity : AppSystemActivity() {
                         wavBytes.toRequestBody("audio/wav".toMediaType())
                     )
                     .addFormDataPart("sample_rate", sampleRate.toString())
+                    .addFormDataPart("auto_generate", "true")
                     .build()
 
                 val request = Request.Builder()
-                    .url("$SERVER_URL/api/v1/voice/transcribe")
+                    .url("$SERVER_URL/api/v1/voice/voice-to-image")
                     .post(requestBody)
                     .build()
 
@@ -181,7 +194,8 @@ class ImmersiveActivity : AppSystemActivity() {
                         val body = response.body?.string()
                         Log.i(TAG, "🎙️ Server Response: $body")
                     } else {
-                        Log.e(TAG, "🎙️ Server Error: ${response.code}")
+                        val errorBody = response.body?.string()
+                        Log.e(TAG, "🎙️ Server Error: ${response.code} - $errorBody")
                     }
                 }
             } catch (e: Exception) {
@@ -196,22 +210,22 @@ class ImmersiveActivity : AppSystemActivity() {
         val totalAudioLen = totalDataLen + 36
         val byteRate = sampleRate * 2
 
-        header[0] = 'R'.toByte() // RIFF
-        header[1] = 'I'.toByte()
-        header[2] = 'F'.toByte()
-        header[3] = 'F'.toByte()
+        header[0] = 'R'.code.toByte() // RIFF
+        header[1] = 'I'.code.toByte()
+        header[2] = 'F'.code.toByte()
+        header[3] = 'F'.code.toByte()
         header[4] = (totalAudioLen and 0xff).toByte()
         header[5] = (totalAudioLen shr 8 and 0xff).toByte()
         header[6] = (totalAudioLen shr 16 and 0xff).toByte()
         header[7] = (totalAudioLen shr 24 and 0xff).toByte()
-        header[8] = 'W'.toByte() // WAVE
-        header[9] = 'A'.toByte()
-        header[10] = 'V'.toByte()
-        header[11] = 'E'.toByte()
-        header[12] = 'f'.toByte() // fmt
-        header[13] = 'm'.toByte()
-        header[14] = 't'.toByte()
-        header[15] = ' '.toByte()
+        header[8] = 'W'.code.toByte() // WAVE
+        header[9] = 'A'.code.toByte()
+        header[10] = 'V'.code.toByte()
+        header[11] = 'E'.code.toByte()
+        header[12] = 'f'.code.toByte() // fmt
+        header[13] = 'm'.code.toByte()
+        header[14] = 't'.code.toByte()
+        header[15] = ' '.code.toByte()
         header[16] = 16 // size of fmt chunk
         header[17] = 0
         header[18] = 0
@@ -232,10 +246,10 @@ class ImmersiveActivity : AppSystemActivity() {
         header[33] = 0
         header[34] = 16 // bits per sample
         header[35] = 0
-        header[36] = 'd'.toByte() // data
-        header[37] = 'a'.toByte()
-        header[38] = 't'.toByte()
-        header[39] = 'a'.toByte()
+        header[36] = 'd'.code.toByte() // data
+        header[37] = 'a'.code.toByte()
+        header[38] = 't'.code.toByte()
+        header[39] = 'a'.code.toByte()
         header[40] = (totalDataLen and 0xff).toByte()
         header[41] = (totalDataLen shr 8 and 0xff).toByte()
         header[42] = (totalDataLen shr 16 and 0xff).toByte()
@@ -300,6 +314,7 @@ class ImmersiveActivity : AppSystemActivity() {
         if (isRecording) voiceController?.stopRecording()
         broadcastReceiver?.let { unregisterReceiver(it) }
         nativeEntities.values.forEach { it.destroy() }
+        activityJob.cancel()
         super.onDestroy()
     }
 
@@ -357,7 +372,7 @@ class ImmersiveActivity : AppSystemActivity() {
                     processLeftController(leftState)
                 } else {
                     updateControllerState(rightState, transform.transform, buttons)
-                    processRightController(rightState)
+                    processRightController(rightState, entity)
                 }
             }
         }
@@ -377,13 +392,13 @@ class ImmersiveActivity : AppSystemActivity() {
             if (state.buttonX) handleDeletion(state.pose)
         }
 
-        private fun processRightController(state: ControllerState) {
-            handleVoiceInput(state)
+        private fun processRightController(state: ControllerState, controllerEntity: Entity) {
+            handleVoiceInput(state, controllerEntity)
             if (state.trigger) handlePlacement(state.pose)
             if (state.buttonB) handleDeletion(state.pose)
         }
 
-        private fun handleVoiceInput(state: ControllerState) {
+        private fun handleVoiceInput(state: ControllerState, controllerEntity: Entity) {
             val now = System.currentTimeMillis()
 
             if (state.buttonA) {
@@ -391,13 +406,13 @@ class ImmersiveActivity : AppSystemActivity() {
                 if (!isRecording) {
                     isRecording = true
                     voiceController?.startRecording()
-                    showVoiceIndicator(state.pose, true)
+                    showVoiceIndicator(controllerEntity, state.pose, true)
                 }
             } else {
                 if (isRecording && (now - buttonADebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
                     isRecording = false
                     voiceController?.stopRecording()
-                    showVoiceIndicator(state.pose, false)
+                    showVoiceIndicator(null, state.pose, false)
                 }
             }
 
@@ -523,24 +538,37 @@ class ImmersiveActivity : AppSystemActivity() {
         }
     }
 
-    private fun showVoiceIndicator(pose: Pose, show: Boolean) {
+    private fun showVoiceIndicator(controllerEntity: Entity?, pose: Pose, show: Boolean) {
         if (show) {
+            if (voiceIndicator != null) return
             Log.i(TAG, "🔴 Creating voice indicator")
-            voiceIndicator = Entity.create()
+            val entity = Entity.create()
+            voiceIndicator = entity
 
-            voiceIndicator?.setComponent(Sphere(0.15f))
+            entity.setComponent(Sphere(0.05f))
 
-            val indicatorPose = pose * Pose(t = Vector3(0f, 0.3f, -0.6f))
+            val offsetPose = Pose(t = Vector3(0f, 0.15f, 0.2f))
+            
+            // Initial placement
+            entity.setComponent(Transform(pose * offsetPose))
 
-            voiceIndicator?.setComponent(Transform(indicatorPose))
-            voiceIndicator?.setComponent(Scale(Vector3(1f, 1f, 1f)))
-            voiceIndicator?.setComponent(Mesh(mesh = "mesh://sphere".toUri()))
-            voiceIndicator?.setComponent(Material().apply {
-                baseColor = Color4(0f, 1f, 0f, 1f)
+            if (controllerEntity != null) {
+                entity.setComponent(Followable(
+                    target = controllerEntity,
+                    offset = offsetPose,
+                    type = FollowableType.FACE,
+                    active = true
+                ))
+            }
+
+            entity.setComponent(Scale(Vector3(1f, 1f, 1f)))
+            entity.setComponent(Mesh(mesh = "mesh://sphere".toUri()))
+            entity.setComponent(Material().apply {
+                baseColor = Color4(1f, 0f, 0f, 1f)
                 unlit = true
             })
-            voiceIndicator?.setComponent(Visible(true))
-            Log.i(TAG, "✅ Indicator displayed at ${indicatorPose.t}")
+            entity.setComponent(Visible(true))
+            Log.i(TAG, "✅ Indicator displayed. Following hand: ${controllerEntity != null}")
         } else {
             Log.i(TAG, "🔴 Destroying voice indicator")
             voiceIndicator?.destroy()
@@ -549,8 +577,7 @@ class ImmersiveActivity : AppSystemActivity() {
     }
 
     private fun updateVoiceIndicator(pose: Pose) {
-        val indicatorPose = pose * Pose(t = Vector3(0f, 0.3f, -0.6f))
-        voiceIndicator?.setComponent(Transform(indicatorPose))
+        // Automatically handled by Followable component
     }
 
     inner class VoiceController {
