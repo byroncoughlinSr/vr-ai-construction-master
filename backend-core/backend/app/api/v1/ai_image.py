@@ -4,8 +4,18 @@ from typing import Optional
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+import uuid
+import logging
+import asyncio
 
 from ...services import AIImageService
+from .websocket import (
+    send_image_progress_update,
+    complete_image_generation,
+    fail_image_generation
+)
+
+logger = logging.getLogger(__name__)
 
 # Rate limiter for AI endpoints
 limiter = Limiter(key_func=get_remote_address)
@@ -32,40 +42,68 @@ class ArchitecturalVisualizationRequest(BaseModel):
 
 
 @router.post("/generate")
-@limiter.limit("5/minute")  # 5 image generations per minute
 async def generate_image(request: ImageGenerationRequest, background_tasks: BackgroundTasks):
     """
     Generate an image using Stable Diffusion based on the provided prompt.
 
-    This endpoint generates images asynchronously and returns the result.
-    For large images or complex prompts, generation may take several seconds.
+    This endpoint returns immediately with a generation_id.
+    The actual generation happens in the background.
+    
+    Clients should connect to WebSocket endpoint /ws/image-progress/{generation_id}
+    BEFORE calling this endpoint to receive real-time progress updates.
     """
-    try:
-        result = await image_service.generate_image(
-            prompt=request.prompt,
-            negative_prompt=request.negative_prompt,
-            width=request.width,
-            height=request.height,
-            num_inference_steps=request.num_inference_steps,
-            guidance_scale=request.guidance_scale
-        )
-
-        if result["success"]:
-            return JSONResponse(
-                status_code=200,
-                content=result
+    # Generate unique ID for tracking this generation
+    generation_id = str(uuid.uuid4())
+    logger.info(f"Starting background image generation with ID: {generation_id}")
+    
+    # Define the background generation task
+    async def background_generation():
+        try:
+            logger.info(f"Background task started for generation {generation_id}")
+            
+            # Define progress callback to send updates via WebSocket
+            async def progress_callback(progress_data):
+                await send_image_progress_update(generation_id, progress_data)
+            
+            # Start generation with progress tracking
+            result = await image_service.generate_image(
+                prompt=request.prompt,
+                negative_prompt=request.negative_prompt,
+                width=request.width,
+                height=request.height,
+                num_inference_steps=request.num_inference_steps,
+                guidance_scale=request.guidance_scale,
+                progress_callback=progress_callback,
+                generation_id=generation_id
             )
-        else:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Image generation failed: {result.get('error', 'Unknown error')}"
-            )
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Image generation service error: {str(e)}"
-        )
+            # Notify completion or failure via WebSocket
+            if result["success"]:
+                await complete_image_generation(generation_id, result)
+                logger.info(f"Image generation {generation_id} completed successfully")
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                await fail_image_generation(generation_id, error_msg)
+                logger.error(f"Image generation {generation_id} failed: {error_msg}")
+
+        except Exception as e:
+            logger.error(f"Image generation {generation_id} error: {str(e)}")
+            await fail_image_generation(generation_id, str(e))
+    
+    # Create the task in the background using asyncio (fire-and-forget)
+    asyncio.create_task(background_generation())
+    
+    # Return immediately with generation_id
+    return JSONResponse(
+        status_code=202,  # Accepted - processing in background
+        content={
+            "success": True,
+            "generation_id": generation_id,
+            "status": "processing",
+            "message": "Image generation started. Connect to WebSocket for progress updates.",
+            "websocket_url": f"/api/v1/ws/image-progress/{generation_id}"
+        }
+    )
 
 
 @router.post("/architectural-visualization")
@@ -76,32 +114,61 @@ async def generate_architectural_visualization(
     """
     Generate an architectural visualization optimized for construction projects.
 
-    This endpoint creates professional architectural renderings with appropriate
-    lighting, perspective, and detail for construction planning.
+    This endpoint returns immediately with a generation_id.
+    The actual generation happens in the background.
+    
+    Clients should connect to WebSocket endpoint /ws/image-progress/{generation_id}
+    to receive real-time progress updates during generation.
     """
-    try:
-        result = await image_service.generate_architectural_visualization(
-            design_description=request.design_description,
-            style=request.style,
-            time_of_day=request.time_of_day
-        )
-
-        if result["success"]:
-            return JSONResponse(
-                status_code=200,
-                content=result
+    # Generate unique ID for tracking this generation
+    generation_id = str(uuid.uuid4())
+    logger.info(f"Starting background architectural visualization with ID: {generation_id}")
+    
+    # Define the background generation task
+    async def background_generation():
+        try:
+            logger.info(f"Background task started for architectural visualization {generation_id}")
+            
+            # Define progress callback to send updates via WebSocket
+            async def progress_callback(progress_data):
+                await send_image_progress_update(generation_id, progress_data)
+            
+            # Start generation with progress tracking
+            result = await image_service.generate_architectural_visualization(
+                design_description=request.design_description,
+                style=request.style,
+                time_of_day=request.time_of_day,
+                progress_callback=progress_callback,
+                generation_id=generation_id
             )
-        else:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Architectural visualization failed: {result.get('error', 'Unknown error')}"
-            )
 
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Architectural visualization service error: {str(e)}"
-        )
+            # Notify completion or failure via WebSocket
+            if result["success"]:
+                await complete_image_generation(generation_id, result)
+                logger.info(f"Architectural visualization {generation_id} completed successfully")
+            else:
+                error_msg = result.get('error', 'Unknown error')
+                await fail_image_generation(generation_id, error_msg)
+                logger.error(f"Architectural visualization {generation_id} failed: {error_msg}")
+
+        except Exception as e:
+            logger.error(f"Architectural visualization {generation_id} error: {str(e)}")
+            await fail_image_generation(generation_id, str(e))
+    
+    # Create the task in the background using asyncio (fire-and-forget)
+    asyncio.create_task(background_generation())
+    
+    # Return immediately with generation_id
+    return JSONResponse(
+        status_code=202,  # Accepted - processing in background
+        content={
+            "success": True,
+            "generation_id": generation_id,
+            "status": "processing",
+            "message": "Architectural visualization started. Connect to WebSocket for progress updates.",
+            "websocket_url": f"/api/v1/ws/image-progress/{generation_id}"
+        }
+    )
 
 
 @router.get("/status")

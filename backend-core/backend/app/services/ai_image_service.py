@@ -228,15 +228,21 @@ class AIImageService:
                     if progress_callback and generation_id:
                         try:
                             percentage = int((step / num_inference_steps) * 100)
-                            asyncio.create_task(
-                                progress_callback({
-                                    "generation_id": generation_id,
-                                    "step": step,
-                                    "total_steps": num_inference_steps,
-                                    "percentage": percentage,
-                                    "status": "generating"
-                                })
-                            )
+                            progress_data = {
+                                "generation_id": generation_id,
+                                "step": step,
+                                "total_steps": num_inference_steps,
+                                "percentage": percentage,
+                                "status": "generating"
+                            }
+                            
+                            # Get the running event loop and schedule the coroutine
+                            loop = asyncio.get_event_loop()
+                            if loop and loop.is_running():
+                                # Schedule the callback to run in the event loop
+                                asyncio.ensure_future(progress_callback(progress_data), loop=loop)
+                            else:
+                                logger.warning("No running event loop found for progress callback")
                         except Exception as e:
                             logger.warning(f"Failed to send progress update: {e}")
                 
@@ -329,7 +335,9 @@ class AIImageService:
         design_description: str,
         style: str = "modern",
         time_of_day: str = "day",
-        view_type: str = "exterior"
+        view_type: str = "exterior",
+        progress_callback: Optional[callable] = None,
+        generation_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate an architectural visualization with optimized prompts.
@@ -340,6 +348,8 @@ class AIImageService:
             style: Architectural style (modern, traditional, craftsman, etc.)
             time_of_day: Time of day for lighting (day, night, sunset, golden_hour)
             view_type: Type of view (exterior, interior, aerial, detail)
+            progress_callback: Optional callback for progress updates
+            generation_id: Optional ID for tracking
 
         Returns:
             Generated image data
@@ -371,7 +381,9 @@ class AIImageService:
             height=512,  # Landscape format for architecture
             num_inference_steps=50,  # High quality
             guidance_scale=8.0,  # Follow prompt closely
-            num_images=1
+            num_images=1,
+            progress_callback=progress_callback,
+            generation_id=generation_id
         )
     
     def build_architectural_prompt(

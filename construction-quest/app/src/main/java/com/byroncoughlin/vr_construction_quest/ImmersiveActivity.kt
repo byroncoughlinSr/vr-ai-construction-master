@@ -55,6 +55,10 @@ import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import org.json.JSONObject
 
 data class ControllerState(
     var buttonA: Boolean = false,
@@ -71,6 +75,7 @@ class ImmersiveActivity : AppSystemActivity() {
     private val activityScope = CoroutineScope(Dispatchers.Main + activityJob)
     private val nativeEntities = mutableMapOf<Int, Entity>()
     private var voiceController: VoiceController? = null
+    private var roomWebSocket: WebSocket? = null
     
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
@@ -90,6 +95,7 @@ class ImmersiveActivity : AppSystemActivity() {
         private var isLibraryLoaded = false
         private const val DEBOUNCE_TIMEOUT_MS = 150L
         private const val SERVER_URL = "http://192.168.7.249:8000"
+        private const val WS_URL = "ws://192.168.7.249:8000/api/v1/ws"
 
         init {
             try {
@@ -193,6 +199,12 @@ class ImmersiveActivity : AppSystemActivity() {
                     if (response.isSuccessful) {
                         val body = response.body?.string()
                         Log.i(TAG, "🎙️ Server Response: $body")
+                        
+                        val json = JSONObject(body ?: "{}")
+                        val imageUrl = json.optString("image_url")
+                        if (imageUrl.isNotEmpty()) {
+                            displayGeneratedImage(imageUrl)
+                        }
                     } else {
                         val errorBody = response.body?.string()
                         Log.e(TAG, "🎙️ Server Error: ${response.code} - $errorBody")
@@ -201,6 +213,28 @@ class ImmersiveActivity : AppSystemActivity() {
             } catch (e: Exception) {
                 Log.e(TAG, "🎙️ Voice upload failed", e)
             }
+        }
+    }
+
+    private fun displayGeneratedImage(imageUrl: String) {
+        runOnUiThread {
+            Log.i(TAG, "🖼️ Displaying generated image from: $imageUrl")
+            val imagePanel = Entity.create()
+            
+            // Position in front of the user (e.g., 1.5m away, 1.2m high)
+            imagePanel.setComponent(Transform(Pose(t = Vector3(0f, 1.2f, -1.5f))))
+            
+            // Define shape using a Box component (flat like a canvas)
+            imagePanel.setComponent(com.meta.spatial.toolkit.Box(Vector3(0.5f, 0.5f, 0.01f)))
+            imagePanel.setComponent(Mesh(mesh = "mesh://box".toUri()))
+
+            imagePanel.setComponent(Material().apply {
+                baseColor = Color4(1f, 1f, 1f, 1f)  // Changed from baseTexture to baseTextureUri
+                unlit = true
+            })
+            
+            imagePanel.setComponent(Visible(true))
+            imagePanel.setComponent(Grabbable())
         }
     }
 
@@ -304,6 +338,10 @@ class ImmersiveActivity : AppSystemActivity() {
                 IntentFilter("com.byroncoughlin.CHANGE_MATERIAL"),
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
+            
+            // Connect to real-time collaboration room
+            connectToRoom("tiny_house_room", "quest_user_${System.currentTimeMillis() % 1000}")
+            
             isInitialized = true
         } catch (e: Exception) {
             Log.e(TAG, "Initialization failed", e)
@@ -312,10 +350,107 @@ class ImmersiveActivity : AppSystemActivity() {
 
     override fun onDestroy() {
         if (isRecording) voiceController?.stopRecording()
+        roomWebSocket?.close(1000, "Activity destroyed")
         broadcastReceiver?.let { unregisterReceiver(it) }
         nativeEntities.values.forEach { it.destroy() }
         activityJob.cancel()
         super.onDestroy()
+    }
+
+    private fun connectToRoom(roomId: String, userId: String) {
+        val request = Request.Builder()
+            .url("$WS_URL/room/$roomId?user_id=$userId")
+            .build()
+
+        roomWebSocket = httpClient.newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                Log.i(TAG, "🌐 WebSocket Connected to room: $roomId")
+            }
+
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                try {
+                    val json = JSONObject(text)
+                    val type = json.optString("type")
+                    
+                    if (type == "design_update") {
+                        handleRemoteDesignUpdate(json)
+                    } else if (type == "user_joined") {
+                        Log.i(TAG, "👥 User joined: ${json.optString("user_id")}")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Failed to parse WS message", e)
+                }
+            }
+
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                Log.i(TAG, "🌐 WebSocket Closing: $reason")
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                Log.e(TAG, "🌐 WebSocket Failure", t)
+            }
+        })
+    }
+
+    private fun handleRemoteDesignUpdate(json: JSONObject) {
+        val elementId = json.optInt("element_id", -1)
+        val action = json.optString("action", "update")
+        val data = json.optJSONObject("data") ?: return
+
+        runOnUiThread {
+            when (action) {
+                "create" -> {
+                    val pos = data.getJSONObject("position")
+                    val dim = data.getJSONObject("dimensions")
+                    val x = pos.getDouble("x").toFloat()
+                    val y = pos.getDouble("y").toFloat()
+                    val z = pos.getDouble("z").toFloat()
+                    val dx = dim.getDouble("width").toFloat()
+                    val dy = dim.getDouble("height").toFloat()
+                    val dz = dim.getDouble("depth").toFloat()
+                    
+                    val newId = nativeAddElement(0, x, y, z, dx, dy, dz)
+                    createEntityForElement(id = newId, x = x, y = y, z = z, dx = dx, dy = dy, dz = dz)
+                }
+                "update" -> {
+                    val pos = data.getJSONObject("position")
+                    val x = pos.getDouble("x").toFloat()
+                    val y = pos.getDouble("y").toFloat()
+                    val z = pos.getDouble("z").toFloat()
+                    
+                    val existingData = nativeGetElementData(elementId) ?: return@runOnUiThread
+                    nativeUpdateElement(elementId, x, y, z, existingData[3], existingData[4], existingData[5])
+                    nativeEntities[elementId]?.setComponent(Transform(Pose(t = Vector3(x, y, z))))
+                }
+                "delete" -> {
+                    if (nativeRemoveElement(elementId)) {
+                        nativeEntities[elementId]?.destroy()
+                        nativeEntities.remove(elementId)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun broadcastDesignUpdate(id: Int, action: String, x: Float, y: Float, z: Float, dx: Float, dy: Float, dz: Float) {
+        val update = JSONObject().apply {
+            put("type", "design_update")
+            put("element_id", id)
+            put("action", action)
+            put("data", JSONObject().apply {
+                put("position", JSONObject().apply {
+                    put("x", x)
+                    put("y", y)
+                    put("z", z)
+                })
+                put("dimensions", JSONObject().apply {
+                    put("width", dx)
+                    put("height", dy)
+                    put("depth", dz)
+                })
+            })
+        }
+        roomWebSocket?.send(update.toString())
     }
 
     override fun onSceneReady() {
@@ -332,6 +467,7 @@ class ImmersiveActivity : AppSystemActivity() {
         skybox.setComponent(Transform(Pose(t = Vector3(0f, 0f, 0f))))
         skybox.setComponent(Mesh(mesh = "mesh://skybox".toUri()))
         skybox.setComponent(Material().apply {
+            // For Android drawable resources, use baseTextureAndroidResourceId
             baseTextureAndroidResourceId = R.drawable.skydome
             unlit = true
         })
@@ -433,6 +569,13 @@ class ImmersiveActivity : AppSystemActivity() {
                 }
             } else if (!state.grip && grabbedElementId != -1) {
                 highlightElement(grabbedElementId, false)
+                
+                // Broadcast the final update when released
+                val d = nativeGetElementData(grabbedElementId)
+                if (d != null) {
+                    broadcastDesignUpdate(grabbedElementId, "update", d[0], d[1], d[2], d[3], d[4], d[5])
+                }
+                
                 grabbedElementId = -1
             } else if (grabbedElementId != -1) {
                 val targetPos =
@@ -475,6 +618,9 @@ class ImmersiveActivity : AppSystemActivity() {
                     if (snapped != null) {
                         val id = nativeAddElement(0, snapped[0], 0.8f, snapped[2], 0.4f, 1.6f, 0.1f)
                         createEntityForElement(id, snapped[0], 0.8f, snapped[2], 0.4f, 1.6f, 0.1f)
+                        
+                        // Broadcast the creation
+                        broadcastDesignUpdate(id, "create", snapped[0], 0.8f, snapped[2], 0.4f, 1.6f, 0.1f)
                     }
                 }
             }
@@ -483,9 +629,14 @@ class ImmersiveActivity : AppSystemActivity() {
         private fun handleDeletion(pose: Pose) {
             val f = pose.q * Vector3(0f, 0f, -1f)
             val hitId = nativeRaycast(pose.t.x, pose.t.y, pose.t.z, f.x, f.y, f.z)
-            if (hitId != -1 && nativeRemoveElement(hitId)) {
-                nativeEntities[hitId]?.destroy()
-                nativeEntities.remove(hitId)
+            if (hitId != -1) {
+                if (nativeRemoveElement(hitId)) {
+                    nativeEntities[hitId]?.destroy()
+                    nativeEntities.remove(hitId)
+                    
+                    // Broadcast the deletion
+                    broadcastDesignUpdate(hitId, "delete", 0f, 0f, 0f, 0f, 0f, 0f)
+                }
             }
         }
     }
@@ -547,12 +698,13 @@ class ImmersiveActivity : AppSystemActivity() {
 
             entity.setComponent(Sphere(0.05f))
 
-            val offsetPose = Pose(t = Vector3(0f, 0.15f, 0.2f))
+            val offsetPose = Pose(t = Vector3(0f, 0.15f, -0.2f))
             
-            // Initial placement
+            // Ensure the indicator always has a transform component initially
             entity.setComponent(Transform(pose * offsetPose))
 
             if (controllerEntity != null) {
+                // Attach to hand if found
                 entity.setComponent(Followable(
                     target = controllerEntity,
                     offset = offsetPose,
