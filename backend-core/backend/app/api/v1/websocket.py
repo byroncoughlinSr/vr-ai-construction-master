@@ -394,50 +394,63 @@ async def image_progress_test_page(generation_id: str):
         <div id="messages"></div>
 
         <script>
-            const ws = new WebSocket('ws://localhost:8000/api/v1/ws/image-progress/{generation_id}');
+            let ws = null;
             const messages = document.getElementById('messages');
             const status = document.getElementById('status');
             const progressBar = document.getElementById('progressFill');
             const percentage = document.getElementById('percentage');
+            let currentGenerationId = '{generation_id}';
 
-            ws.onopen = function(event) {{
-                status.textContent = 'Connected to progress WebSocket for {generation_id}';
-                status.className = 'status';
-                addMessage('Connected to WebSocket');
-            }};
-
-            ws.onmessage = function(event) {{
-                const data = JSON.parse(event.data);
-                addMessage('Received: ' + JSON.stringify(data, null, 2));
-
-                if (data.type === 'progress') {{
-                    updateProgress(data.step, data.total_steps, data.percentage);
-                    status.textContent = `Generating image... Step ${{data.step}}/${{data.total_steps}}`;
-                    status.className = 'status generating';
-                }} else if (data.type === 'completed') {{
-                    updateProgress(data.result.metadata.steps, data.result.metadata.steps, 100);
-                    status.textContent = 'Image generation completed!';
-                    status.className = 'status completed';
-                    if (data.result.image_url) {{
-                        addMessage(`Image available at: ${{data.result.image_url}}`);
-                    }}
-                }} else if (data.type === 'error') {{
-                    status.textContent = `Generation failed: ${{data.error}}`;
-                    status.className = 'status failed';
+            function connectWebSocket(genId) {{
+                // Close existing connection if any
+                if (ws) {{
+                    ws.close();
                 }}
-            }};
 
-            ws.onclose = function(event) {{
-                status.textContent = 'WebSocket disconnected';
-                status.className = 'status failed';
-                addMessage('Disconnected from WebSocket');
-            }};
+                currentGenerationId = genId;
+                ws = new WebSocket(`ws://localhost:8000/api/v1/ws/image-progress/${{genId}}`);
 
-            ws.onerror = function(error) {{
-                status.textContent = 'WebSocket error';
-                status.className = 'status failed';
-                addMessage('WebSocket error: ' + error);
-            }};
+                ws.onopen = function(event) {{
+                    status.textContent = `Connected to progress WebSocket for ${{genId}}`;
+                    status.className = 'status';
+                    addMessage(`✅ Connected to WebSocket for generation ${{genId}}`);
+                }};
+
+                ws.onmessage = function(event) {{
+                    const data = JSON.parse(event.data);
+                    addMessage('Received: ' + JSON.stringify(data, null, 2));
+
+                    if (data.type === 'progress') {{
+                        updateProgress(data.step, data.total_steps, data.percentage);
+                        status.textContent = `Generating image... Step ${{data.step}}/${{data.total_steps}} (${{data.percentage}}%)`;
+                        status.className = 'status generating';
+                    }} else if (data.type === 'completed') {{
+                        updateProgress(data.result.metadata.steps, data.result.metadata.steps, 100);
+                        status.textContent = 'Image generation completed!';
+                        status.className = 'status completed';
+                        if (data.result.images && data.result.images[0]) {{
+                            addMessage(`✅ Image available at: ${{data.result.images[0].image_url}}`);
+                        }}
+                    }} else if (data.type === 'error') {{
+                        status.textContent = `Generation failed: ${{data.error}}`;
+                        status.className = 'status failed';
+                    }}
+                }};
+
+                ws.onclose = function(event) {{
+                    status.textContent = 'WebSocket disconnected';
+                    addMessage('Disconnected from WebSocket');
+                }};
+
+                ws.onerror = function(error) {{
+                    status.textContent = 'WebSocket error';
+                    status.className = 'status failed';
+                    addMessage('❌ WebSocket error: ' + error);
+                }};
+            }}
+
+            // Connect to initial generation ID from URL
+            connectWebSocket(currentGenerationId);
 
             function updateProgress(step, totalSteps, percent) {{
                 progressBar.style.width = percent + '%';
@@ -457,24 +470,35 @@ async def image_progress_test_page(generation_id: str):
 
             async function startGeneration() {{
                 try {{
-                    const response = await fetch('/api/v1/voice/prompt', {{
+                    addMessage('🚀 Starting image generation...');
+                    
+                    const response = await fetch('/api/v1/image/generate', {{
                         method: 'POST',
-                        body: new FormData() {{
-                            append('text', 'modern kitchen with island');
-                            append('prompt_type', 'image');
-                            append('room_id', 'test_room');
-                            append('user_id', 'test_user');
-                        }}
+                        headers: {{
+                            'Content-Type': 'application/json'
+                        }},
+                        body: JSON.stringify({{
+                            prompt: 'modern kitchen with island',
+                            width: 512,
+                            height: 512,
+                            num_inference_steps: 10,
+                            guidance_scale: 7.5
+                        }})
                     }});
 
                     if (response.ok) {{
                         const result = await response.json();
-                        addMessage('Generation started with ID: ' + result.generation_id);
+                        addMessage('✅ Generation started with ID: ' + result.generation_id);
+                        
+                        // Auto-connect to the new generation's WebSocket
+                        addMessage('🔌 Reconnecting to new generation WebSocket...');
+                        connectWebSocket(result.generation_id);
                     }} else {{
-                        addMessage('Failed to start generation: ' + response.status);
+                        const errorText = await response.text();
+                        addMessage('❌ Failed to start generation: ' + response.status + ' - ' + errorText);
                     }}
                 }} catch (error) {{
-                    addMessage('Error starting generation: ' + error.message);
+                    addMessage('❌ Error starting generation: ' + error.message);
                 }}
             }}
         </script>
@@ -498,6 +522,17 @@ async def image_progress_websocket(websocket: WebSocket, generation_id: str):
         progress_connections[generation_id] = []
     progress_connections[generation_id].append(websocket)
 
+    # Send connection confirmation immediately
+    try:
+        await websocket.send_json({
+            "type": "connected",
+            "generation_id": generation_id,
+            "timestamp": datetime.utcnow().isoformat(),
+            "message": "Connected to progress WebSocket"
+        })
+    except Exception as e:
+        logger.error(f"Failed to send connection confirmation: {e}")
+
     # Send current progress if generation is in progress
     if generation_id in image_generation_progress:
         try:
@@ -512,21 +547,28 @@ async def image_progress_websocket(websocket: WebSocket, generation_id: str):
 
     try:
         while True:
-            # Keep connection alive and wait for client messages (ping/pong)
+            # Keep connection alive and wait for client messages (ping/pong) with timeout
             try:
-                data = await websocket.receive_json()
+                # Wait for message with 30 second timeout
+                data = await asyncio.wait_for(websocket.receive_json(), timeout=30.0)
                 if data.get("type") == "ping":
                     await websocket.send_json({"type": "pong"})
-            except Exception:
-                # Client may not send messages, just keep connection alive
-                await asyncio.sleep(30)  # Ping every 30 seconds
+            except asyncio.TimeoutError:
+                # Send ping if no message received
                 try:
                     await websocket.send_json({"type": "ping"})
                 except Exception:
                     break
+            except WebSocketDisconnect:
+                break
+            except Exception as e:
+                logger.error(f"Error in WebSocket loop: {e}")
+                break
 
     except WebSocketDisconnect:
         pass
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
     finally:
         # Clean up connection
         if generation_id in progress_connections and websocket in progress_connections[generation_id]:
