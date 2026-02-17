@@ -8,13 +8,12 @@ import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Vector3
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
-import com.meta.spatial.toolkit.Scale
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.Visible
 
 /**
  * VR Progress Bar for Quest 2
- * 
+ *
  * Displays image generation progress as a 3D bar with:
  * - Background bar (gray)
  * - Fill bar (green, grows left to right)
@@ -35,7 +34,7 @@ class ProgressBar(
     private var backgroundBar: Entity? = null
     private var fillBar: Entity? = null
     private var textEntity: Entity? = null
-    
+
     private var currentProgress: Float = 0f
     private var isVisible: Boolean = false
 
@@ -64,7 +63,6 @@ class ProgressBar(
             setComponent(Material().apply {
                 baseColor = Color4(0.3f, 0.3f, 0.3f, 0.8f) // Dark gray, semi-transparent
                 unlit = true // Don't need lighting for UI
-                alphaMode = Material.AlphaMode.BLEND
             })
             setComponent(Visible(true))
         }
@@ -79,7 +77,6 @@ class ProgressBar(
             setComponent(Material().apply {
                 baseColor = Color4(0.2f, 0.8f, 0.3f, 1.0f) // Bright green
                 unlit = true
-                alphaMode = Material.AlphaMode.OPAQUE
             })
             setComponent(Visible(true))
         }
@@ -94,7 +91,7 @@ class ProgressBar(
         if (rootEntity == null) {
             create()
         }
-        
+
         rootEntity?.setComponent(Visible(true))
         isVisible = true
         Log.i(TAG, "👁️ Progress bar shown")
@@ -124,10 +121,10 @@ class ProgressBar(
 
         // Calculate fill bar dimensions
         val fillWidth = width * clampedProgress
-        
+
         // Position fill bar so it grows from left edge
         val fillOffset = -width / 2f + fillWidth / 2f
-        
+
         // Update fill bar transform and scale
         fillBar?.let { bar ->
             bar.setComponent(Transform(Pose(t = Vector3(fillOffset, 0f, depth / 2f + 0.001f))))
@@ -186,12 +183,12 @@ class ProgressBar(
         backgroundBar?.destroy()
         textEntity?.destroy()
         rootEntity?.destroy()
-        
+
         fillBar = null
         backgroundBar = null
         textEntity = null
         rootEntity = null
-        
+
         currentProgress = 0f
         isVisible = false
     }

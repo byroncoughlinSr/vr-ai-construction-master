@@ -13,6 +13,7 @@ import android.media.MediaRecorder
 import android.os.Bundle
 import android.os.Looper
 import android.util.Log
+import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -35,6 +36,7 @@ import com.meta.spatial.toolkit.FollowableType
 import com.meta.spatial.toolkit.Grabbable
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
+import com.meta.spatial.toolkit.Panel
 import com.meta.spatial.toolkit.PanelRegistration
 import com.meta.spatial.toolkit.Scale
 import com.meta.spatial.toolkit.Sphere
@@ -76,6 +78,15 @@ class ImmersiveActivity : AppSystemActivity() {
     private val nativeEntities = mutableMapOf<Int, Entity>()
     private var voiceController: VoiceController? = null
     private var roomWebSocket: WebSocket? = null
+    private var generationWebSocket: WebSocket? = null
+    private var progressBar: ProgressBar? = null
+    private var dashboardWebView: WebView? = null
+    private var dashboardPanelEntity: Entity? = null
+
+    private enum class VoiceState { IDLE, AWAITING_CONFIRMATION, GENERATING }
+    private var voiceState = VoiceState.IDLE
+    private var pendingTranscription = ""
+    private var pendingConfirmationText: String? = null
     
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
@@ -173,47 +184,298 @@ class ImmersiveActivity : AppSystemActivity() {
         activityScope.launch(Dispatchers.IO) {
             try {
                 val byteBuffer = ByteBuffer.allocate(audioData.size * 2).order(ByteOrder.LITTLE_ENDIAN)
-                for (sample in audioData) {
-                    byteBuffer.putShort(sample)
-                }
-                val pcmBytes = byteBuffer.array()
-                val wavBytes = createWavHeader(pcmBytes, sampleRate)
+                for (sample in audioData) byteBuffer.putShort(sample)
+                val wavBytes = createWavHeader(byteBuffer.array(), sampleRate)
 
-                val requestBody = MultipartBody.Builder()
+                // ── VR → BACKEND ─────────────────────────────────────────────
+                Log.i(TAG, "📤 Sending WAV to backend | size=${wavBytes.size} bytes | " +
+                    "samples=${audioData.size} | sampleRate=$sampleRate Hz | " +
+                    "url=$SERVER_URL/api/v1/voice/transcribe")
+
+                // Transcribe audio with Whisper — return text to VR for confirmation
+                val transcribeBody = MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
-                    .addFormDataPart(
-                        "audio_file",
-                        "voice.wav",
-                        wavBytes.toRequestBody("audio/wav".toMediaType())
-                    )
+                    .addFormDataPart("audio_file", "voice.wav", wavBytes.toRequestBody("audio/wav".toMediaType()))
                     .addFormDataPart("sample_rate", sampleRate.toString())
-                    .addFormDataPart("auto_generate", "true")
                     .build()
 
-                val request = Request.Builder()
-                    .url("$SERVER_URL/api/v1/voice/voice-to-image")
-                    .post(requestBody)
-                    .build()
-
-                httpClient.newCall(request).execute().use { response ->
+                var transcribedText = ""
+                httpClient.newCall(
+                    Request.Builder().url("$SERVER_URL/api/v1/voice/transcribe").post(transcribeBody).build()
+                ).execute().use { response ->
+                    // ── BACKEND → VR ──────────────────────────────────────────
+                    Log.i(TAG, "📨 Backend response | HTTP ${response.code}")
                     if (response.isSuccessful) {
-                        val body = response.body?.string()
-                        Log.i(TAG, "🎙️ Server Response: $body")
-                        
-                        val json = JSONObject(body ?: "{}")
-                        val imageUrl = json.optString("image_url")
-                        if (imageUrl.isNotEmpty()) {
-                            displayGeneratedImage(imageUrl)
-                        }
+                        val body = response.body?.string() ?: "{}"
+                        val json = JSONObject(body)
+                        transcribedText = json.optString("text")
+                        val lang     = json.optString("language", "?")
+                        val duration = json.optJSONObject("metadata")?.optDouble("duration", 0.0) ?: 0.0
+                        Log.i(TAG, "✅ Text received from backend | " +
+                            "text='$transcribedText' | lang=$lang | " +
+                            "duration=${"%.2f".format(duration)}s")
                     } else {
-                        val errorBody = response.body?.string()
-                        Log.e(TAG, "🎙️ Server Error: ${response.code} - $errorBody")
+                        Log.e(TAG, "❌ Transcription failed | HTTP ${response.code}")
                     }
                 }
+
+                if (transcribedText.isBlank()) {
+                    Log.w(TAG, "⚠️ Empty transcription, aborting")
+                    return@launch
+                }
+
+                // Show confirmation panel — user must confirm or retry before image is generated
+                runOnUiThread { showConfirmationPanel(transcribedText) }
+
             } catch (e: Exception) {
-                Log.e(TAG, "🎙️ Voice upload failed", e)
+                Log.e(TAG, "🎙️ Voice processing failed", e)
             }
         }
+    }
+
+    private fun connectGenerationWebSocket(generationId: String) {
+        generationWebSocket?.close(1000, "New generation started")
+
+        val request = Request.Builder()
+            .url("$WS_URL/image-progress/$generationId")
+            .build()
+
+        generationWebSocket = httpClient.newWebSocket(request, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                Log.i(TAG, "📡 Connected to generation WebSocket: $generationId")
+            }
+
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                try {
+                    val json = JSONObject(text)
+                    when (json.optString("type")) {
+                        "progress" -> {
+                            val percentage = json.optInt("percentage", 0)
+                            Log.i(TAG, "📊 Generation progress: $percentage%")
+                            runOnUiThread {
+                                progressBar?.setProgressPercentage(percentage)
+                            }
+                        }
+                        "completed" -> {
+                            Log.i(TAG, "✅ Generation completed!")
+                            val imageUrl = json.optJSONObject("result")
+                                ?.optJSONArray("images")
+                                ?.optJSONObject(0)
+                                ?.optString("image_url") ?: ""
+                            runOnUiThread {
+                                progressBar?.setProgressPercentage(100)
+                                progressBar?.setStateColor(ProgressBar.ProgressState.COMPLETE)
+                                android.os.Handler(Looper.getMainLooper()).postDelayed({
+                                    progressBar?.hide()
+                                    progressBar?.destroy()
+                                    progressBar = null
+                                    voiceState = VoiceState.IDLE
+                                    if (imageUrl.isNotEmpty()) {
+                                        displayGeneratedImage("$SERVER_URL$imageUrl")
+                                    }
+                                }, 1500)
+                            }
+                            webSocket.close(1000, "Generation completed")
+                        }
+                        "error" -> {
+                            val error = json.optString("error", "Unknown error")
+                            Log.e(TAG, "❌ Generation error: $error")
+                            runOnUiThread {
+                                progressBar?.setStateColor(ProgressBar.ProgressState.ERROR)
+                                android.os.Handler(Looper.getMainLooper()).postDelayed({
+                                    progressBar?.hide()
+                                    progressBar?.destroy()
+                                    progressBar = null
+                                    voiceState = VoiceState.IDLE
+                                }, 2000)
+                            }
+                            webSocket.close(1000, "Generation failed")
+                        }
+                        "ping" -> webSocket.send("""{"type":"pong"}""")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Failed to parse generation WebSocket message", e)
+                }
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                Log.e(TAG, "❌ Generation WebSocket failure", t)
+                runOnUiThread {
+                    progressBar?.setStateColor(ProgressBar.ProgressState.ERROR)
+                    progressBar?.hide()
+                    voiceState = VoiceState.IDLE
+                }
+            }
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                Log.i(TAG, "🔌 Generation WebSocket closed: $reason")
+            }
+        })
+    }
+
+    private fun showConfirmationPanel(text: String) {
+        pendingTranscription = text
+        voiceState = VoiceState.AWAITING_CONFIRMATION
+        pendingConfirmationText = text
+
+        val wv = dashboardWebView
+        if (wv != null) {
+            pendingConfirmationText = null
+            loadConfirmationHtml(text)
+            return
+        }
+
+        Log.w(TAG, "⚠️ dashboardWebView not ready — polling every 500ms | text='$text'")
+        pollForDashboardWebView()
+    }
+
+    private fun pollForDashboardWebView() {
+        val handler = android.os.Handler(Looper.getMainLooper())
+        var attempts = 0
+
+        fun poll() {
+            val text = pendingConfirmationText
+            if (text == null) {
+                Log.d(TAG, "🚫 Poll cancelled — pending text already cleared")
+                return
+            }
+            if (voiceState != VoiceState.AWAITING_CONFIRMATION) {
+                Log.d(TAG, "🚫 Poll cancelled — voice state changed to $voiceState")
+                return
+            }
+
+            val wv = dashboardWebView
+            if (wv != null) {
+                pendingConfirmationText = null
+                Log.i(TAG, "✅ Poll found dashboardWebView ready (attempt $attempts) — showing confirmation")
+                loadConfirmationHtml(text)
+                return
+            }
+
+            attempts++
+            if (attempts >= 20) {
+                Log.e(TAG, "❌ Timed out waiting for dashboardWebView after ${attempts * 500}ms — panel { } never fired. Check that panel entity is in scene and ui_example.xml is correct.")
+                voiceState = VoiceState.IDLE
+                pendingConfirmationText = null
+                return
+            }
+
+            Log.d(TAG, "⏳ Poll attempt $attempts — dashboardWebView still null, retrying in 500ms")
+            handler.postDelayed({ poll() }, 500)
+        }
+
+        handler.postDelayed({ poll() }, 500)
+    }
+
+    private fun loadConfirmationHtml(text: String) {
+        val safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+        val html = """
+            <!DOCTYPE html><html>
+            <body style="margin:0;padding:24px;background:#1A1A2E;color:white;
+                         font-family:sans-serif;display:flex;flex-direction:column;
+                         align-items:center;justify-content:center;height:100vh;box-sizing:border-box;">
+              <p style="color:#AAAAAA;font-size:20px;margin-bottom:12px;">Did you say?</p>
+              <p style="font-size:26px;padding:16px;background:#2A2A4E;border-radius:8px;
+                        width:100%;text-align:center;box-sizing:border-box;margin-bottom:32px;">$safe</p>
+              <div style="display:flex;gap:16px;width:100%;">
+                <button onclick="Android.retry()"
+                  style="flex:1;background:#B71C1C;color:white;font-size:22px;
+                         padding:14px;border:none;border-radius:8px;cursor:pointer;">Retry</button>
+                <button onclick="Android.confirm()"
+                  style="flex:1;background:#2E7D32;color:white;font-size:22px;
+                         padding:14px;border:none;border-radius:8px;cursor:pointer;">Confirm</button>
+              </div>
+            </body></html>
+        """.trimIndent()
+
+        dashboardWebView?.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+        Log.i(TAG, "📋 Confirmation HTML loaded into dashboard panel | text='$text'")
+    }
+
+    private fun loadIdleHtml(wv: WebView) {
+        val html = """
+            <!DOCTYPE html><html>
+            <body style="margin:0;padding:32px;background:#1A1A2E;color:white;
+                         font-family:sans-serif;display:flex;flex-direction:column;
+                         align-items:center;justify-content:center;height:100vh;box-sizing:border-box;">
+              <p style="font-size:28px;color:#64B5F6;margin-bottom:16px;">🏗️ Construction Quest</p>
+              <p style="font-size:20px;color:#AAAAAA;text-align:center;">
+                Hold <strong style="color:white;">A</strong> and speak to describe what you want to build.
+              </p>
+            </body></html>
+        """.trimIndent()
+        wv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+        Log.i(TAG, "🏠 Idle HTML loaded into dashboard panel")
+    }
+
+    private fun dismissConfirmationPanel() {
+        val wv = dashboardWebView ?: return
+        loadIdleHtml(wv)
+        Log.i(TAG, "📺 Panel returned to idle state after confirmation")
+    }
+
+    internal fun onConfirmTranscription() {
+        val text = pendingTranscription
+        Log.i(TAG, "✅ User confirmed: '$text'")
+        dismissConfirmationPanel()
+        voiceState = VoiceState.GENERATING
+
+        // Show progress bar and start image generation
+        if (progressBar == null) progressBar = ProgressBar(position = Vector3(0f, 1.5f, -1.0f))
+        progressBar?.reset()
+        progressBar?.setStateColor(ProgressBar.ProgressState.GENERATING)
+        progressBar?.show()
+
+        activityScope.launch(Dispatchers.IO) {
+            try {
+                val generateJson = JSONObject().apply {
+                    put("prompt", "$text, architectural rendering, photorealistic, detailed")
+                    put("num_inference_steps", 20)
+                    put("guidance_scale", 7.5)
+                    put("width", 512)
+                    put("height", 512)
+                }
+                val generateBody = generateJson.toString().toRequestBody("application/json".toMediaType())
+
+                var generationId = ""
+                httpClient.newCall(
+                    Request.Builder().url("$SERVER_URL/api/v1/image/generate").post(generateBody).build()
+                ).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val json = JSONObject(response.body?.string() ?: "{}")
+                        generationId = json.optString("generation_id")
+                        Log.i(TAG, "🎨 Generation started: $generationId")
+                    } else {
+                        Log.e(TAG, "❌ Failed to start generation: ${response.code}")
+                    }
+                }
+
+                if (generationId.isBlank()) {
+                    runOnUiThread {
+                        progressBar?.setStateColor(ProgressBar.ProgressState.ERROR)
+                        progressBar?.hide()
+                        voiceState = VoiceState.IDLE
+                    }
+                    return@launch
+                }
+
+                runOnUiThread { connectGenerationWebSocket(generationId) }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Image generation failed", e)
+                runOnUiThread {
+                    progressBar?.setStateColor(ProgressBar.ProgressState.ERROR)
+                    progressBar?.hide()
+                    voiceState = VoiceState.IDLE
+                }
+            }
+        }
+    }
+
+    internal fun onRetryTranscription() {
+        Log.i(TAG, "🔄 User retried — ready to record again")
+        dismissConfirmationPanel()
+        voiceState = VoiceState.IDLE
     }
 
     private fun displayGeneratedImage(imageUrl: String) {
@@ -351,6 +613,12 @@ class ImmersiveActivity : AppSystemActivity() {
     override fun onDestroy() {
         if (isRecording) voiceController?.stopRecording()
         roomWebSocket?.close(1000, "Activity destroyed")
+        generationWebSocket?.close(1000, "Activity destroyed")
+        progressBar?.destroy()
+        progressBar = null
+        dashboardPanelEntity?.destroy()
+        dashboardPanelEntity = null
+        dashboardWebView = null
         broadcastReceiver?.let { unregisterReceiver(it) }
         nativeEntities.values.forEach { it.destroy() }
         activityJob.cancel()
@@ -474,6 +742,16 @@ class ImmersiveActivity : AppSystemActivity() {
         skybox.setComponent(Visible(true))
 
         android.os.Handler(Looper.getMainLooper()).postDelayed({ setupInitialConstruction() }, 500)
+
+        // Create the dashboard panel entity programmatically so the panel { } callback fires.
+        // Scene-defined panel entities do NOT trigger panel { } — only Entity.create() does.
+        Log.i(TAG, "📺 Creating dashboard panel entity programmatically")
+        val panelEntity = Entity.create()
+        panelEntity.setComponent(Panel(R.layout.ui_example))
+        panelEntity.setComponent(Transform(Pose(t = Vector3(0.3f, 1.1f, -1.7f))))
+        panelEntity.setComponent(Visible(true))
+        dashboardPanelEntity = panelEntity
+        Log.i(TAG, "📺 Dashboard panel entity created: $panelEntity")
     }
 
     inner class ConstructionInputSystem : SystemBase() {
@@ -535,6 +813,9 @@ class ImmersiveActivity : AppSystemActivity() {
         }
 
         private fun handleVoiceInput(state: ControllerState, controllerEntity: Entity) {
+            // Block new recordings while the user is confirming or an image is generating
+            if (voiceState != VoiceState.IDLE) return
+
             val now = System.currentTimeMillis()
 
             if (state.buttonA) {
@@ -698,7 +979,7 @@ class ImmersiveActivity : AppSystemActivity() {
 
             entity.setComponent(Sphere(0.05f))
 
-            val offsetPose = Pose(t = Vector3(0f, 0.15f, -0.2f))
+            val offsetPose = Pose(t = Vector3(0f, 0.15f, 0.2f))
             
             // Ensure the indicator always has a transform component initially
             entity.setComponent(Transform(pose * offsetPose))
@@ -730,6 +1011,14 @@ class ImmersiveActivity : AppSystemActivity() {
 
     private fun updateVoiceIndicator(pose: Pose) {
         // Automatically handled by Followable component
+    }
+
+    inner class ConfirmationInterface {
+        @JavascriptInterface
+        fun confirm() = runOnUiThread { onConfirmTranscription() }
+
+        @JavascriptInterface
+        fun retry() = runOnUiThread { onRetryTranscription() }
     }
 
     inner class VoiceController {
@@ -829,9 +1118,28 @@ class ImmersiveActivity : AppSystemActivity() {
                     layoutDpi = 400
                 }
                 panel {
-                    rootView?.findViewById<WebView>(R.id.web_view)?.apply {
-                        settings.javaScriptEnabled = true
-                        loadUrl("http://192.168.7.249:9000")
+                    Log.i(TAG, "📺 Dashboard panel { } fired | rootView=${if (rootView != null) "OK" else "NULL"}")
+                    val wv = rootView?.findViewById<WebView>(R.id.web_view)
+                    Log.i(TAG, "📺 Dashboard WebView lookup | webView=${if (wv != null) "OK" else "NULL"}")
+                    if (wv == null) {
+                        Log.e(TAG, "❌ web_view not found in ui_example layout — check layout XML")
+                        return@panel
+                    }
+                    wv.visibility = android.view.View.VISIBLE
+                    wv.settings.javaScriptEnabled = true
+                    // JS interface enables Android.confirm() / Android.retry() from confirmation HTML
+                    wv.addJavascriptInterface(ConfirmationInterface(), "Android")
+                    dashboardWebView = wv
+                    Log.i(TAG, "✅ dashboardWebView assigned successfully")
+
+                    // If a voice command finished before the panel was ready, show it now
+                    val queued = pendingConfirmationText
+                    if (queued != null) {
+                        pendingConfirmationText = null
+                        Log.i(TAG, "📋 Panel now ready — displaying queued confirmation: '$queued'")
+                        loadConfirmationHtml(queued)
+                    } else {
+                        loadIdleHtml(wv)
                     }
                 }
             }
