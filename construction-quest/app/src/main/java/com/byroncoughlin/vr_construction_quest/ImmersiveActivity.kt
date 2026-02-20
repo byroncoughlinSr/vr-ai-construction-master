@@ -82,6 +82,7 @@ class ImmersiveActivity : AppSystemActivity() {
     private var progressBar: ProgressBar? = null
     private var dashboardWebView: WebView? = null
     private var dashboardPanelEntity: Entity? = null
+    private var webPanelEntity: Entity? = null
 
     private enum class VoiceState { IDLE, AWAITING_CONFIRMATION, GENERATING }
     private var voiceState = VoiceState.IDLE
@@ -752,6 +753,16 @@ class ImmersiveActivity : AppSystemActivity() {
         panelEntity.setComponent(Visible(true))
         dashboardPanelEntity = panelEntity
         Log.i(TAG, "📺 Dashboard panel entity created: $panelEntity")
+
+        // Create the Vue/Quasar web panel to the left of the speak panel.
+        // Speak panel is 1.2f wide centered at x=0.3f; place new panel 0.1f gap to its left.
+        Log.i(TAG, "🌐 Creating web panel entity programmatically")
+        val webPanelEntityLocal = Entity.create()
+        webPanelEntityLocal.setComponent(Panel(R.layout.web_panel))
+        webPanelEntityLocal.setComponent(Transform(Pose(t = Vector3(-1.1f, 1.1f, -1.7f))))
+        webPanelEntityLocal.setComponent(Visible(true))
+        webPanelEntity = webPanelEntityLocal
+        Log.i(TAG, "🌐 Web panel entity created: $webPanelEntityLocal")
     }
 
     inner class ConstructionInputSystem : SystemBase() {
@@ -1111,6 +1122,19 @@ class ImmersiveActivity : AppSystemActivity() {
 
     override fun registerPanels(): List<PanelRegistration> {
         return listOf(
+            PanelRegistration(R.layout.web_panel) {
+                config {
+                    width = 1.2f
+                    height = 0.8f
+                    layoutDpi = 400
+                }
+                panel {
+                    val wv = rootView?.findViewById<WebView>(R.id.web_view) ?: return@panel
+                    wv.settings.javaScriptEnabled = true
+                    wv.settings.domStorageEnabled = true
+                    wv.loadUrl("http://192.168.7.249:3000")
+                }
+            },
             PanelRegistration(R.layout.ui_example) {
                 config {
                     width = 1.2f

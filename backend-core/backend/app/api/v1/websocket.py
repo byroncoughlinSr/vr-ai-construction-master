@@ -104,6 +104,7 @@ manager = ConnectionManager()
 
 # Image generation progress tracking
 image_generation_progress: Dict[str, Dict[str, Any]] = {}  # generation_id -> progress data
+image_generation_completed: Dict[str, Dict[str, Any]] = {}  # generation_id -> completed result
 progress_connections: Dict[str, List[WebSocket]] = {}  # generation_id -> list of connections
 
 
@@ -533,7 +534,23 @@ async def image_progress_websocket(websocket: WebSocket, generation_id: str):
     except Exception as e:
         logger.error(f"Failed to send connection confirmation: {e}")
 
-    # Send current progress if generation is in progress
+    # If generation already completed before client connected, send result immediately and close
+    if generation_id in image_generation_completed:
+        logger.info(f"Generation {generation_id} already completed — sending result to late client")
+        try:
+            await websocket.send_json({
+                "type": "completed",
+                **image_generation_completed[generation_id]
+            })
+        except Exception as e:
+            logger.error(f"Failed to send late-connect completion: {e}")
+        finally:
+            if generation_id in progress_connections and websocket in progress_connections[generation_id]:
+                progress_connections[generation_id].remove(websocket)
+            await websocket.close()
+        return
+
+    # Send current progress if generation is still in progress
     if generation_id in image_generation_progress:
         try:
             await websocket.send_json({
@@ -609,16 +626,20 @@ async def send_image_progress_update(generation_id: str, progress_data: Dict[str
 async def complete_image_generation(generation_id: str, result: Dict[str, Any]):
     """
     Mark image generation as complete and send final result to clients.
+    Stores the result so late-connecting clients can still receive it.
     """
-    if generation_id in progress_connections:
-        # Send completion message
-        completion_data = {
-            "generation_id": generation_id,
-            "status": "completed",
-            "result": result,
-            "timestamp": datetime.utcnow().isoformat()
-        }
+    completion_data = {
+        "generation_id": generation_id,
+        "status": "completed",
+        "result": result,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
+    # Persist result for any clients that connect after completion
+    image_generation_completed[generation_id] = completion_data
+
+    # Send to any already-connected clients
+    if generation_id in progress_connections:
         disconnected = []
         for websocket in progress_connections[generation_id]:
             try:
@@ -630,14 +651,13 @@ async def complete_image_generation(generation_id: str, result: Dict[str, Any]):
                 logger.error(f"Failed to send completion message: {e}")
                 disconnected.append(websocket)
 
-        # Clean up
         for websocket in disconnected:
             if websocket in progress_connections[generation_id]:
                 progress_connections[generation_id].remove(websocket)
 
-        # Clean up progress data after completion
-        if generation_id in image_generation_progress:
-            del image_generation_progress[generation_id]
+    # Clean up in-progress tracking
+    if generation_id in image_generation_progress:
+        del image_generation_progress[generation_id]
 
 
 async def fail_image_generation(generation_id: str, error: str):
