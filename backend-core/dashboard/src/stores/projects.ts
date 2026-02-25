@@ -2,6 +2,58 @@ import { defineStore } from 'pinia'
 import { apiClient } from 'src/services/api'
 import type { Project, ProjectSummary } from 'src/types/models'
 
+// Shape returned by the backend /api/v1/projects/ endpoint
+interface BackendProject {
+  id: number
+  name: string
+  description: string
+  status: string
+  budget: number | null
+  estimated_cost: number
+  actual_cost: number | null
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+  start_date: string | null
+  end_date: string | null
+  estimated_completion_date: string | null
+  created_at: string
+  updated_at: string | null
+}
+
+interface BackendProjectListResponse {
+  projects: BackendProject[]
+  total: number
+  page: number
+  page_size: number
+  total_pages: number
+}
+
+/** Map backend field names to the frontend Project model. */
+function mapProject(p: BackendProject): Project {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description ?? '',
+    project_type: 'house',
+    location: p.address ?? '',
+    address: p.address ?? '',
+    lot_size: 0,
+    climate_zone: '',
+    total_square_footage: 0,
+    number_of_floors: 1,
+    building_height: 0,
+    target_budget: p.budget ?? p.estimated_cost ?? 0,
+    target_completion_days: 0,
+    status: (p.status as Project['status']) ?? 'planning',
+    progress_percentage: 0,
+    created_at: p.created_at,
+    updated_at: p.updated_at ?? p.created_at,
+    started_at: p.start_date ?? undefined,
+    completed_at: p.end_date ?? undefined
+  }
+}
+
 interface ProjectsState {
   projects: Project[]
   currentProject: ProjectSummary | null
@@ -59,9 +111,14 @@ export const useProjectsStore = defineStore('projects', {
       this.loading = true
       this.error = null
       try {
-        const response = await apiClient.get<Project[]>('/projects')
-        this.projects = response
-        return response
+        const response = await apiClient.get<BackendProjectListResponse>('/projects/')
+        const mapped = (response.projects ?? []).map(mapProject)
+        this.projects = mapped
+        // Auto-select the first project if none is currently selected
+        if (!this.currentProject && mapped.length > 0) {
+          this.currentProject = mapped[0] as ProjectSummary
+        }
+        return mapped
       } catch (error) {
         this.error = (error as Error).message
         console.error('Error fetching projects:', error)
@@ -75,9 +132,17 @@ export const useProjectsStore = defineStore('projects', {
       this.loading = true
       this.error = null
       try {
-        const response = await apiClient.get<ProjectSummary>(`/projects/${projectId}/summary`)
-        this.currentProject = response
-        return response
+        const response = await apiClient.get<BackendProject>(`/projects/${projectId}`)
+        const mapped: ProjectSummary = {
+          ...mapProject(response),
+          total_spent: 0,
+          spent_percentage: 0,
+          material_count: 0,
+          task_count: 0,
+          completed_tasks: 0
+        }
+        this.currentProject = mapped
+        return mapped
       } catch (error) {
         this.error = (error as Error).message
         console.error('Error fetching project summary:', error)

@@ -19,7 +19,6 @@ services:
       - vr_network
     restart: unless-stopped
 
-  # Database Management Tool (Replaces PySqlAdmin for Postgres compatibility)
   pgadmin:
     image: dpage/pgadmin4
     container_name: vr_pgadmin_dev
@@ -27,6 +26,8 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: admin_password
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
     ports:
       - "8080:80"
     networks:
@@ -44,8 +45,10 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://vr_admin:SecurePassword123!@postgres:5432/vr_construction
-      OLLAMA_URL: http://host.docker.internal:11434
+      OLLAMA_URL: http://172.17.0.1:11434
       ENVIRONMENT: development
+    extra_hosts:
+      - "host.docker.internal:172.17.0.1"
     volumes:
       - ./app:/app/app
       - ./alembic:/app/alembic
@@ -58,8 +61,6 @@ services:
         condition: service_healthy
     networks:
       - vr_network
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
 volumes:
@@ -67,6 +68,8 @@ volumes:
   generated_images:
   exports:
   uploads:
+  open-webui_data:
+  pgadmin_data:
 
 networks:
   vr_network:

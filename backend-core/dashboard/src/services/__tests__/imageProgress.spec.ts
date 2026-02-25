@@ -30,8 +30,12 @@ describe('ImageProgressService', () => {
       onclose: null
     };
 
-    // Mock WebSocket constructor
+    // Mock WebSocket constructor (with required static constants)
     global.WebSocket = vi.fn(() => mockWebSocket) as any;
+    (global.WebSocket as any).CONNECTING = 0;
+    (global.WebSocket as any).OPEN = 1;
+    (global.WebSocket as any).CLOSING = 2;
+    (global.WebSocket as any).CLOSED = 3;
 
     service = new ImageProgressService();
   });

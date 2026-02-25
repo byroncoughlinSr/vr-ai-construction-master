@@ -20,7 +20,14 @@ export const useAuthStore = defineStore('auth', {
   }),
 
   getters: {
-    isAuthenticated: (state): boolean => !!state.token && !!state.user,
+    isAuthenticated: (state): boolean => {
+      // In development mode, skip authentication if VITE_DEV_MODE is true
+      if (import.meta.env.VITE_DEV_MODE === 'true') {
+        console.log('[Auth] Dev mode: authentication bypassed')
+        return true
+      }
+      return !!state.token && !!state.user
+    },
     isAdmin: (state): boolean => state.user?.role === 'admin',
     isManager: (state): boolean => state.user?.role === 'manager',
     isWorker: (state): boolean => state.user?.role === 'worker',
@@ -48,12 +55,23 @@ export const useAuthStore = defineStore('auth', {
       state.user?.role === 'admin' || state.user?.role === 'manager' || state.user?.role === 'client',
 
     fullName: (state): string => {
-      if (!state.user) return ''
+      if (!state.user) {
+        // Return default name in dev mode
+        if (import.meta.env.VITE_DEV_MODE === 'true') {
+          return 'Developer User'
+        }
+        return ''
+      }
       return `${state.user.first_name} ${state.user.last_name}`.trim()
     },
 
     userInitials: (state): string => {
-      if (!state.user) return ''
+      if (!state.user) {
+        if (import.meta.env.VITE_DEV_MODE === 'true') {
+          return 'DU'
+        }
+        return ''
+      }
       return `${state.user.first_name.charAt(0)}${state.user.last_name.charAt(0)}`.toUpperCase()
     }
   },

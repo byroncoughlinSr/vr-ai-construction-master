@@ -16,7 +16,7 @@ class ProjectBase(BaseModel):
     status: str = Field(default="planning")
     budget: Optional[float] = Field(None, ge=0)
     estimated_cost: float = Field(default=0.0, ge=0)
-    actual_cost: float = Field(default=0.0, ge=0)
+    actual_cost: Optional[float] = Field(default=0.0, ge=0)
     address: Optional[str] = None
     latitude: Optional[float] = Field(None, ge=-90, le=90)
     longitude: Optional[float] = Field(None, ge=-180, le=180)

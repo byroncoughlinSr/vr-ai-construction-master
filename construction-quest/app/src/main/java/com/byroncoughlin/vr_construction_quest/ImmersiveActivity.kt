@@ -95,12 +95,19 @@ class ImmersiveActivity : AppSystemActivity() {
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
+    private var houseGenerator: HouseGenerator? = null
+
+    private var locomotionEnabled = false
+    private var xrayEnabled = false
+    private var roomLabelsVisible = false
+    private val roomLabelEntities = mutableListOf<Entity>()
     private var currentMaterial = "Wood"
     private var isRecording = false
     private var broadcastReceiver: BroadcastReceiver? = null
     private var isInitialized = false
     private var voiceIndicator: Entity? = null
     private var buttonADebounceTimer = 0L
+    private var buttonBDebounceTimer = 0L
 
     companion object {
         private const val TAG = "VRTEST"
@@ -258,7 +265,7 @@ class ImmersiveActivity : AppSystemActivity() {
                             }
                         }
                         "completed" -> {
-                            Log.i(TAG, "✅ Generation completed!")
+                            Log.i(TAG, "✅ Image generation completed!")
                             val imageUrl = json.optJSONObject("result")
                                 ?.optJSONArray("images")
                                 ?.optJSONObject(0)
@@ -273,6 +280,8 @@ class ImmersiveActivity : AppSystemActivity() {
                                     voiceState = VoiceState.IDLE
                                     if (imageUrl.isNotEmpty()) {
                                         displayGeneratedImage("$SERVER_URL$imageUrl")
+                                    } else {
+                                        showPanel()
                                     }
                                 }, 1500)
                             }
@@ -288,6 +297,8 @@ class ImmersiveActivity : AppSystemActivity() {
                                     progressBar?.destroy()
                                     progressBar = null
                                     voiceState = VoiceState.IDLE
+                                    showPanel()  // Show panel again on error
+                                    dismissConfirmationPanel()  // Return to idle state
                                 }, 2000)
                             }
                             webSocket.close(1000, "Generation failed")
@@ -305,6 +316,8 @@ class ImmersiveActivity : AppSystemActivity() {
                     progressBar?.setStateColor(ProgressBar.ProgressState.ERROR)
                     progressBar?.hide()
                     voiceState = VoiceState.IDLE
+                    showPanel()  // Show panel again on failure
+                    dismissConfirmationPanel()  // Return to idle state
                 }
             }
 
@@ -372,24 +385,33 @@ class ImmersiveActivity : AppSystemActivity() {
         val safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
         val html = """
             <!DOCTYPE html><html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
             <body style="margin:0;padding:24px;background:#1A1A2E;color:white;
                          font-family:sans-serif;display:flex;flex-direction:column;
                          align-items:center;justify-content:center;height:100vh;box-sizing:border-box;">
               <p style="color:#AAAAAA;font-size:20px;margin-bottom:12px;">Did you say?</p>
               <p style="font-size:26px;padding:16px;background:#2A2A4E;border-radius:8px;
-                        width:100%;text-align:center;box-sizing:border-box;margin-bottom:32px;">$safe</p>
+                        width:100%;text-align:center;box-sizing:border-box;margin-bottom:20px;">$safe</p>
+              <p style="color:#64B5F6;font-size:16px;margin-bottom:24px;text-align:center;">
+                <strong style="color:white;">Button A</strong> to confirm • 
+                <strong style="color:white;">Button B</strong> to retry
+              </p>
               <div style="display:flex;gap:16px;width:100%;">
-                <button onclick="Android.retry()"
+                <button onclick="try { Android.retry(); } catch(e) { console.log('Retry error: ' + e); }"
                   style="flex:1;background:#B71C1C;color:white;font-size:22px;
-                         padding:14px;border:none;border-radius:8px;cursor:pointer;">Retry</button>
-                <button onclick="Android.confirm()"
+                         padding:14px;border:none;border-radius:8px;cursor:pointer;
+                         -webkit-tap-highlight-color:rgba(0,0,0,0.3);">Retry</button>
+                <button onclick="try { Android.confirm(); } catch(e) { console.log('Confirm error: ' + e); }"
                   style="flex:1;background:#2E7D32;color:white;font-size:22px;
-                         padding:14px;border:none;border-radius:8px;cursor:pointer;">Confirm</button>
+                         padding:14px;border:none;border-radius:8px;cursor:pointer;
+                         -webkit-tap-highlight-color:rgba(0,0,0,0.3);">Confirm</button>
               </div>
             </body></html>
         """.trimIndent()
 
-        dashboardWebView?.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+        dashboardWebView?.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null)
         Log.i(TAG, "📋 Confirmation HTML loaded into dashboard panel | text='$text'")
     }
 
@@ -415,13 +437,69 @@ class ImmersiveActivity : AppSystemActivity() {
         Log.i(TAG, "📺 Panel returned to idle state after confirmation")
     }
 
+    private fun showProjectInfoHtml(
+        projectName: String,
+        totalCost: Double,
+        totalWeeks: Int,
+        phasesCount: Int,
+        materialsCount: Int
+    ) {
+        val wv = dashboardWebView ?: return
+        val costFormatted = "$%,.0f".format(totalCost)
+        val html = """
+            <!DOCTYPE html><html>
+            <head><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+            <body style="margin:0;padding:20px;background:#1A1A2E;color:white;
+                         font-family:sans-serif;display:flex;flex-direction:column;
+                         align-items:center;height:100vh;box-sizing:border-box;overflow-y:auto;">
+              <p style="font-size:13px;color:#64B5F6;margin:16px 0 4px;">🏗️ Project Generated!</p>
+              <p style="font-size:20px;font-weight:bold;margin:0 0 14px;text-align:center;">$projectName</p>
+              <div style="width:100%;background:#2A2A4E;border-radius:8px;padding:12px;box-sizing:border-box;margin-bottom:12px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                  <span style="color:#AAAAAA;">💰 Cost</span>
+                  <span style="font-weight:bold;">$costFormatted</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                  <span style="color:#AAAAAA;">📅 Timeline</span>
+                  <span>$totalWeeks weeks</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+                  <span style="color:#AAAAAA;">🔧 Phases</span>
+                  <span>$phasesCount</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;">
+                  <span style="color:#AAAAAA;">📦 Materials</span>
+                  <span>$materialsCount items</span>
+                </div>
+              </div>
+              <p style="font-size:13px;color:#64B5F6;text-align:center;margin:0;">
+                🥽 VR house loading... Look around!
+              </p>
+              <p style="font-size:11px;color:#666;text-align:center;margin-top:8px;">
+                Hold A to generate a new project
+              </p>
+            </body></html>
+        """.trimIndent()
+        wv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+        Log.i(TAG, "📋 Project info HTML loaded for: $projectName")
+    }
+    
+    private fun hidePanel() {
+        dashboardPanelEntity?.setComponent(Visible(false))
+        Log.i(TAG, "👁️ Panel hidden")
+    }
+    
+    private fun showPanel() {
+        dashboardPanelEntity?.setComponent(Visible(true))
+        Log.i(TAG, "👁️ Panel shown")
+    }
+
     internal fun onConfirmTranscription() {
         val text = pendingTranscription
         Log.i(TAG, "✅ User confirmed: '$text'")
-        dismissConfirmationPanel()
+        hidePanel()
         voiceState = VoiceState.GENERATING
 
-        // Show progress bar and start image generation
         if (progressBar == null) progressBar = ProgressBar(position = Vector3(0f, 1.5f, -1.0f))
         progressBar?.reset()
         progressBar?.setStateColor(ProgressBar.ProgressState.GENERATING)
@@ -429,45 +507,106 @@ class ImmersiveActivity : AppSystemActivity() {
 
         activityScope.launch(Dispatchers.IO) {
             try {
+                // Step 1: Generate a full AI project (plan + optional image)
                 val generateJson = JSONObject().apply {
-                    put("prompt", "$text, architectural rendering, photorealistic, detailed")
-                    put("num_inference_steps", 20)
-                    put("guidance_scale", 7.5)
-                    put("width", 512)
-                    put("height", 512)
+                    put("prompt", text)
+                    put("budget", 150000)
+                    put("timeline_weeks", 16)
+                    put("generate_image", true)
                 }
                 val generateBody = generateJson.toString().toRequestBody("application/json".toMediaType())
 
-                var generationId = ""
+                var projectId = -1
+                var projectName = ""
+                var imageGenerationId = ""
+                var totalCost = 0.0
+                var totalWeeks = 0
+                var phasesCount = 0
+                var materialsCount = 0
+
                 httpClient.newCall(
-                    Request.Builder().url("$SERVER_URL/api/v1/image/generate").post(generateBody).build()
+                    Request.Builder()
+                        .url("$SERVER_URL/api/v1/planning/generate-project")
+                        .post(generateBody)
+                        .build()
                 ).execute().use { response ->
                     if (response.isSuccessful) {
                         val json = JSONObject(response.body?.string() ?: "{}")
-                        generationId = json.optString("generation_id")
-                        Log.i(TAG, "🎨 Generation started: $generationId")
+                        projectId = json.optInt("project_id", -1)
+                        projectName = json.optString("project_name", "Your Project")
+                        imageGenerationId = json.optString("image_generation_id", "")
+                        val meta = json.optJSONObject("metadata")
+                        totalCost = meta?.optDouble("total_cost", 0.0) ?: 0.0
+                        totalWeeks = meta?.optInt("total_duration_weeks", 0) ?: 0
+                        phasesCount = meta?.optInt("phases_count", 0) ?: 0
+                        materialsCount = meta?.optInt("materials_count", 0) ?: 0
+                        Log.i(TAG, "🏗️ Project created: id=$projectId name='$projectName'")
                     } else {
-                        Log.e(TAG, "❌ Failed to start generation: ${response.code}")
+                        Log.e(TAG, "❌ generate-project failed: HTTP ${response.code}")
                     }
                 }
 
-                if (generationId.isBlank()) {
+                if (projectId == -1) {
                     runOnUiThread {
                         progressBar?.setStateColor(ProgressBar.ProgressState.ERROR)
                         progressBar?.hide()
                         voiceState = VoiceState.IDLE
+                        showPanel()
+                        dismissConfirmationPanel()
                     }
                     return@launch
                 }
 
-                runOnUiThread { connectGenerationWebSocket(generationId) }
+                // Step 2: Show project info panel and start image WebSocket
+                val pName = projectName
+                val pCost = totalCost
+                val pWeeks = totalWeeks
+                val pPhases = phasesCount
+                val pMaterials = materialsCount
+                val imgId = imageGenerationId
+                runOnUiThread {
+                    showProjectInfoHtml(pName, pCost, pWeeks, pPhases, pMaterials)
+                    showPanel()
+                    if (imgId.isNotBlank()) {
+                        connectGenerationWebSocket(imgId)
+                    } else {
+                        progressBar?.hide()
+                        progressBar?.destroy()
+                        progressBar = null
+                    }
+                }
+
+                // Step 3: Fetch VR geometry on IO thread, then build entities on main thread
+                val finalId = projectId
+                val hasImageWs = imgId.isNotBlank()
+                val geometry = houseGenerator?.fetchVRGeometry(finalId)
+                if (geometry != null) {
+                    runOnUiThread {
+                        val spawnPos = houseGenerator?.buildFromGeometry(geometry)
+                        Log.i(TAG, "🏠 VR house ready! Spawn: $spawnPos")
+
+                        // Step 7 — Spawn player at entrance and enable locomotion
+                        if (spawnPos != null) {
+                            scene.setViewOrigin(spawnPos.x, 0f, spawnPos.z, 0f)
+                            Log.i(TAG, "🧍 Player spawned at (${spawnPos.x}, ${spawnPos.z})")
+                        }
+                        locomotionEnabled = true
+
+                        if (!hasImageWs) voiceState = VoiceState.IDLE
+                    }
+                } else {
+                    Log.w(TAG, "⚠️ Could not fetch VR geometry for project $finalId")
+                    if (!hasImageWs) runOnUiThread { voiceState = VoiceState.IDLE }
+                }
 
             } catch (e: Exception) {
-                Log.e(TAG, "❌ Image generation failed", e)
+                Log.e(TAG, "❌ Project generation failed", e)
                 runOnUiThread {
                     progressBar?.setStateColor(ProgressBar.ProgressState.ERROR)
                     progressBar?.hide()
                     voiceState = VoiceState.IDLE
+                    showPanel()
+                    dismissConfirmationPanel()
                 }
             }
         }
@@ -479,25 +618,156 @@ class ImmersiveActivity : AppSystemActivity() {
         voiceState = VoiceState.IDLE
     }
 
-    private fun displayGeneratedImage(imageUrl: String) {
-        runOnUiThread {
-            Log.i(TAG, "🖼️ Displaying generated image from: $imageUrl")
-            val imagePanel = Entity.create()
-            
-            // Position in front of the user (e.g., 1.5m away, 1.2m high)
-            imagePanel.setComponent(Transform(Pose(t = Vector3(0f, 1.2f, -1.5f))))
-            
-            // Define shape using a Box component (flat like a canvas)
-            imagePanel.setComponent(com.meta.spatial.toolkit.Box(Vector3(0.5f, 0.5f, 0.01f)))
-            imagePanel.setComponent(Mesh(mesh = "mesh://box".toUri()))
+    /**
+     * Fetch the most recently created project from the backend and load its VR geometry.
+     * Safe to call at startup or when the user presses B in IDLE state to recover a
+     * missed generation (e.g. headset slept during the Ollama run).
+     */
+    fun loadLatestProject() {
+        if (locomotionEnabled) {
+            Log.i(TAG, "⏭️  loadLatestProject skipped — house already loaded")
+            return
+        }
+        Log.i(TAG, "🔃 Loading latest project from backend…")
+        activityScope.launch(Dispatchers.IO) {
+            try {
+                val response = httpClient.newCall(
+                    Request.Builder().url("$SERVER_URL/api/v1/projects/latest").get().build()
+                ).execute()
 
-            imagePanel.setComponent(Material().apply {
-                baseColor = Color4(1f, 1f, 1f, 1f)  // Changed from baseTexture to baseTextureUri
-                unlit = true
-            })
-            
-            imagePanel.setComponent(Visible(true))
-            imagePanel.setComponent(Grabbable())
+                if (!response.isSuccessful) {
+                    Log.w(TAG, "⚠️  /projects/latest returned HTTP ${response.code} — no project to load")
+                    return@launch
+                }
+
+                val json = JSONObject(response.body?.string() ?: "{}")
+                val projectId = json.optInt("project_id", -1)
+                val projectName = json.optString("project_name", "")
+                if (projectId == -1) {
+                    Log.w(TAG, "⚠️  /projects/latest returned no project_id")
+                    return@launch
+                }
+
+                Log.i(TAG, "📦 Auto-loading project $projectId '$projectName'")
+                val geometry = houseGenerator?.fetchVRGeometry(projectId)
+                if (geometry != null) {
+                    runOnUiThread {
+                        val spawnPos = houseGenerator?.buildFromGeometry(geometry)
+                        if (spawnPos != null) {
+                            scene.setViewOrigin(spawnPos.x, 0f, spawnPos.z, 0f)
+                            Log.i(TAG, "🧍 Auto-spawned at (${spawnPos.x}, ${spawnPos.z})")
+                        }
+                        locomotionEnabled = true
+                        voiceState = VoiceState.IDLE
+                        Log.i(TAG, "✅ Auto-load complete: '$projectName'")
+                    }
+                } else {
+                    Log.w(TAG, "⚠️  fetchVRGeometry returned null for project $projectId")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ loadLatestProject failed", e)
+            }
+        }
+    }
+
+    private fun handleTeleportation(pose: Pose) {
+        val forward = pose.q * Vector3(0f, 0f, -1f)
+        if (forward.y >= 0f) return  // must aim downward toward floor
+        val t = -pose.t.y / forward.y  // parametric distance to y=0 plane
+        if (t < 0.3f || t > 20.0f) return  // too close or too far
+        val tx = pose.t.x + forward.x * t
+        val tz = pose.t.z + forward.z * t
+        scene.setViewOrigin(tx, 0f, tz, 0f)
+        Log.i(TAG, "🌀 Teleported to (${"%.1f".format(tx)}, ${"%.1f".format(tz)})")
+    }
+
+    private fun toggleXRay() {
+        xrayEnabled = !xrayEnabled
+        houseGenerator?.setXRayEnabled(xrayEnabled)
+        Log.i(TAG, "🔍 X-ray ${if (xrayEnabled) "ON" else "OFF"}")
+    }
+
+    private fun toggleRoomLabels() {
+        roomLabelsVisible = !roomLabelsVisible
+        if (roomLabelsVisible) {
+            val rooms = houseGenerator?.getRoomInfoList() ?: emptyList()
+            if (rooms.isEmpty()) {
+                Log.w(TAG, "⚠️ No room data for labels — house not loaded yet?")
+                roomLabelsVisible = false
+                return
+            }
+            rooms.forEach { room ->
+                val entity = Entity.create()
+                entity.setComponent(Sphere(0.2f))
+                entity.setComponent(Mesh(mesh = "mesh://sphere".toUri()))
+                entity.setComponent(Transform(Pose(t = Vector3(room.centerX, room.ceilingY - 0.5f, room.centerZ))))
+                entity.setComponent(Material().apply {
+                    baseColor = Color4(0.2f, 0.8f, 1.0f, 0.9f)
+                    unlit = true
+                })
+                entity.setComponent(Visible(true))
+                roomLabelEntities.add(entity)
+            }
+            Log.i(TAG, "🏷️ Room beacons shown: ${rooms.size}")
+        } else {
+            roomLabelEntities.forEach { it.destroy() }
+            roomLabelEntities.clear()
+            Log.i(TAG, "🏷️ Room beacons hidden")
+        }
+    }
+
+    private fun displayGeneratedImage(imageUrl: String) {
+        Log.i(TAG, "🖼️ Displaying generated image from: $imageUrl")
+        try {
+            val wv = dashboardWebView
+            if (wv != null) {
+                val imageHtml = """
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <style>
+                            body {
+                                margin: 0;
+                                padding: 10px;
+                                background: #000;
+                                display: flex;
+                                flex-direction: column;
+                                justify-content: center;
+                                align-items: center;
+                                height: 100vh;
+                                box-sizing: border-box;
+                            }
+                            img {
+                                max-width: 100%;
+                                max-height: 85vh;
+                                object-fit: contain;
+                                border: 2px solid #64B5F6;
+                                border-radius: 8px;
+                            }
+                            p {
+                                color: #64B5F6;
+                                font-family: sans-serif;
+                                font-size: 14px;
+                                margin-top: 10px;
+                                text-align: center;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <img src="$imageUrl" alt="Generated Image" />
+                        <p>Hold A to start a new generation</p>
+                    </body>
+                    </html>
+                """.trimIndent()
+
+                wv.loadDataWithBaseURL("$SERVER_URL/", imageHtml, "text/html", "UTF-8", null)
+                Log.i(TAG, "✅ Image loaded into dashboard panel")
+            } else {
+                Log.e(TAG, "❌ dashboardWebView is null, cannot display image")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to display image", e)
         }
     }
 
@@ -561,7 +831,7 @@ class ImmersiveActivity : AppSystemActivity() {
     }
 
     override fun registerFeatures(): List<SpatialFeature> {
-        return listOf(VRFeature(this))
+        return listOf(VRFeature(this), CastInputForwardFeature(this))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -602,6 +872,8 @@ class ImmersiveActivity : AppSystemActivity() {
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
             
+            houseGenerator = HouseGenerator(SERVER_URL)
+            
             // Connect to real-time collaboration room
             connectToRoom("tiny_house_room", "quest_user_${System.currentTimeMillis() % 1000}")
             
@@ -622,6 +894,9 @@ class ImmersiveActivity : AppSystemActivity() {
         dashboardWebView = null
         broadcastReceiver?.let { unregisterReceiver(it) }
         nativeEntities.values.forEach { it.destroy() }
+        roomLabelEntities.forEach { it.destroy() }
+        roomLabelEntities.clear()
+        houseGenerator?.clearAllEntities()
         activityJob.cancel()
         super.onDestroy()
     }
@@ -744,12 +1019,16 @@ class ImmersiveActivity : AppSystemActivity() {
 
         android.os.Handler(Looper.getMainLooper()).postDelayed({ setupInitialConstruction() }, 500)
 
+        // Auto-load the most recent project on startup (recovers missed generations)
+        android.os.Handler(Looper.getMainLooper()).postDelayed({ loadLatestProject() }, 2000)
+
         // Create the dashboard panel entity programmatically so the panel { } callback fires.
         // Scene-defined panel entities do NOT trigger panel { } — only Entity.create() does.
         Log.i(TAG, "📺 Creating dashboard panel entity programmatically")
         val panelEntity = Entity.create()
         panelEntity.setComponent(Panel(R.layout.ui_example))
         panelEntity.setComponent(Transform(Pose(t = Vector3(0.3f, 1.1f, -1.7f))))
+        panelEntity.setComponent(Grabbable())
         panelEntity.setComponent(Visible(true))
         dashboardPanelEntity = panelEntity
         Log.i(TAG, "📺 Dashboard panel entity created: $panelEntity")
@@ -759,7 +1038,8 @@ class ImmersiveActivity : AppSystemActivity() {
         Log.i(TAG, "🌐 Creating web panel entity programmatically")
         val webPanelEntityLocal = Entity.create()
         webPanelEntityLocal.setComponent(Panel(R.layout.web_panel))
-        webPanelEntityLocal.setComponent(Transform(Pose(t = Vector3(-1.1f, 1.1f, -1.7f))))
+        webPanelEntityLocal.setComponent(Transform(Pose(t = Vector3(-1.9f, 1.1f, -1.7f))))
+        webPanelEntityLocal.setComponent(Grabbable())
         webPanelEntityLocal.setComponent(Visible(true))
         webPanelEntity = webPanelEntityLocal
         Log.i(TAG, "🌐 Web panel entity created: $webPanelEntityLocal")
@@ -770,6 +1050,9 @@ class ImmersiveActivity : AppSystemActivity() {
         private var grabOffset = Vector3(0f)
         private val leftState = ControllerState()
         private val rightState = ControllerState()
+        private var xrayDebounceTimer = 0L
+        private var teleportDebounceTimer = 0L
+        private var roomLabelDebounceTimer = 0L
 
         override fun execute() {
             if (!isLibraryLoaded) return
@@ -813,22 +1096,69 @@ class ImmersiveActivity : AppSystemActivity() {
         }
 
         private fun processLeftController(state: ControllerState) {
-            handleGrabAndMove(state)
-            if (state.buttonX) handleDeletion(state.pose)
+            if (locomotionEnabled) {
+                // Explore mode: X = toggle x-ray, Y = toggle room label beacons
+                val now = System.currentTimeMillis()
+                if (state.buttonX && (now - xrayDebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
+                    xrayDebounceTimer = now
+                    toggleXRay()
+                }
+                if (state.buttonY && (now - roomLabelDebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
+                    roomLabelDebounceTimer = now
+                    toggleRoomLabels()
+                }
+            } else {
+                // Construction mode: grip = grab/move, X = delete
+                handleGrabAndMove(state)
+                if (state.buttonX) handleDeletion(state.pose)
+            }
         }
 
         private fun processRightController(state: ControllerState, controllerEntity: Entity) {
             handleVoiceInput(state, controllerEntity)
-            if (state.trigger) handlePlacement(state.pose)
-            if (state.buttonB) handleDeletion(state.pose)
+            if (locomotionEnabled) {
+                // Explore mode: trigger = teleport to aimed floor position
+                val now = System.currentTimeMillis()
+                if (state.trigger && (now - teleportDebounceTimer > 300L)) {
+                    teleportDebounceTimer = now
+                    handleTeleportation(state.pose)
+                }
+            } else {
+                // Construction mode: trigger = place element, B = delete
+                if (state.trigger) handlePlacement(state.pose)
+                if (state.buttonB) handleDeletion(state.pose)
+            }
         }
 
         private fun handleVoiceInput(state: ControllerState, controllerEntity: Entity) {
-            // Block new recordings while the user is confirming or an image is generating
-            if (voiceState != VoiceState.IDLE) return
-
             val now = System.currentTimeMillis()
 
+            // If awaiting confirmation, Button A confirms and Button B retries
+            if (voiceState == VoiceState.AWAITING_CONFIRMATION) {
+                if (state.buttonA && (now - buttonADebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
+                    buttonADebounceTimer = now
+                    Log.i(TAG, "✅ Button A pressed — confirming transcription via controller")
+                    onConfirmTranscription()
+                }
+                if (state.buttonB && (now - buttonBDebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
+                    buttonBDebounceTimer = now
+                    Log.i(TAG, "🔄 Button B pressed — retrying transcription via controller")
+                    onRetryTranscription()
+                }
+                return
+            }
+
+            // If generating, block all input
+            if (voiceState == VoiceState.GENERATING) return
+
+            // IDLE: B = reload last project (recovery if headset slept during generation)
+            if (state.buttonB && !locomotionEnabled && (now - buttonBDebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
+                buttonBDebounceTimer = now
+                Log.i(TAG, "🔃 Button B in IDLE — loading latest project")
+                loadLatestProject()
+            }
+
+            // Normal voice recording (IDLE state)
             if (state.buttonA) {
                 buttonADebounceTimer = now
                 if (!isRecording) {
@@ -1124,9 +1454,9 @@ class ImmersiveActivity : AppSystemActivity() {
         return listOf(
             PanelRegistration(R.layout.web_panel) {
                 config {
-                    width = 1.2f
-                    height = 0.8f
-                    layoutDpi = 400
+                    width = 3.0f
+                    height = 2.0f
+                    layoutDpi = 250
                 }
                 panel {
                     val wv = rootView?.findViewById<WebView>(R.id.web_view) ?: return@panel
@@ -1138,7 +1468,7 @@ class ImmersiveActivity : AppSystemActivity() {
             PanelRegistration(R.layout.ui_example) {
                 config {
                     width = 1.2f
-                    height = 0.8f
+                    height = 1.2f
                     layoutDpi = 400
                 }
                 panel {
@@ -1150,11 +1480,23 @@ class ImmersiveActivity : AppSystemActivity() {
                         return@panel
                     }
                     wv.visibility = android.view.View.VISIBLE
-                    wv.settings.javaScriptEnabled = true
+                    
+                    // Configure WebView settings for proper JavaScript interface support
+                    wv.settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        javaScriptCanOpenWindowsAutomatically = false
+                        allowFileAccess = true
+                        allowContentAccess = true
+                    }
+                    
+                    // Enable remote debugging for WebView (helps diagnose issues)
+                    WebView.setWebContentsDebuggingEnabled(true)
+                    
                     // JS interface enables Android.confirm() / Android.retry() from confirmation HTML
                     wv.addJavascriptInterface(ConfirmationInterface(), "Android")
                     dashboardWebView = wv
-                    Log.i(TAG, "✅ dashboardWebView assigned successfully")
+                    Log.i(TAG, "✅ dashboardWebView assigned successfully with enhanced settings")
 
                     // If a voice command finished before the panel was ready, show it now
                     val queued = pendingConfirmationText
