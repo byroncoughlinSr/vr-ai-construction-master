@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import Optional, List
 
 from ...database import get_db
@@ -218,10 +219,10 @@ async def get_project_material_summary(
 
     # Get material statistics
     stats = db.query(
-        db.func.count(Material.id).label("total_materials"),
-        db.func.sum(Material.quantity_needed * Material.unit_cost).label("total_cost"),
-        db.func.sum(Material.quantity_available).label("total_available"),
-        db.func.sum(Material.quantity_needed).label("total_needed")
+        func.count(Material.id).label("total_materials"),
+        func.sum(Material.quantity_needed * Material.unit_cost).label("total_cost"),
+        func.sum(Material.quantity_available).label("total_available"),
+        func.sum(Material.quantity_needed).label("total_needed")
     ).filter(Material.project_id == project_id).first()
 
     return {

@@ -51,7 +51,7 @@ export class WebSocketService {
         this.ws = new WebSocket(this.config.url!)
 
         this.ws.onopen = () => {
-          console.log('WebSocket connected')
+          console.log('[WebSocket] Connected to:', this.config.url)
           this.connected.value = true
           this.connecting.value = false
           this.reconnectAttempts = 0
@@ -70,19 +70,22 @@ export class WebSocketService {
         }
 
         this.ws.onclose = (event) => {
-          console.log('WebSocket disconnected:', event.code, event.reason)
+          console.log('[WebSocket] Disconnected:', event.code, event.reason)
           this.connected.value = false
           this.connecting.value = false
           this.stopHeartbeat()
           this.emitConnectionEvent('disconnected')
 
           if (!event.wasClean && this.reconnectAttempts < (this.config.maxReconnectAttempts || 10)) {
+            console.log('[WebSocket] Scheduling reconnect...')
             this.scheduleReconnect()
+          } else {
+            console.log('[WebSocket] Not reconnecting (wasClean:', event.wasClean, 'attempts:', this.reconnectAttempts, ')')
           }
         }
 
         this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error)
+          console.error('[WebSocket] Connection error:', error, 'URL:', this.config.url)
           this.connecting.value = false
           reject(error)
         }

@@ -107,11 +107,12 @@ export const useMaterialsStore = defineStore('materials', {
       this.error = null
       try {
         const response = await apiClient.get<{ materials: ProjectMaterial[] } | ProjectMaterial[]>(
-          `/projects/${projectId}/materials`
+          `/materials/`,
+          { project_id: projectId }
         )
         this.projectMaterials = Array.isArray(response)
           ? response
-          : response.materials
+          : (response as { materials: ProjectMaterial[] }).materials ?? []
         return this.projectMaterials
       } catch (error) {
         this.error = (error as Error).message

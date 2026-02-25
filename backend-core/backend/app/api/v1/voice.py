@@ -57,14 +57,21 @@ async def transcribe_audio(
     Transcribe audio to text using Whisper.
     Returns just the transcribed text for user confirmation in VR.
     """
-    logger.info(f"🎙️ Received audio: {audio_file.filename} ({audio_file.content_type})")
-    
+    # ── VR → BACKEND ─────────────────────────────────────────────────────────
+    logger.info(
+        f"📥 WAV received from VR | filename={audio_file.filename} | "
+        f"content_type={audio_file.content_type} | sample_rate={sample_rate} Hz"
+    )
+
     temp_path = None
-    
+
     try:
         # Read audio bytes
         audio_bytes = await audio_file.read()
-        logger.info(f"📊 Audio size: {len(audio_bytes):,} bytes")
+        logger.info(
+            f"📊 WAV details | size={len(audio_bytes):,} bytes "
+            f"({len(audio_bytes)/1024:.1f} KB) | sample_rate={sample_rate} Hz"
+        )
         
         if len(audio_bytes) == 0:
             raise HTTPException(status_code=400, detail="Empty audio file")
@@ -115,9 +122,17 @@ async def transcribe_audio(
         
         transcribed_text = " ".join(full_text).strip()
         detected_language = info.language
-        
-        logger.info(f"✅ Transcription complete ({detected_language}): '{transcribed_text}'")
-        
+        duration = all_segments[-1]["end"] if all_segments else 0.0
+
+        logger.info(f"✅ Whisper transcription complete | lang={detected_language} | text='{transcribed_text}'")
+
+        # ── BACKEND → VR ─────────────────────────────────────────────────────
+        logger.info(
+            f"📤 Sending text back to VR | text='{transcribed_text}' | "
+            f"lang={detected_language} | segments={len(all_segments)} | "
+            f"audio_duration={duration:.2f}s"
+        )
+
         return {
             "success": True,
             "text": transcribed_text,

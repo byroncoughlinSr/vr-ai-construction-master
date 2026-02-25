@@ -365,10 +365,18 @@ const loadData = async (): Promise<void> => {
   loadingMessage.value = 'Loading dashboard data...'
 
   try {
+    loadingMessage.value = 'Loading projects...'
+    await projectsStore.fetchProjects()
+
     const projectId = projectsStore.currentProject?.id
     if (projectId) {
       loadingMessage.value = 'Loading project materials...'
-      await materialsStore.fetchProjectMaterials(projectId)
+      // Materials are optional — don't block the dashboard if they fail
+      try {
+        await materialsStore.fetchProjectMaterials(projectId)
+      } catch {
+        console.warn('Could not load materials for project', projectId)
+      }
     }
   } catch (err) {
     error.value = (err as Error).message

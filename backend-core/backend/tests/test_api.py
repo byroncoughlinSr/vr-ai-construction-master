@@ -7,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base, get_db
 from app.main import app
 from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 # Test database URL
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -31,15 +32,22 @@ def override_get_db():
 
 app.dependency_overrides[get_db] = override_get_db
 
-# Disable rate limiting for tests
-app.state.limiter = None
+# Create a mock limiter for tests (disabled but with proper structure)
+test_limiter = Limiter(key_func=get_remote_address, enabled=False)
+app.state.limiter = test_limiter
 
 # Create test client
 client = TestClient(app)
 
 @pytest.fixture(scope="function", autouse=True)
 def setup_database():
-    """Create tables before each test and drop after."""
+    """Create tables before each test and drop after.
+
+    Re-asserts the dependency override each time because other test modules
+    (e.g. test_complete_workflow.py) set their own override at module level,
+    which would otherwise clobber this file's in-memory engine.
+    """
+    app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)

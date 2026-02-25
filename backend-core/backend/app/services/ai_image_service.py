@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from typing import Optional, Dict, Any
 from pathlib import Path
 import torch
@@ -176,160 +177,107 @@ class AIImageService:
         progress_callback: Optional[callable] = None,
         generation_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Generate an architectural image based on the prompt.
-        Uses Compel to bypass 77 token limit.
-
-        Args:
-            prompt: Description of the image to generate (can be very long)
-            negative_prompt: What to avoid in the image
-            width: Image width (default 768 for quality)
-            height: Image height (default 512 for landscape architecture)
-            num_inference_steps: Number of denoising steps (50 for quality)
-            guidance_scale: How closely to follow the prompt (8.0 for architectural)
-            num_images: Number of images to generate
-            progress_callback: Optional callback for progress updates
-            generation_id: Optional ID for tracking
-
-        Returns:
-            Dict containing image data and metadata
-        """
         try:
             await self.initialize_model()
 
-            # Set default negative prompt for architectural images
             if negative_prompt is None:
-                negative_prompt = """cartoon, anime, sketch, drawing, painting,
-                illustration, cgi, toy, miniature,
-                low quality, blurry, distorted, deformed, ugly,
-                bad proportions, unrealistic, oversaturated,
-                text, watermark, signature, multiple structures,
-                people, animals"""
+                negative_prompt = "cartoon, low quality, blurry, text"
 
-            # Log token counts
+            # 1. Define Callback Logic at the very beginning of the method
+            def stable_diffusion_callback(step: int, timestep, latents):
+                if progress_callback and generation_id:
+                    try:
+                        percentage = int(((step + 1) / num_inference_steps) * 100)
+                        progress_data = {
+                            "generation_id": generation_id,
+                            "step": step + 1,
+                            "total_steps": num_inference_steps,
+                            "percentage": min(percentage, 100),
+                            "status": "generating"
+                        }
+                        
+                        # Schedule callback as a task on the running event loop
+                        try:
+                            loop = asyncio.get_running_loop()
+                            loop.create_task(progress_callback(progress_data))
+                        except RuntimeError:
+                            pass  # No running loop; skip callback
+                    except Exception as e:
+                        logger.warning(f"Callback failure: {e}")
+
+            # 2. Package all shared arguments into a dictionary
+            # This ensures BOTH paths below are forced to use the callback
+            pipeline_kwargs = {
+                "width": width,
+                "height": height,
+                "num_inference_steps": num_inference_steps,
+                "guidance_scale": guidance_scale,
+                "num_images_per_prompt": num_images,
+                "callback": stable_diffusion_callback if progress_callback else None,
+                "callback_steps": 1
+            }
+
             prompt_tokens = self.count_tokens(prompt)
-            negative_tokens = self.count_tokens(negative_prompt)
-            
-            logger.info(f"Generating image - Prompt: {prompt_tokens} tokens, Negative: {negative_tokens} tokens")
-            logger.debug(f"Full prompt: {prompt[:200]}...")
-
-            # Use Compel for long prompt support (handles prompts of any length)
             use_compel = prompt_tokens > self.max_tokens or self.compel is not None
-            
+
             if use_compel and self.compel is not None:
-                logger.info("Using Compel for long prompt support")
-                
-                # Build conditioning tensors with Compel (bypasses 77 token limit)
+                logger.info("Using Compel path")
                 prompt_embeds = self.compel.build_conditioning_tensor(prompt)
                 negative_embeds = self.compel.build_conditioning_tensor(negative_prompt)
-                
-                # Progress callback function for Stable Diffusion
-                def stable_diffusion_callback(step: int, timestep, latents):
-                    if progress_callback and generation_id:
-                        try:
-                            percentage = int((step / num_inference_steps) * 100)
-                            asyncio.create_task(
-                                progress_callback({
-                                    "generation_id": generation_id,
-                                    "step": step,
-                                    "total_steps": num_inference_steps,
-                                    "percentage": percentage,
-                                    "status": "generating"
-                                })
-                            )
-                        except Exception as e:
-                            logger.warning(f"Failed to send progress update: {e}")
-                
-                # Generate with Compel embeddings
                 with torch.no_grad():
                     result = self.pipe(
                         prompt_embeds=prompt_embeds,
                         negative_prompt_embeds=negative_embeds,
-                        width=width,
-                        height=height,
-                        num_inference_steps=num_inference_steps,
-                        guidance_scale=guidance_scale,
-                        num_images_per_prompt=num_images,
-                        callback=stable_diffusion_callback if progress_callback else None,
-                        callback_steps=1
+                        **pipeline_kwargs
                     )
             else:
                 logger.info("Using standard prompt (fits in 77 tokens)")
-                
-                # Standard generation (prompt fits in 77 tokens)
                 with torch.no_grad():
                     result = self.pipe(
                         prompt=prompt,
                         negative_prompt=negative_prompt,
-                        width=width,
-                        height=height,
-                        num_inference_steps=num_inference_steps,
-                        guidance_scale=guidance_scale,
-                        num_images_per_prompt=num_images
+                        **pipeline_kwargs  # CRITICAL: This was likely missing
                     )
 
-            images = result.images
-            
-            # Save images and prepare response
-            output_data = []
-            output_path = Path(settings.generated_images_dir)
-            output_path.mkdir(exist_ok=True)
+            # Encode each image to base64 and save to disk
+            images_output = []
+            output_dir = Path(settings.generated_images_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
 
-            for idx, image in enumerate(images):
-                # Convert to base64 for API response
-                buffered = io.BytesIO()
-                image.save(buffered, format="PNG")
-                img_str = base64.b64encode(buffered.getvalue()).decode()
+            for i, img in enumerate(result.images):
+                filename = f"generated_{generation_id or int(time.time() * 1000)}_{i}.png"
+                filepath = output_dir / filename
 
-                # Save to file
-                timestamp = int(asyncio.get_event_loop().time() * 1000)
-                filename = f"generated_{timestamp}_{idx}.png"
-                filepath = output_path / filename
-                image.save(filepath)
+                # Save to disk
+                img.save(str(filepath))
 
-                logger.info(f"Image {idx+1}/{len(images)} generated and saved to {filepath}")
+                # Encode to base64 for API response
+                buffer = io.BytesIO()
+                img.save(buffer, format="PNG")
+                buffer.seek(0)
+                img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-                output_data.append({
-                    "image_data": img_str,
+                images_output.append({
+                    "image_data": img_base64,
+                    "filename": filename,
+                    "path": str(filepath),
                     "image_url": f"/generated_images/{filename}",
-                    "filename": filename
                 })
 
-            return {
-                "success": True,
-                "images": output_data,
-                "count": len(images),
-                "metadata": {
-                    "prompt": prompt[:500],  # Truncate for logging
-                    "prompt_tokens": prompt_tokens,
-                    "negative_prompt": negative_prompt[:200],
-                    "negative_tokens": negative_tokens,
-                    "width": width,
-                    "height": height,
-                    "steps": num_inference_steps,
-                    "guidance_scale": guidance_scale,
-                    "model": "Realistic_Vision_V5.1",
-                    "used_compel": use_compel
-                }
-            }
+            return {"success": True, "images": images_output, "count": len(images_output)}
 
         except Exception as e:
-            logger.error(f"Image generation failed: {e}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e),
-                "metadata": {
-                    "prompt": prompt[:200],
-                    "model": "Realistic_Vision_V5.1"
-                }
-            }
-
+            logger.error(f"Generation failed: {e}")
+            return {"success": False, "error": str(e)}
+        
     async def generate_architectural_visualization(
         self,
         design_description: str,
         style: str = "modern",
         time_of_day: str = "day",
-        view_type: str = "exterior"
+        view_type: str = "exterior",
+        progress_callback: Optional[callable] = None,
+        generation_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate an architectural visualization with optimized prompts.
@@ -340,6 +288,8 @@ class AIImageService:
             style: Architectural style (modern, traditional, craftsman, etc.)
             time_of_day: Time of day for lighting (day, night, sunset, golden_hour)
             view_type: Type of view (exterior, interior, aerial, detail)
+            progress_callback: Optional callback for progress updates
+            generation_id: Optional ID for tracking
 
         Returns:
             Generated image data
@@ -371,7 +321,9 @@ class AIImageService:
             height=512,  # Landscape format for architecture
             num_inference_steps=50,  # High quality
             guidance_scale=8.0,  # Follow prompt closely
-            num_images=1
+            num_images=1,
+            progress_callback=progress_callback,
+            generation_id=generation_id
         )
     
     def build_architectural_prompt(

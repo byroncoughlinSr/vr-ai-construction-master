@@ -27,24 +27,41 @@ export class ApiClient {
     // Request interceptor for authentication
     this.client.interceptors.request.use(
       (config) => {
+        console.log('[API] Request:', config.method?.toUpperCase(), config.url)
         const token = localStorage.getItem('auth_token')
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
         return config
       },
-      (error) => Promise.reject(error)
+      (error) => {
+        console.error('[API] Request error:', error)
+        return Promise.reject(error)
+      }
     )
 
     // Response interceptor for error handling
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        console.log('[API] Response:', response.status, response.config.url, response.data)
+        return response
+      },
       (error) => {
+        console.error('[API] Response error:', {
+          url: error.config?.url,
+          status: error.response?.status,
+          message: error.message,
+          data: error.response?.data
+        })
+        
         if (error.response?.status === 401) {
           // Handle unauthorized access
           localStorage.removeItem('auth_token')
           localStorage.removeItem('refresh_token')
-          window.location.href = '/login'
+          // Only redirect to login if we're not already there
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login'
+          }
         }
         return Promise.reject(error)
       }
@@ -53,28 +70,28 @@ export class ApiClient {
 
   // Generic CRUD methods
   async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
-    const response: AxiosResponse<ApiResponse<T>> = await this.client.get(endpoint, { params })
-    return response.data.data
+    const response: AxiosResponse<T> = await this.client.get(endpoint, { params })
+    return response.data
   }
 
   async post<T>(endpoint: string, data: any): Promise<T> {
-    const response: AxiosResponse<ApiResponse<T>> = await this.client.post(endpoint, data)
-    return response.data.data
+    const response: AxiosResponse<T> = await this.client.post(endpoint, data)
+    return response.data
   }
 
   async put<T>(endpoint: string, data: any): Promise<T> {
-    const response: AxiosResponse<ApiResponse<T>> = await this.client.put(endpoint, data)
-    return response.data.data
+    const response: AxiosResponse<T> = await this.client.put(endpoint, data)
+    return response.data
   }
 
   async patch<T>(endpoint: string, data: any): Promise<T> {
-    const response: AxiosResponse<ApiResponse<T>> = await this.client.patch(endpoint, data)
-    return response.data.data
+    const response: AxiosResponse<T> = await this.client.patch(endpoint, data)
+    return response.data
   }
 
   async delete<T>(endpoint: string): Promise<T> {
-    const response: AxiosResponse<ApiResponse<T>> = await this.client.delete(endpoint)
-    return response.data.data
+    const response: AxiosResponse<T> = await this.client.delete(endpoint)
+    return response.data
   }
 
   // File upload method
@@ -104,14 +121,14 @@ export class ApiClient {
     pageSize = 20,
     params?: Record<string, any>
   ): Promise<PaginatedResponse<T>> {
-    const response: AxiosResponse<ApiResponse<PaginatedResponse<T>>> = await this.client.get(endpoint, {
+    const response: AxiosResponse<PaginatedResponse<T>> = await this.client.get(endpoint, {
       params: {
         page,
         page_size: pageSize,
         ...params
       }
     })
-    return response.data.data
+    return response.data
   }
 
   // Search method
@@ -120,13 +137,13 @@ export class ApiClient {
     query: string,
     filters?: Record<string, any>
   ): Promise<T[]> {
-    const response: AxiosResponse<ApiResponse<T[]>> = await this.client.get(endpoint, {
+    const response: AxiosResponse<T[]> = await this.client.get(endpoint, {
       params: {
         q: query,
         ...filters
       }
     })
-    return response.data.data
+    return response.data
   }
 
   // Batch operations

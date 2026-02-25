@@ -259,35 +259,65 @@ const connectionStatus = computed(() => {
 
 // Methods
 const loadProjects = async () => {
+  console.log('[MainLayout] Loading projects...')
   try {
     await projectsStore.fetchProjects()
+    console.log('[MainLayout] Projects loaded:', projectsStore.projects.length)
+    
     if (projectsStore.projects.length > 0 && !selectedProjectId.value) {
       selectedProjectId.value = projectsStore.projects[0].id
+      console.log('[MainLayout] Auto-selected project:', selectedProjectId.value)
       await onProjectChange(projectsStore.projects[0].id)
+    } else if (projectsStore.projects.length === 0) {
+      console.warn('[MainLayout] No projects found')
+      $q.notify({
+        type: 'warning',
+        message: 'No projects found',
+        caption: 'Create a new project to get started'
+      })
     }
   } catch (error) {
+    console.error('[MainLayout] Failed to load projects:', error)
     $q.notify({
       type: 'negative',
-      message: 'Failed to load projects'
+      message: 'Failed to load projects',
+      caption: error instanceof Error ? error.message : 'Unknown error'
     })
   }
 }
 
-const onProjectChange = async (projectId: number) => {
-  if (!projectId) return
+const onProjectChange = async (projectId: number | { id: number; name: string; label: string }) => {
+  // Handle both direct ID and object from q-select
+  const id = typeof projectId === 'number' ? projectId : projectId.id
+  
+  if (!id) {
+    console.warn('[MainLayout] onProjectChange called with invalid ID:', projectId)
+    return
+  }
 
+  console.log('[MainLayout] Changing to project:', id)
+  
   try {
-    await projectsStore.fetchProjectSummary(projectId)
-    await websocketService.subscribeToProject(projectId)
+    await projectsStore.fetchProjectSummary(id)
+    console.log('[MainLayout] Project loaded:', projectsStore.currentProject?.name)
+    
+    // Subscribe to WebSocket updates if connected
+    if (websocketService.connected.value) {
+      await websocketService.subscribeToProject(id)
+      console.log('[MainLayout] Subscribed to project WebSocket updates')
+    }
 
     $q.notify({
       type: 'positive',
-      message: `Loaded project: ${projectsStore.currentProject?.name}`
+      message: `Loaded project: ${projectsStore.currentProject?.name}`,
+      timeout: 2000
     })
   } catch (error) {
+    console.error('[MainLayout] Failed to load project:', error)
     $q.notify({
       type: 'negative',
-      message: 'Failed to load project data'
+      message: 'Failed to load project data',
+      caption: error instanceof Error ? error.message : 'Unknown error'
     })
   }
 }
@@ -403,9 +433,18 @@ const refreshData = async () => {
 // WebSocket connection
 const connectWebSocket = async () => {
   try {
+    console.log('[MainLayout] Attempting WebSocket connection...')
     await websocketService.connect()
+    console.log('[MainLayout] WebSocket connected successfully')
   } catch (error) {
-    console.warn('WebSocket connection failed:', error)
+    console.warn('[MainLayout] WebSocket connection failed:', error)
+    // Don't fail the app if WebSocket doesn't connect
+    $q.notify({
+      type: 'warning',
+      message: 'Real-time updates unavailable',
+      caption: 'WebSocket connection failed - some features may be limited',
+      timeout: 3000
+    })
   }
 }
 
@@ -417,7 +456,9 @@ onMounted(async () => {
 
 // Watch for authentication changes
 watch(() => authStore.isAuthenticated, async (isAuthenticated) => {
-  if (!isAuthenticated) {
+  // Only redirect to login if not in dev mode
+  if (!isAuthenticated && import.meta.env.VITE_DEV_MODE !== 'true') {
+    console.log('[MainLayout] User not authenticated, redirecting to login')
     router.push('/login')
   }
 })
