@@ -86,6 +86,7 @@ class ImmersiveActivity : AppSystemActivity() {
 
     private enum class VoiceState { IDLE, AWAITING_CONFIRMATION, GENERATING }
     private var voiceState = VoiceState.IDLE
+    private var isImageDisplayed = false
     private var pendingTranscription = ""
     private var pendingConfirmationText: String? = null
     
@@ -619,53 +620,39 @@ class ImmersiveActivity : AppSystemActivity() {
     }
 
     /**
-     * Fetch the most recently created project from the backend and load its VR geometry.
-     * Safe to call at startup or when the user presses B in IDLE state to recover a
-     * missed generation (e.g. headset slept during the Ollama run).
+     * Load a specific project by ID from the backend and display its VR geometry.
+     * Safe to call from UI or background threads.
+     * 
+     * @param projectId The database ID of the project to load
      */
-    fun loadLatestProject() {
+    fun loadProjectById(projectId: Int) {
         if (locomotionEnabled) {
-            Log.i(TAG, "⏭️  loadLatestProject skipped — house already loaded")
+            Log.i(TAG, "⏭️ loadProjectById($projectId) skipped — house already loaded")
             return
         }
-        Log.i(TAG, "🔃 Loading latest project from backend…")
+        Log.i(TAG, "🔃 Loading project $projectId from backend…")
         activityScope.launch(Dispatchers.IO) {
             try {
-                val response = httpClient.newCall(
-                    Request.Builder().url("$SERVER_URL/api/v1/projects/latest").get().build()
-                ).execute()
-
-                if (!response.isSuccessful) {
-                    Log.w(TAG, "⚠️  /projects/latest returned HTTP ${response.code} — no project to load")
-                    return@launch
-                }
-
-                val json = JSONObject(response.body?.string() ?: "{}")
-                val projectId = json.optInt("project_id", -1)
-                val projectName = json.optString("project_name", "")
-                if (projectId == -1) {
-                    Log.w(TAG, "⚠️  /projects/latest returned no project_id")
-                    return@launch
-                }
-
-                Log.i(TAG, "📦 Auto-loading project $projectId '$projectName'")
+                // Fetch VR geometry for the specific project
                 val geometry = houseGenerator?.fetchVRGeometry(projectId)
                 if (geometry != null) {
                     runOnUiThread {
                         val spawnPos = houseGenerator?.buildFromGeometry(geometry)
                         if (spawnPos != null) {
                             scene.setViewOrigin(spawnPos.x, 0f, spawnPos.z, 0f)
-                            Log.i(TAG, "🧍 Auto-spawned at (${spawnPos.x}, ${spawnPos.z})")
+                            Log.i(TAG, "🧍 Spawned at (${spawnPos.x}, ${spawnPos.z})")
                         }
                         locomotionEnabled = true
                         voiceState = VoiceState.IDLE
-                        Log.i(TAG, "✅ Auto-load complete: '$projectName'")
+                        
+                        val projectName = geometry.optString("project_name", "Project $projectId")
+                        Log.i(TAG, "✅ Project loaded: '$projectName' (id=$projectId)")
                     }
                 } else {
-                    Log.w(TAG, "⚠️  fetchVRGeometry returned null for project $projectId")
+                    Log.w(TAG, "⚠️ fetchVRGeometry returned null for project $projectId")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "❌ loadLatestProject failed", e)
+                Log.e(TAG, "❌ loadProjectById($projectId) failed", e)
             }
         }
     }
@@ -756,12 +743,13 @@ class ImmersiveActivity : AppSystemActivity() {
                     </head>
                     <body>
                         <img src="$imageUrl" alt="Generated Image" />
-                        <p>Hold A to start a new generation</p>
+                        <p>Hold A: new generation &nbsp;|&nbsp; B: dismiss image</p>
                     </body>
                     </html>
                 """.trimIndent()
 
                 wv.loadDataWithBaseURL("$SERVER_URL/", imageHtml, "text/html", "UTF-8", null)
+                isImageDisplayed = true
                 Log.i(TAG, "✅ Image loaded into dashboard panel")
             } else {
                 Log.e(TAG, "❌ dashboardWebView is null, cannot display image")
@@ -769,6 +757,13 @@ class ImmersiveActivity : AppSystemActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to display image", e)
         }
+    }
+
+    private fun dismissGeneratedImage() {
+        val wv = dashboardWebView ?: return
+        isImageDisplayed = false
+        loadIdleHtml(wv)
+        Log.i(TAG, "🗑️ Generated image dismissed — panel returned to idle")
     }
 
     private fun createWavHeader(pcmAudioData: ByteArray, sampleRate: Int): ByteArray {
@@ -1019,15 +1014,15 @@ class ImmersiveActivity : AppSystemActivity() {
 
         android.os.Handler(Looper.getMainLooper()).postDelayed({ setupInitialConstruction() }, 500)
 
-        // Auto-load the most recent project on startup (recovers missed generations)
-        android.os.Handler(Looper.getMainLooper()).postDelayed({ loadLatestProject() }, 2000)
+        // ❌ REMOVED: Auto-load on startup - projects now loaded explicitly via dashboard
+        // android.os.Handler(Looper.getMainLooper()).postDelayed({ loadLatestProject() }, 2000)
 
         // Create the dashboard panel entity programmatically so the panel { } callback fires.
         // Scene-defined panel entities do NOT trigger panel { } — only Entity.create() does.
         Log.i(TAG, "📺 Creating dashboard panel entity programmatically")
         val panelEntity = Entity.create()
         panelEntity.setComponent(Panel(R.layout.ui_example))
-        panelEntity.setComponent(Transform(Pose(t = Vector3(0.3f, 1.1f, -1.7f))))
+        panelEntity.setComponent(Transform(Pose(t = Vector3(2.3f, 1.1f, 2.7f))))
         panelEntity.setComponent(Grabbable())
         panelEntity.setComponent(Visible(true))
         dashboardPanelEntity = panelEntity
@@ -1038,7 +1033,7 @@ class ImmersiveActivity : AppSystemActivity() {
         Log.i(TAG, "🌐 Creating web panel entity programmatically")
         val webPanelEntityLocal = Entity.create()
         webPanelEntityLocal.setComponent(Panel(R.layout.web_panel))
-        webPanelEntityLocal.setComponent(Transform(Pose(t = Vector3(-1.9f, 1.1f, -1.7f))))
+        webPanelEntityLocal.setComponent(Transform(Pose(t = Vector3(-2.5f, 1.1f, 2.7f))))
         webPanelEntityLocal.setComponent(Grabbable())
         webPanelEntityLocal.setComponent(Visible(true))
         webPanelEntity = webPanelEntityLocal
@@ -1117,11 +1112,23 @@ class ImmersiveActivity : AppSystemActivity() {
         private fun processRightController(state: ControllerState, controllerEntity: Entity) {
             handleVoiceInput(state, controllerEntity)
             if (locomotionEnabled) {
-                // Explore mode: trigger = teleport to aimed floor position
+                // Explore mode: trigger = teleport, B = clear house
                 val now = System.currentTimeMillis()
                 if (state.trigger && (now - teleportDebounceTimer > 300L)) {
                     teleportDebounceTimer = now
                     handleTeleportation(state.pose)
+                }
+                if (state.buttonB && !isImageDisplayed && (now - buttonBDebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
+                    buttonBDebounceTimer = now
+                    Log.i(TAG, "🗑️ Button B — clearing house")
+                    runOnUiThread {
+                        houseGenerator?.clearAllEntities()
+                        roomLabelEntities.forEach { it.destroy() }
+                        roomLabelEntities.clear()
+                        locomotionEnabled = false
+                        dashboardPanelEntity?.setComponent(Transform(Pose(t = Vector3(0.3f, 1.1f, 2.7f))))
+                        webPanelEntity?.setComponent(Transform(Pose(t = Vector3(-1.9f, 1.1f, 2.7f))))
+                    }
                 }
             } else {
                 // Construction mode: trigger = place element, B = delete
@@ -1151,12 +1158,20 @@ class ImmersiveActivity : AppSystemActivity() {
             // If generating, block all input
             if (voiceState == VoiceState.GENERATING) return
 
-            // IDLE: B = reload last project (recovery if headset slept during generation)
-            if (state.buttonB && !locomotionEnabled && (now - buttonBDebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
+            // Button B dismisses the generated image when one is displayed
+            if (isImageDisplayed && state.buttonB && (now - buttonBDebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
                 buttonBDebounceTimer = now
-                Log.i(TAG, "🔃 Button B in IDLE — loading latest project")
-                loadLatestProject()
+                Log.i(TAG, "🗑️ Button B pressed — dismissing generated image")
+                runOnUiThread { dismissGeneratedImage() }
+                return
             }
+
+            // ❌ REMOVED: Button B auto-load functionality - projects now loaded via dashboard
+            // if (state.buttonB && !locomotionEnabled && (now - buttonBDebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
+            //     buttonBDebounceTimer = now
+            //     Log.i(TAG, "🔃 Button B in IDLE — loading latest project")
+            //     loadLatestProject()
+            // }
 
             // Normal voice recording (IDLE state)
             if (state.buttonA) {
@@ -1462,6 +1477,17 @@ class ImmersiveActivity : AppSystemActivity() {
                     val wv = rootView?.findViewById<WebView>(R.id.web_view) ?: return@panel
                     wv.settings.javaScriptEnabled = true
                     wv.settings.domStorageEnabled = true
+                    
+                    // Add JavaScript interface for dashboard to trigger VR loading
+                    wv.addJavascriptInterface(object {
+                        @JavascriptInterface
+                        fun loadProject(projectId: Int) {
+                            Log.i(TAG, "📲 Dashboard requested loadProject($projectId)")
+                            runOnUiThread { loadProjectById(projectId) }
+                        }
+                    }, "Android")
+                    
+                    Log.i(TAG, "🌐 Web panel JS interface registered - Android.loadProject() available")
                     wv.loadUrl("http://192.168.7.249:3000")
                 }
             },

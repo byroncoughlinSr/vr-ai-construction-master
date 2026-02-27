@@ -13,7 +13,7 @@ export class ApiClient {
   constructor(config: Partial<ApiClientConfig> = {}) {
     this.client = axios.create({
       baseURL: config.baseURL || import.meta.env.VITE_API_BASE_URL,
-      timeout: config.timeout || 30000,
+      timeout: config.timeout || 900000, // 15 minutes timeout for long-running operations like image generation
       headers: {
         'Content-Type': 'application/json',
         ...config.headers
