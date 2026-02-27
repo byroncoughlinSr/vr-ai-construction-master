@@ -15,6 +15,7 @@
         {{ error }}
         <template v-slot:action>
           <q-btn flat label="Retry" @click="refreshData" />
+          <q-btn flat label="Load to VR" @click="loadProjectToVR" icon="view_in_ar" />
         </template>
       </q-banner>
     </div>
@@ -39,6 +40,15 @@
             icon="refresh"
             @click="refreshData"
             :loading="loading"
+            class="q-mr-sm"
+          />
+          <q-btn
+            color="secondary"
+            label="Load to VR"
+            icon="view_in_ar"
+            @click="loadProjectToVR"
+            :loading="loading"
+            :disable="!project"
           />
         </div>
       </div>
@@ -255,6 +265,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { useProjectsStore } from 'stores/projects'
 import { useMaterialsStore } from 'stores/materials'
+import { apiClient } from 'src/services/api'
 import BudgetPieChart from 'components/BudgetPieChart.vue'
 import CostTrendChart from 'components/CostTrendChart.vue'
 import TimelineGantt from 'components/TimelineGantt.vue'
@@ -398,6 +409,83 @@ const refreshData = async (): Promise<void> => {
       message: 'Dashboard data refreshed'
     })
   }
+}
+
+const loadProjectToVR = (): void => {
+  const projectId = projectsStore.currentProject?.id
+  const projectName = projectsStore.currentProject?.name || 'Project'
+  
+  if (!projectId) {
+    $q.notify({
+      type: 'warning',
+      message: 'No project selected',
+      caption: 'Please select a project first'
+    })
+    return
+  }
+  
+  // Show immediate feedback
+  $q.notify({
+    type: 'info',
+    message: `Loading "${projectName}" into VR`,
+    caption: 'Request sent to backend...',
+    timeout: 2000
+  })
+  
+  // Fire-and-forget: Send request without waiting for response
+  apiClient.post<{
+    success: boolean
+    project_id: number
+    project_name: string
+    generation_id: string
+    status: string
+    message: string
+    websocket_url: string
+    vr_geometry_url: string
+  }>(`/projects/${projectId}/load-to-vr`, {})
+    .then((response) => {
+      // Handle success in background
+      console.log(`✅ Project ${projectId} load initiated, generation_id: ${response.generation_id}`)
+      $q.notify({
+        type: 'positive',
+        message: 'VR load started successfully',
+        caption: 'Image generation in progress...',
+        timeout: 2000
+      })
+      
+      // Trigger VR Quest app to load the project
+      try {
+        // Check if running in VR Quest WebView with Android interface
+        if (typeof (window as any).Android !== 'undefined' && 
+            typeof (window as any).Android.loadProject === 'function') {
+          console.log(`📲 Calling Android.loadProject(${projectId})`)
+          ;(window as any).Android.loadProject(projectId)
+          $q.notify({
+            type: 'positive',
+            message: 'VR loading...',
+            caption: 'Check your Quest headset!',
+            timeout: 3000
+          })
+        } else {
+          console.log('ℹ️ Not in VR WebView - Android interface not available')
+        }
+      } catch (err) {
+        console.error('Failed to call Android.loadProject:', err)
+      }
+    })
+    .catch((err) => {
+      // Handle errors in background
+      console.error('Load to VR failed:', err)
+      $q.notify({
+        type: 'negative',
+        message: 'Failed to load project to VR',
+        caption: (err as Error).message,
+        timeout: 3000
+      })
+    })
+  
+  // Don't wait - return immediately
+  console.log(`🚀 Load to VR request sent for project ${projectId}`)
 }
 
 const formatCurrency = (value: number): string => {

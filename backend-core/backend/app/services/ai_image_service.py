@@ -28,32 +28,38 @@ class AIImageService:
         self.max_tokens = 75  # Safe limit for SD 1.5 (77 including special tokens)
         logger.info(f"AI Image Service initialized with device: {self.device}")
 
+    def _load_model_sync(self):
+        """Synchronous model loading - runs in thread pool."""
+        logger.info("Loading Stable Diffusion model (Realistic Vision)...")
+        
+        # Use architecture-focused realistic model
+        pipe = StableDiffusionPipeline.from_pretrained(
+            "SG161222/Realistic_Vision_V5.1_noVAE",
+            torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+            safety_checker=None,
+            requires_safety_checker=False
+        )
+        
+        # Use better scheduler for quality
+        pipe.scheduler = DPMSolverMultistepScheduler(
+            beta_start=0.00085,
+            beta_end=0.012,
+            beta_schedule="scaled_linear",
+            num_train_timesteps=1000,
+            algorithm_type="dpmsolver++",
+            solver_order=2,
+            final_sigmas_type="sigma_min"
+        )
+        
+        return pipe.to(self.device)
+    
     async def initialize_model(self):
         """Initialize the Stable Diffusion model with Compel support."""
         if self.pipe is None:
             try:
-                logger.info("Loading Stable Diffusion model (Realistic Vision)...")
-                
-                # Use architecture-focused realistic model
-                self.pipe = StableDiffusionPipeline.from_pretrained(
-                    "SG161222/Realistic_Vision_V5.1_noVAE",
-                    torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                    safety_checker=None,
-                    requires_safety_checker=False
-                )
-                
-                # Use better scheduler for quality
-                self.pipe.scheduler = DPMSolverMultistepScheduler(
-                    beta_start=0.00085,
-                    beta_end=0.012,
-                    beta_schedule="scaled_linear",
-                    num_train_timesteps=1000,
-                    algorithm_type="dpmsolver++",
-                    solver_order=2,
-                    final_sigmas_type="sigma_min"
-                )
-                
-                self.pipe = self.pipe.to(self.device)
+                # Run blocking model loading in thread pool
+                loop = asyncio.get_event_loop()
+                self.pipe = await loop.run_in_executor(None, self._load_model_sync)
                 
                 # Initialize Compel for long prompt support (bypasses 77 token limit)
                 self.compel = Compel(
@@ -220,24 +226,30 @@ class AIImageService:
             prompt_tokens = self.count_tokens(prompt)
             use_compel = prompt_tokens > self.max_tokens or self.compel is not None
 
-            if use_compel and self.compel is not None:
-                logger.info("Using Compel path")
-                prompt_embeds = self.compel.build_conditioning_tensor(prompt)
-                negative_embeds = self.compel.build_conditioning_tensor(negative_prompt)
-                with torch.no_grad():
-                    result = self.pipe(
-                        prompt_embeds=prompt_embeds,
-                        negative_prompt_embeds=negative_embeds,
-                        **pipeline_kwargs
-                    )
-            else:
-                logger.info("Using standard prompt (fits in 77 tokens)")
-                with torch.no_grad():
-                    result = self.pipe(
-                        prompt=prompt,
-                        negative_prompt=negative_prompt,
-                        **pipeline_kwargs  # CRITICAL: This was likely missing
-                    )
+            # Create synchronous generation function to run in thread pool
+            def generate_sync():
+                if use_compel and self.compel is not None:
+                    logger.info("Using Compel path")
+                    prompt_embeds = self.compel.build_conditioning_tensor(prompt)
+                    negative_embeds = self.compel.build_conditioning_tensor(negative_prompt)
+                    with torch.no_grad():
+                        return self.pipe(
+                            prompt_embeds=prompt_embeds,
+                            negative_prompt_embeds=negative_embeds,
+                            **pipeline_kwargs
+                        )
+                else:
+                    logger.info("Using standard prompt (fits in 77 tokens)")
+                    with torch.no_grad():
+                        return self.pipe(
+                            prompt=prompt,
+                            negative_prompt=negative_prompt,
+                            **pipeline_kwargs
+                        )
+            
+            # Run SD generation in thread pool to avoid blocking event loop
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, generate_sync)
 
             # Encode each image to base64 and save to disk
             images_output = []

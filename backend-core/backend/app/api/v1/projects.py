@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from sqlalchemy import or_, and_, func
 import logging
+import uuid
+import asyncio
 
 from ...database import get_db
 from ...models import Project
@@ -11,9 +13,12 @@ from ...schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
     ProjectListResponse, ProjectStats
 )
+from ...services import AIImageService
+from .websocket import send_image_progress_update, complete_image_generation, fail_image_generation
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+image_service = AIImageService()
 
 
 @router.post("/", response_model=ProjectResponse)
@@ -182,6 +187,95 @@ async def delete_project(
         )
 
 
+@router.post("/{project_id}/load-to-vr")
+async def load_project_to_vr(
+    project_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    """
+    Load an existing project into VR with image generation.
+    
+    This endpoint:
+    1. Validates the project exists
+    2. Starts background image generation with WebSocket progress
+    3. Prepares VR geometry (already available via /generate-vr)
+    4. Returns generation_id for tracking
+    
+    Use WebSocket /api/v1/ws/image-progress/{generation_id} for progress updates.
+    """
+    logger.info(f"🎮 Load-to-VR requested for project {project_id}")
+    
+    # Validate project exists
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    logger.info(f"📦 Project found: '{project.name}' (id={project_id})")
+    
+    try:
+        # Generate unique ID for image generation tracking
+        generation_id = str(uuid.uuid4())
+        
+        # Get project description for image generation
+        project_description = project.description or project.name
+        
+        # Start background image generation
+        async def background_image_generation():
+            try:
+                logger.info(f"🖼️ Starting image generation for project {project_id}")
+                
+                # Progress callback for WebSocket updates
+                async def progress_callback(progress_data):
+                    await send_image_progress_update(generation_id, progress_data)
+                
+                # Generate architectural visualization
+                result = await image_service.generate_architectural_visualization(
+                    design_description=project_description,
+                    style="modern",
+                    time_of_day="day",
+                    progress_callback=progress_callback,
+                    generation_id=generation_id
+                )
+                
+                if result["success"]:
+                    await complete_image_generation(generation_id, result)
+                    logger.info(f"✅ Image generation completed for project {project_id}")
+                else:
+                    error_msg = result.get('error', 'Unknown error')
+                    await fail_image_generation(generation_id, error_msg)
+                    logger.error(f"❌ Image generation failed: {error_msg}")
+                    
+            except Exception as e:
+                logger.error(f"❌ Background image generation error: {e}", exc_info=True)
+                await fail_image_generation(generation_id, str(e))
+        
+        # Start background task
+        asyncio.create_task(background_image_generation())
+        
+        # Return response immediately
+        return JSONResponse(
+            status_code=202,  # Accepted - processing in background
+            content={
+                "success": True,
+                "project_id": project_id,
+                "project_name": project.name,
+                "generation_id": generation_id,
+                "status": "processing",
+                "message": "Project loading to VR initiated. Image generation in progress.",
+                "websocket_url": f"/api/v1/ws/image-progress/{generation_id}",
+                "vr_geometry_url": f"/api/v1/projects/{project_id}/generate-vr"
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Load-to-VR failed for project {project_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load project to VR: {str(e)}"
+        )
+
+
 @router.get("/{project_id}/generate-vr")
 async def generate_vr_geometry(
     project_id: int,
@@ -273,7 +367,7 @@ async def generate_vr_geometry(
                         "position": {"x": x_offset + dimensions["length"]/2, "y": 0, "z": z_offset},
                         "width": 3.0,
                         "height": 6.67,
-                        "rotation": 0,
+                        "rotation": 90,  # EAST wall runs along Z-axis → 90° Y-rotation
                         "door_type": "interior"
                     })
 
@@ -282,7 +376,7 @@ async def generate_vr_geometry(
                         "position": {"x": x_offset, "y": 3.0, "z": z_offset + dimensions["width"]/2},
                         "width": 4.0,
                         "height": 5.0,
-                        "rotation": 270,
+                        "rotation": 180,  # NORTH wall runs along -X-axis → 180° Y-rotation
                         "glass_type": "double_pane"
                     })
 
@@ -341,7 +435,7 @@ async def generate_vr_geometry(
                     "position": {"x": x_offset + dimensions["length"]/2, "y": 0, "z": z_offset},
                     "width": 3.0,
                     "height": 6.67,
-                    "rotation": 0,
+                    "rotation": 90,  # EAST wall runs along Z-axis → 90° Y-rotation
                     "door_type": "interior"
                 })
 
@@ -350,7 +444,7 @@ async def generate_vr_geometry(
                     "position": {"x": x_offset, "y": 3.0, "z": z_offset + dimensions["width"]/2},
                     "width": 4.0,
                     "height": 5.0,
-                    "rotation": 270,
+                    "rotation": 180,  # NORTH wall runs along -X-axis → 180° Y-rotation
                     "glass_type": "double_pane"
                 })
 

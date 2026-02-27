@@ -195,9 +195,9 @@ class HouseGenerator(private val serverUrl: String) {
             unlit = false
         })
 
-        // Calculate rotation angle
-        val angle = Math.atan2(dz.toDouble(), dx.toDouble()).toFloat()
-        val quat = com.meta.spatial.core.Quaternion(0f, angle, 0f)
+        // Calculate rotation angle — atan2 returns radians, Quaternion expects degrees
+        val angleDeg = Math.toDegrees(Math.atan2(dz.toDouble(), dx.toDouble())).toFloat()
+        val quat = com.meta.spatial.core.Quaternion(0f, angleDeg, 0f)
 
         entity.setComponent(Transform(Pose(
             t = Vector3(centerX, centerY, centerZ),
@@ -296,6 +296,7 @@ class HouseGenerator(private val serverUrl: String) {
         val x = position.optDouble("x", 0.0).toFloat()
         val y = position.optDouble("y", 0.0).toFloat()
         val z = position.optDouble("z", 0.0).toFloat()
+        val rotationDeg = rotation.toFloat()
 
         // Create door frame entity
         val entity = Entity.create()
@@ -306,7 +307,8 @@ class HouseGenerator(private val serverUrl: String) {
             roughness = 0.6f
             unlit = false
         })
-        entity.setComponent(Transform(Pose(t = Vector3(x, height / 2, z))))
+        val doorQuat = com.meta.spatial.core.Quaternion(0f, rotationDeg, 0f)
+        entity.setComponent(Transform(Pose(t = Vector3(x, height / 2, z), q = doorQuat)))
         entity.setComponent(Visible(true))
 
         doorEntities.add(entity)
@@ -319,6 +321,7 @@ class HouseGenerator(private val serverUrl: String) {
         val position = windowJson.getJSONObject("position")
         val width = windowJson.optDouble("width", 4.0).toFloat()
         val height = windowJson.optDouble("height", 5.0).toFloat()
+        val rotationDeg = windowJson.optDouble("rotation", 0.0).toFloat()
 
         val x = position.optDouble("x", 0.0).toFloat()
         val y = position.optDouble("y", 3.0).toFloat()
@@ -334,7 +337,8 @@ class HouseGenerator(private val serverUrl: String) {
             metallic = 0.1f
             unlit = false
         })
-        entity.setComponent(Transform(Pose(t = Vector3(x, y, z))))
+        val windowQuat = com.meta.spatial.core.Quaternion(0f, rotationDeg, 0f)
+        entity.setComponent(Transform(Pose(t = Vector3(x, y, z), q = windowQuat)))
         entity.setComponent(Visible(true))
 
         windowEntities.add(entity)
