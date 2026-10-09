@@ -325,3 +325,7 @@ libs/
 # Generated source files
 /app/src/main/generated/
 
+
+# opencode editor tool config
+.opencode/
+opencode.jsonc
