@@ -15,6 +15,10 @@ class Settings(BaseSettings):
     ollama_url: str = "http://localhost:11434"
     gemini_api_key: Optional[str] = None
 
+    # Groq cloud LLM (primary planner)
+    groq_api_key: Optional[str] = None
+    groq_model: str = "llama-3.3-70b-versatile"
+
     # File paths
     uploads_dir: str = "uploads"
     generated_images_dir: str = "generated_images"

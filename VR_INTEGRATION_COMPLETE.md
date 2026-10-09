@@ -115,7 +115,7 @@ Open http://localhost:3000 and click "Load to VR". You'll see console logs showi
 
 1. **Deploy updated Quest app** to your headset
 2. **Launch the app** in VR
-3. **Look at the dashboard panel** (should show Vue/Quasar UI at http://192.168.7.249:3000)
+3. **Look at the dashboard panel** (should show Vue/Quasar UI at http://192.168.4.249:3000)
 4. **Click "Load to VR" button** for any project
 5. **Watch the console logs** in Android Studio Logcat:
    ```

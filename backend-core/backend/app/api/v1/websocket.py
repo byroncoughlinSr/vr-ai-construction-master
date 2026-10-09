@@ -105,6 +105,7 @@ manager = ConnectionManager()
 # Image generation progress tracking
 image_generation_progress: Dict[str, Dict[str, Any]] = {}  # generation_id -> progress data
 image_generation_completed: Dict[str, Dict[str, Any]] = {}  # generation_id -> completed result
+image_generation_failed: Dict[str, Dict[str, Any]] = {}  # generation_id -> failure data
 progress_connections: Dict[str, List[WebSocket]] = {}  # generation_id -> list of connections
 
 
@@ -550,6 +551,24 @@ async def image_progress_websocket(websocket: WebSocket, generation_id: str):
             await websocket.close()
         return
 
+    # If generation already failed before the client connected, send the error immediately
+    # and close. Without this a client that connects after a fast failure (model load
+    # error, CUDA OOM) never hears anything and waits forever.
+    if generation_id in image_generation_failed:
+        logger.info(f"Generation {generation_id} already failed — sending error to late client")
+        try:
+            await websocket.send_json({
+                "type": "error",
+                **image_generation_failed[generation_id]
+            })
+        except Exception as e:
+            logger.error(f"Failed to send late-connect error: {e}")
+        finally:
+            if generation_id in progress_connections and websocket in progress_connections[generation_id]:
+                progress_connections[generation_id].remove(websocket)
+            await websocket.close()
+        return
+
     # Send current progress if generation is still in progress
     if generation_id in image_generation_progress:
         try:
@@ -662,16 +681,22 @@ async def complete_image_generation(generation_id: str, result: Dict[str, Any]):
 
 async def fail_image_generation(generation_id: str, error: str):
     """
-    Mark image generation as failed and send error to clients.
+    Mark image generation as failed and send the error to clients.
+    Stores the failure so late-connecting clients can still receive it — mirrors
+    complete_image_generation, which does the same for successful results.
     """
-    if generation_id in progress_connections:
-        error_data = {
-            "generation_id": generation_id,
-            "status": "failed",
-            "error": error,
-            "timestamp": datetime.utcnow().isoformat()
-        }
+    error_data = {
+        "generation_id": generation_id,
+        "status": "failed",
+        "error": error,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
+    # Persist failure for any clients that connect after the generation failed
+    image_generation_failed[generation_id] = error_data
+
+    # Send to any already-connected clients
+    if generation_id in progress_connections:
         for websocket in progress_connections[generation_id]:
             try:
                 await websocket.send_json({
@@ -681,9 +706,9 @@ async def fail_image_generation(generation_id: str, error: str):
             except Exception as e:
                 logger.error(f"Failed to send error message: {e}")
 
-        # Clean up progress data on failure
-        if generation_id in image_generation_progress:
-            del image_generation_progress[generation_id]
+    # Clean up progress data on failure
+    if generation_id in image_generation_progress:
+        del image_generation_progress[generation_id]
 
 
 @router.get("/image-progress/{generation_id}/status")
@@ -695,6 +720,12 @@ async def get_image_generation_status(generation_id: str):
             "status": "in_progress",
             "progress": image_generation_progress[generation_id],
             "connections": len(progress_connections.get(generation_id, []))
+        }
+    elif generation_id in image_generation_failed:
+        return {
+            "generation_id": generation_id,
+            "status": "failed",
+            "error": image_generation_failed[generation_id]["error"]
         }
     else:
         return {

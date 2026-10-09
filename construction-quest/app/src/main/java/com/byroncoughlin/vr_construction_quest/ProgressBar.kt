@@ -18,7 +18,7 @@ import com.meta.spatial.toolkit.Visible
  * visibility must be set on each visual entity individually.
  * All positions are in world space.
  */
-class ProgressBar(
+class VRProgressBar(
     private val width: Float = 1.0f,
     private val height: Float = 0.05f,
     private val depth: Float = 0.02f,

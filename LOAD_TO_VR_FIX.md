@@ -120,7 +120,7 @@ async def background_image_generation():
 
 ```bash
 # Check if backend is responding
-curl http://192.168.7.249:8000/health
+curl http://192.168.4.249:8000/health
 
 # Check backend process
 ps aux | grep uvicorn
@@ -129,7 +129,7 @@ ps aux | grep uvicorn
 tail -f backend-core/backend/*.log
 
 # Test Load to VR endpoint directly
-curl -X POST "http://192.168.7.249:8000/api/v1/projects/1/load-to-vr" \
+curl -X POST "http://192.168.4.249:8000/api/v1/projects/1/load-to-vr" \
   -H "Content-Type: application/json" -d '{}'
 
 # Check generated images

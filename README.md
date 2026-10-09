@@ -1,253 +1,172 @@
 # VR AI Construction Project
 
-A professional-grade VR construction design platform that combines AI-powered planning with immersive virtual reality design tools. Design, plan, and visualize construction projects in VR using Meta Quest, powered by machine learning for intelligent assistance.
+End-to-end pipeline that turns a spoken prompt into a walkable VR house on Meta Quest 2/3. Speak a design, watch an AI generate the plan and renderings, then step inside the generated 3D environment.
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12+-green.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-orange.svg)](https://fastapi.tiangolo.com/)
 [![Vue.js](https://img.shields.io/badge/Vue.js-3-green.svg)](https://vuejs.org/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-Meta%20Spatial%20SDK-purple.svg)](https://developers.meta.com/horizon/develop/spatial-sdk/)
 [![Android](https://img.shields.io/badge/Android-API%2034+-brightgreen.svg)](https://developer.android.com/)
-[![C++](https://img.shields.io/badge/C++-17+-blue.svg)](https://isocpp.org/)
 
-## 🎯 Active Project: The Tiny House
-
-**Objective:** Design a 20sqm modern tiny house with AI-assisted planning
-- **Base Materials:** Cedar Wood & Concrete
-- **Key Features:** Floor-to-ceiling glass windows, lofted sleeping area, modular wall layout
-- **AI Integration:** Materials list generation and cost estimation
-
-## 🏗️ Architecture Overview
+## Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Meta Quest    │    │   Backend Core   │    │   Dashboard     │
-│   (VR Design)   │◄──►│   (AI Services)  │◄──►│   (Management)  │
+│   Meta Quest    │    │   Backend Core   │    │    Dashboard    │
+│    (VR App)     │◄──►│  (AI Services)   │◄──►│   (Web UI)      │
 │                 │    │                  │    │                 │
-│ • C++ Engine    │    │ • FastAPI        │    │ • Vue.js        │
-│ • OpenXR        │    │ • PostgreSQL     │    │ • Quasar        │
-│ • Voice Control │    │ • AI Models      │    │ • Charts        │
+│ • Kotlin        │    │ • FastAPI        │    │ • Vue 3         │
+│ • Meta Spatial  │    │ • PostgreSQL     │    │ • Quasar        │
+│ • OpenXR        │    │ • Ollama         │    │ • Pinia         │
+│ • Voice / WS    │    │ • Stable Diff.   │    │ • Charts        │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
-## 📦 Components
+- **Backend server:** `http://192.168.4.249:8000`
+- **Dashboard dev server:** `http://localhost:3001`
+- **WebSocket base:** `ws://192.168.4.249:8000/api/v1/ws`
 
-### Backend Core
+## Voice-to-VR Pipeline
 
-A comprehensive FastAPI-based backend service providing AI-powered construction planning and management.
+The implemented end-to-end flow in [ImmersiveActivity.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/ImmersiveActivity.kt):
 
-**Key Features:**
-- **AI-Powered Generation**: Stable Diffusion for architectural visualization, Ollama for construction planning
-- **Voice Integration**: Whisper STT for voice commands and design input
-- **Database Management**: PostgreSQL with comprehensive project tracking (15+ tables)
-- **Real-time Communication**: WebSocket support for live updates
-- **Export Capabilities**: PDF reports, HTML viewers, and VR geometry generation
+1. **Record** — Hold Button A to capture a voice prompt.
+2. **Transcribe** — Audio is sent to `POST /api/v1/voice/transcribe` (Whisper).
+3. **Confirm** — A WebView HTML panel shows the transcription; Button A confirms, Button B retries.
+4. **Plan** — `POST /api/v1/planning/generate-project` returns a full AI project: phases, tasks, materials, cost, timeline, and a generated image prompt.
+5. **Display plan** — Project info panel renders name, cost, timeline, phases, and materials.
+6. **Watch image generation** — VR [ProgressBar.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/ProgressBar.kt) connects to the image WebSocket and animates until the rendered house image is shown on a panel.
+7. **Walk the house** — [HouseGenerator.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/HouseGenerator.kt) fetches geometry from `GET /api/v1/projects/{id}/generate-vr` on an IO thread, then builds Meta Spatial entities on the main thread.
 
-**Tech Stack:**
-- **Backend**: FastAPI, SQLAlchemy 2.0, Pydantic
-- **Database**: PostgreSQL with Alembic migrations
-- **AI**: Stable Diffusion, Ollama (Llama 3.1), Whisper
-- **Frontend**: Vue.js 3 with Quasar Framework
-- **Containerization**: Docker with GPU support
+## Components
 
-**API Endpoints:**
-- `POST /api/v1/voice/transcribe` - Voice transcription
-- `POST /api/v1/projects/{id}/generate-vr` - VR geometry generation
-- `POST /api/v1/ai/image/generate` - AI image generation
-- `GET /api/v1/materials/` - Materials catalog
-- `GET /docs` - Interactive API documentation
+### Backend Core (`backend-core/backend`)
 
-For detailed setup and usage, see [backend-core/backend/README.md](backend-core/backend/README.md)
+FastAPI service that coordinates AI planning, image generation, voice transcription, and VR geometry.
 
-### Construction Quest
+- **Framework:** FastAPI, SQLAlchemy 2.0, Pydantic, Alembic
+- **Database:** PostgreSQL
+- **AI:** Ollama (Llama 3.1) for planning, Stable Diffusion for renderings, Whisper for speech-to-text
+- **Realtime:** WebSockets for image-generation progress and room collaboration
+- **Deployment:** Docker Compose with optional GPU profile
 
-A high-performance VR application for Meta Quest 2/3, built with a C++ core for maximum performance and low-latency interactions.
+Key endpoints used by the VR app:
 
-**Key Features:**
-- **Immersive Design**: Place walls, floors, and architectural elements in VR
-- **Voice Commands**: Natural language design input with AI processing
-- **Real-time VR Generation**: Walk through procedurally generated houses
-- **Precision Tools**: Grid snapping, measurement tools, teleportation
-- **Network Integration**: Real-time sync with backend services
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `POST` | `/api/v1/planning/generate-project` | Full AI project generation |
+| `GET`  | `/api/v1/projects/{id}/generate-vr` | VR geometry JSON |
+| `POST` | `/api/v1/voice/transcribe` | Whisper transcription |
+| `WS`   | `/api/v1/ws/image-progress/{id}` | Image generation progress |
+| `WS`   | `/api/v1/ws/room/{roomId}` | Real-time room collaboration |
+| `GET`  | `/docs` | Interactive OpenAPI docs |
 
-**Tech Stack:**
-- **Core Engine**: C++17 with OpenXR and Meta XR SDK
-- **Graphics**: OpenGL ES 3.2 / Vulkan
-- **Platform**: Android (API 34+) with JNI bridge
-- **Math**: GLM (OpenGL Mathematics)
-- **Networking**: libcurl for backend communication
-- **Build**: CMake with Gradle integration
+See [backend-core/backend/README.md](backend-core/backend/README.md) for setup details.
 
-**VR Capabilities:**
-- ✅ Walkable house generation from database designs
-- ✅ Voice-controlled design modifications
-- ✅ Real-time material and texture changes
-- ✅ Measurement and scaling tools
-- ✅ Collision detection and navigation
-- ✅ X-ray vision and room labeling
+### Dashboard (`backend-core/dashboard`)
 
-For technical details, see [construction-quest/documents/](construction-quest/documents/)
+Vue 3 + Quasar + Pinia management UI for projects, materials, generated images, and run history. Runs on port **3001**.
 
-## ✨ Key Features
+### Construction Quest VR App (`construction-quest`)
 
-### 🤖 AI-Powered Design
-- **Intelligent Planning**: AI generates construction phases, timelines, and cost estimates
-- **Voice Interface**: Natural language design input and modifications
-- **Image Generation**: Stable Diffusion creates realistic architectural visualizations
-- **Material Intelligence**: AI-assisted material selection and supplier matching
+Kotlin Android app for Meta Quest 2/3 built on the **Meta Spatial SDK** (OpenXR). No C++ core — all VR logic is Kotlin + Meta Spatial entities.
 
-### 🕶️ VR Immersion
-- **Walkable Designs**: Experience your house before construction begins
-- **Precision Placement**: Grid-based snapping with sub-centimeter accuracy
-- **Real-time Feedback**: Instant visual updates during design sessions
-- **Multi-scale Design**: From tiny houses to large commercial projects
+- **Platform:** Android API 34+, Meta Quest 2/3
+- **VR framework:** Meta Spatial SDK / OpenXR
+- **Networking:** OkHttp (HTTP + WebSocket)
+- **Build:** Gradle
 
-### 📊 Project Management
-- **Comprehensive Tracking**: Budget, timeline, resources, and compliance
-- **Visual Dashboards**: Charts and Gantt charts for project oversight
-- **Document Management**: Photos, receipts, blueprints, and permits
-- **Export Tools**: PDF reports, 3D models, and construction documents
+Core files:
 
-### 🔗 Seamless Integration
-- **Real-time Sync**: Changes in VR instantly update the database
-- **Cross-platform**: Design in VR, manage on web dashboard
-- **Voice Commands**: "Add a window here" or "Show me the kitchen"
-- **API-First**: RESTful APIs enable third-party integrations
+- [ImmersiveActivity.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/ImmersiveActivity.kt) — main VR activity, voice capture, WebSocket wiring, panels, generation orchestration
+- [HouseGenerator.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/HouseGenerator.kt) — fetches VR geometry and creates 3D entities (IO fetch → main-thread build)
+- [ProgressBar.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/ProgressBar.kt) — VR progress bar (background + fill entities) driven by the image-progress WebSocket
+- [PanelActivity.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/PanelActivity.kt) — WebView-backed confirmation and info panels
 
-## 🚀 Quick Start
+Technical notes live in [construction-quest/documents/](construction-quest/documents/).
+
+## Quick Start
 
 ### Prerequisites
-- **Meta Quest 2/3** (for VR design)
-- **Python 3.12+** (for backend)
-- **Node.js 18+** (for dashboard)
-- **Android Studio** (for VR app development)
-- **Docker** (recommended for backend)
-- **GPU** (optional, for faster AI generation)
 
-### Backend Setup
+- Meta Quest 2/3
+- Python 3.12+
+- Node.js 18+
+- Android Studio (Giraffe or newer)
+- Docker (recommended for backend)
+- NVIDIA GPU (recommended for Stable Diffusion)
+
+### Backend
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/vr-ai-construction-project.git
-cd vr-ai-construction-project/backend-core/backend
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up environment
-cp .env.example .env
-# Edit .env with your database and AI settings
-
-# Run with Docker (recommended)
+cd backend-core/backend
+cp .env.example .env      # edit DB + AI settings
 docker compose --profile dev up -d
-
-# Access API documentation
 open http://localhost:8000/docs
 ```
 
-### VR App Setup
-
-```bash
-cd construction-quest
-
-# Build with Gradle
-./gradlew assembleDebug
-
-# Install on connected Quest device
-./gradlew installDebug
-
-# Or build in Android Studio
-# Open construction-quest/ in Android Studio
-# Build → Make Project
-# Run → Run 'app'
-```
-
-### Dashboard Setup
+### Dashboard
 
 ```bash
 cd backend-core/dashboard
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
-
-# Access dashboard
-open http://localhost:5173
+open http://localhost:3001
 ```
 
-## 🎮 Usage Example
+### VR App
 
-1. **Start the Backend**: Run the FastAPI server with database and AI models
-2. **Launch VR App**: Open Construction Quest on Meta Quest
-3. **Design in VR**: Use controllers to place walls, add windows, set dimensions
-4. **Voice Commands**: Say "Make this room bigger" or "Add hardwood floors"
-5. **AI Assistance**: Request material suggestions or cost estimates
-6. **Generate VR House**: Walk through your design as a complete 3D environment
-7. **Manage Projects**: Use the web dashboard to track progress and budgets
+```bash
+cd construction-quest
+./gradlew assembleDebug
+./gradlew installDebug     # with Quest connected via adb
+```
 
-## 🛠️ Development
+Or open `construction-quest/` in Android Studio and Run.
 
-### Project Structure
+## Project Structure
+
 ```
 vr-ai-construction-project/
-├── backend-core/           # Backend services and dashboard
-│   ├── backend/           # FastAPI application
-│   └── dashboard/         # Vue.js management interface
-├── construction-quest/    # VR Android application
-│   ├── app/              # Android app with C++ engine
-│   └── documents/        # Technical specifications
-└── README.md             # This file
+├── backend-core/
+│   ├── backend/          # FastAPI application
+│   └── dashboard/        # Vue 3 + Quasar management UI
+├── construction-quest/   # Kotlin VR app (Meta Spatial SDK)
+│   ├── app/              # Android module
+│   └── documents/        # Technical notes
+└── README.md
 ```
 
-### Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Testing
+## Testing
 
 ```bash
-# Backend tests
-cd backend-core/backend
-pytest
+# Backend
+cd backend-core/backend && pytest
 
-# Dashboard tests
-cd backend-core/dashboard
-npm run test
+# Dashboard
+cd backend-core/dashboard && npm run test
 
-# VR app tests (Android)
-cd construction-quest
-./gradlew test
+# VR app
+cd construction-quest && ./gradlew test
 ```
 
-## 📚 Documentation
+## Roadmap
 
-- [Backend API Documentation](backend-core/backend/README.md)
-- [VR Technical Architecture](construction-quest/documents/cpp-technical-plan.md)
-- [AI Integration Guide](backend-core/Documents/backend-plan.md)
-- [VR House Generation Workflow](backend-core/Documents/vr-house-workflow.md)
+- AI furniture placement
+- Real-time multi-user VR collaboration
+- Advanced PBR textures
+- Construction phase simulation
+- CAD / PDF export
 
-## 🤝 Support
+## License
 
-- **Issues**: [GitHub Issues](https://github.com/your-username/vr-ai-construction-project/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/vr-ai-construction-project/discussions)
-- **Discord**: Join our community for real-time support
+MIT — see [LICENSE](LICENSE).
 
-## 📄 License
+## Acknowledgments
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Meta XR SDK and OpenXR for VR capabilities
-- Stability AI for Stable Diffusion models
-- Ollama for local AI model hosting
-- FastAPI and Vue.js communities for excellent frameworks
-
----
-
-**Experience the future of construction design - where AI meets virtual reality.** 🏠🤖🕶️
+- **Meta Spatial SDK** and **OpenXR** for the VR runtime
+- **Ollama** for local Llama 3.1 hosting
+- **Stability AI** for Stable Diffusion
+- **OpenAI Whisper** for speech-to-text
+- **FastAPI**, **Vue 3**, and **Quasar** communities
