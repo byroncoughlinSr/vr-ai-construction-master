@@ -6,7 +6,7 @@ import requests
 import json
 import time
 
-BASE_URL = "http://192.168.7.249:8000/api/v1"
+BASE_URL = "http://192.168.4.249:8000/api/v1"
 
 def test_backend_health():
     """Test if backend is running."""

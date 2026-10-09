@@ -10,6 +10,8 @@ import asyncio
 import logging
 
 from ...services import AIPlanningService, AIImageService
+from ...services.vr_geometry_service import build_geometry_from_rooms
+from ...config import settings
 from ...database import get_db
 from ...models import Project, ConstructionPhase, Task, Material
 from .websocket import send_image_progress_update, complete_image_generation, fail_image_generation
@@ -39,6 +41,12 @@ class CompleteProjectRequest(BaseModel):
     timeline_weeks: Optional[int] = None
     constraints: Optional[List[str]] = None
     generate_image: Optional[bool] = True
+
+
+class VRFromPromptRequest(BaseModel):
+    """Request model for prompt-only VR geometry generation."""
+    prompt: str
+    image_prompt: Optional[str] = None
 
 
 @router.post("/generate-plan")
@@ -83,11 +91,16 @@ async def get_service_status():
         return {
             "service": "AI Construction Planning",
             "status": "healthy",
+            "groq_available": planning_service.groq_available,
             "ollama_available": planning_service.ollama_available,
             "gemini_available": planning_service.gemini_available,
             "models": {
-                "primary": "Llama 3.1 8B (Ollama)" if planning_service.ollama_available else None,
-                "fallback": "Gemini Pro" if planning_service.gemini_available else None
+                "primary": f"{settings.groq_model} (Groq)" if planning_service.groq_available else (
+                    "Llama 3.1 8B (Ollama)" if planning_service.ollama_available else None
+                ),
+                "fallback": "Llama 3.1 8B (Ollama)" if planning_service.ollama_available else (
+                    "Gemini Pro" if planning_service.gemini_available else None
+                )
             },
             "capabilities": [
                 "construction plan generation",
@@ -110,6 +123,14 @@ async def list_available_models():
     """List available AI models for planning."""
     try:
         models = []
+
+        if planning_service.groq_available:
+            models.append({
+                "name": settings.groq_model,
+                "provider": "Groq",
+                "status": "available",
+                "capabilities": ["text generation", "planning", "analysis"]
+            })
 
         if planning_service.ollama_available:
             models.append({
@@ -333,4 +354,82 @@ async def generate_complete_project(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate project: {str(e)}"
+        )
+
+
+@router.post("/generate-vr-from-prompt")
+@limiter.limit("3/minute")
+async def generate_vr_from_prompt(
+    vr_request: VRFromPromptRequest,
+    request: Request,
+):
+    """
+    Generate VR geometry directly from a floor-plan prompt, without creating
+    a DB Project / phases / tasks / materials.
+
+    Used by the second voice prompt in the VR two-prompt flow: after the user
+    has confirmed a 2D image from prompt 1, they speak a second prompt
+    describing the floor plan. The optional ``image_prompt`` from prompt 1
+    is prepended as grounding context so the planning AI keeps the style
+    consistent with the accepted image.
+
+    This endpoint is fully stateless. The response has the same ``geometry``
+    shape as ``GET /projects/{id}/generate-vr``.
+    """
+    try:
+        if vr_request.image_prompt:
+            combined_prompt = (
+                f"{vr_request.image_prompt}\n\n"
+                f"Floor plan details: {vr_request.prompt}"
+            )
+        else:
+            combined_prompt = vr_request.prompt
+
+        logger.info(
+            f"🎯 VR-from-prompt: {combined_prompt[:160]}"
+            f"{'…' if len(combined_prompt) > 160 else ''}"
+        )
+
+        project_data = await planning_service.generate_complete_project(
+            project_description=combined_prompt,
+        )
+
+        if not project_data.get("success"):
+            raise HTTPException(
+                status_code=500,
+                detail=f"Plan generation failed: {project_data.get('error', 'unknown')}",
+            )
+
+        plan = project_data.get("plan", {}) or {}
+        project_structure = plan.get("project_structure", {}) or {}
+        rooms_ft = list(project_structure.get("rooms", []) or [])
+
+        if not rooms_ft:
+            logger.warning("⚠️  AI plan returned no rooms — VR scene will be empty")
+
+        geometry = build_geometry_from_rooms(
+            rooms_ft=rooms_ft,
+            materials=plan.get("material_list"),
+            project_id=None,
+            project_name=project_data.get("project_name", "Generated House"),
+        )
+
+        logger.info(
+            f"🎉 VR-from-prompt geometry ready: {len(geometry['rooms'])} rooms, "
+            f"{len(geometry['doors'])} doors, {len(geometry['windows'])} windows"
+        )
+
+        return {
+            "success": True,
+            "geometry": geometry,
+            "status": "ready",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"VR-from-prompt generation failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate VR geometry from prompt: {str(e)}",
         )

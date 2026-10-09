@@ -5,6 +5,7 @@ import re
 from typing import Optional, Dict, Any, List
 import ollama
 import google.generativeai as genai
+from groq import Groq
 
 from ..config import settings
 
@@ -15,9 +16,20 @@ class AIPlanningService:
     """Service for construction planning using LLM models."""
 
     def __init__(self):
+        self.groq_available = False
         self.ollama_available = False
         self.gemini_available = False
-        
+
+        # Initialize Groq client (primary planner) if API key is available
+        self.groq_client = None
+        if settings.groq_api_key:
+            try:
+                self.groq_client = Groq(api_key=settings.groq_api_key)
+                self.groq_available = True
+                logger.info(f"Groq API initialized (model: {settings.groq_model})")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Groq API: {e}")
+
         # Initialize Ollama client with custom host
         self.ollama_client = ollama.Client(host=settings.ollama_url)
 
@@ -62,30 +74,71 @@ class AIPlanningService:
             project_description, budget, timeline_weeks, constraints
         )
 
-        ollama_error = None
-        
-        # Try Ollama first, fallback to Gemini
+        last_error = None
+
+        # Priority chain: Groq (primary) -> Ollama -> Gemini
+        if self.groq_available:
+            try:
+                return await self._generate_with_groq(prompt)
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Groq planning failed, trying Ollama: {e}")
+
         if self.ollama_available:
             try:
                 return await self._generate_with_ollama(prompt)
             except Exception as e:
-                ollama_error = e
+                last_error = e
                 logger.warning(f"Ollama planning failed, trying Gemini: {e}")
-        
-        # Try Gemini if Ollama failed or wasn't available
+
         if self.gemini_available:
             try:
                 return await self._generate_with_gemini(prompt)
             except Exception as gemini_error:
                 logger.error(f"Gemini planning also failed: {gemini_error}")
-                # If both failed, raise the most recent error
                 raise gemini_error
-        
-        # If no service is available or both failed
-        if ollama_error:
-            raise ollama_error
+
+        # If no service is available or all failed
+        if last_error:
+            raise last_error
         else:
             raise Exception("No AI services available for planning")
+
+    async def _generate_with_groq(self, prompt: str) -> Dict[str, Any]:
+        """Generate construction plan using the Groq cloud API (primary planner)."""
+        try:
+            logger.info(f"Generating construction plan with Groq ({settings.groq_model})...")
+
+            loop = asyncio.get_event_loop()
+
+            def _groq_generate():
+                return self.groq_client.chat.completions.create(
+                    model=settings.groq_model,
+                    messages=[{'role': 'user', 'content': prompt}],
+                    temperature=0.7,
+                    top_p=0.9,
+                    max_tokens=4096,
+                    response_format={'type': 'json_object'},
+                )
+
+            # Groq is fast; a short timeout is plenty
+            response = await asyncio.wait_for(
+                loop.run_in_executor(None, _groq_generate),
+                timeout=120.0
+            )
+
+            content = response.choices[0].message.content
+            logger.info("Groq response received successfully")
+
+            # Reuse the shared repair pipeline as a safety net (JSON mode should be clean)
+            return self._parse_structured_plan(content, "groq")
+
+        except asyncio.TimeoutError:
+            logger.error("Groq generation timed out after 120 seconds")
+            raise Exception("Groq generation timed out")
+        except Exception as e:
+            logger.error(f"Groq generation failed: {e}")
+            raise
 
     async def _generate_with_ollama(self, prompt: str) -> Dict[str, Any]:
         """Generate construction plan using Ollama with reduced memory footprint."""
@@ -216,7 +269,29 @@ Requirements:
 Return ONLY the project name, nothing else."""
 
         try:
-            if self.ollama_available:
+            name = None
+
+            # Priority chain: Groq (primary) -> Ollama -> Gemini
+            if self.groq_available:
+                try:
+                    loop = asyncio.get_event_loop()
+                    response = await asyncio.wait_for(
+                        loop.run_in_executor(
+                            None,
+                            lambda: self.groq_client.chat.completions.create(
+                                model=settings.groq_model,
+                                messages=[{'role': 'user', 'content': prompt}],
+                                temperature=0.8,
+                                max_tokens=50,
+                            )
+                        ),
+                        timeout=15.0
+                    )
+                    name = response.choices[0].message.content.strip().strip('"\'')
+                except Exception as groq_err:
+                    logger.warning(f"Groq name generation failed: {groq_err}")
+
+            if name is None and self.ollama_available:
                 try:
                     loop = asyncio.get_event_loop()
                     response = await asyncio.wait_for(
@@ -233,15 +308,12 @@ Return ONLY the project name, nothing else."""
                     name = response['message']['content'].strip().strip('"\'')
                 except Exception as ollama_err:
                     logger.warning(f"Ollama name generation failed: {ollama_err}")
-                    if self.gemini_available:
-                        response = self.gemini_model.generate_content(prompt)
-                        name = response.text.strip().strip('"\'')
-                    else:
-                        raise ollama_err
-            elif self.gemini_available:
+
+            if name is None and self.gemini_available:
                 response = self.gemini_model.generate_content(prompt)
                 name = response.text.strip().strip('"\'')
-            else:
+
+            if name is None:
                 # Fallback: extract key words
                 words = description.split()[:3]
                 name = " ".join(words).title() + " Project"

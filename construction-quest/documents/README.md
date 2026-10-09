@@ -161,7 +161,7 @@ result = self.pipe(
 
 ### Client → Server
 ```
-ws://192.168.7.249:8000/api/v1/ws/generation/{generation_id}
+ws://192.168.4.249:8000/api/v1/ws/generation/{generation_id}
 
 Optional ping/pong:
 ← "ping"
@@ -254,7 +254,7 @@ val wsUrl = "$WS_URL/generation/$generationId"
 Log.i(TAG, "🔌 Connecting to: $wsUrl")
 
 // Verify server is running
-curl http://192.168.7.249:8000/health
+curl http://192.168.4.249:8000/health
 ```
 
 **Progress not updating:**

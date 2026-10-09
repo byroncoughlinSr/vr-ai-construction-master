@@ -43,6 +43,8 @@ services:
     container_name: vr_backend_dev
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql://vr_admin:SecurePassword123!@postgres:5432/vr_construction
       OLLAMA_URL: http://172.17.0.1:11434

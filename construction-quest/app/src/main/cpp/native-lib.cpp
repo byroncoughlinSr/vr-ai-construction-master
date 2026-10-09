@@ -68,7 +68,7 @@ Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_initNative(
         g_voiceBridge = new VoiceBridge();
     }
     if (g_networkClient == nullptr) {
-        g_networkClient = new NetworkClient("http://192.168.7.249:8000");
+        g_networkClient = new NetworkClient("http://192.168.4.249:8000");
     }
 
     LOGI("Native initialization complete");

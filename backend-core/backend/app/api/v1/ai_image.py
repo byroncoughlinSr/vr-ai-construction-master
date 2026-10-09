@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
 from typing import Optional
+from pathlib import Path
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -8,6 +9,7 @@ import uuid
 import logging
 import asyncio
 
+from ...config import settings
 from ...services import AIImageService
 from .websocket import (
     send_image_progress_update,
@@ -169,6 +171,42 @@ async def generate_architectural_visualization(
             "websocket_url": f"/api/v1/ws/image-progress/{generation_id}"
         }
     )
+
+
+@router.delete("/{generation_id}")
+async def delete_generated_image(generation_id: str):
+    """
+    Delete all image files on disk associated with a generation_id.
+
+    Used by the VR app when the user chooses "Edit Prompt" or "Start Over"
+    during the 2D image review loop, so iterated-over images don't accumulate
+    in the generated_images Docker volume.
+
+    Idempotent: returns success even if no files exist for the given id.
+    """
+    output_dir = Path(settings.generated_images_dir)
+    pattern = f"generated_{generation_id}_*.png"
+
+    deleted_files: list[str] = []
+    try:
+        for path in output_dir.glob(pattern):
+            try:
+                path.unlink()
+                deleted_files.append(path.name)
+            except OSError as unlink_err:
+                logger.warning(f"Failed to unlink {path}: {unlink_err}")
+    except Exception as e:
+        logger.error(f"Error while deleting images for {generation_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    logger.info(
+        f"DELETE image {generation_id}: removed {len(deleted_files)} file(s)"
+    )
+    return {
+        "success": True,
+        "generation_id": generation_id,
+        "deleted_files": deleted_files,
+    }
 
 
 @router.get("/status")
