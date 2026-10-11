@@ -30,8 +30,7 @@ class TestAIImageService:
     @patch('app.services.ai_image_service.torch.cuda.is_available')
     @patch('app.services.ai_image_service.StableDiffusionPipeline.from_pretrained')
     @patch('app.services.ai_image_service.Compel')
-    @patch('app.services.ai_image_service.CLIPTokenizer.from_pretrained')
-    async def test_initialize_model_cuda(self, mock_clip, mock_compel, mock_sd_from_pretrained, mock_cuda, service, mock_pipe_obj):
+    async def test_initialize_model_cuda(self, mock_compel, mock_sd_from_pretrained, mock_cuda, service, mock_pipe_obj):
         """Test initialization logic with CUDA."""
         # Fix: Overwrite the device set during __init__ to simulate CUDA environment
         service.device = "cuda" 
@@ -41,6 +40,9 @@ class TestAIImageService:
         
         assert service.pipe is not None
         mock_pipe_obj.to.assert_called_with("cuda")
+        # Long prompts must not be cut at 77 tokens, and counting uses the pipe's tokenizer.
+        assert mock_compel.call_args.kwargs["truncate_long_prompts"] is False
+        assert service.tokenizer is mock_pipe_obj.tokenizer
 
     @patch('app.services.ai_image_service.settings')
     @patch('app.services.ai_image_service.torch.no_grad')

@@ -6,7 +6,6 @@ from pathlib import Path
 import torch
 from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
 from compel import Compel
-from transformers import CLIPTokenizer
 from PIL import Image
 import io
 import base64
@@ -21,6 +20,9 @@ class AIImageService:
     """Service for generating architectural images using Stable Diffusion with Compel support."""
 
     def __init__(self):
+        # One pipeline per process, used by one generation at a time: diffusers
+        # pipelines are not safe to run concurrently, and loading twice doubles VRAM.
+        self._lock = asyncio.Lock()
         self.pipe = None
         self.compel = None
         self.tokenizer = None
@@ -54,23 +56,28 @@ class AIImageService:
         return pipe.to(self.device)
     
     async def initialize_model(self):
-        """Initialize the Stable Diffusion model with Compel support."""
+        """Initialize the Stable Diffusion model with Compel support.
+
+        Callers must hold ``self._lock`` so two requests can't both load the model.
+        """
         if self.pipe is None:
             try:
                 # Run blocking model loading in thread pool
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 self.pipe = await loop.run_in_executor(None, self._load_model_sync)
                 
-                # Initialize Compel for long prompt support (bypasses 77 token limit)
+                # Compel encodes prompts past CLIP's 77-token window in chunks.
+                # Its default is to truncate, which would drop the style and
+                # lighting text that build_architectural_prompt puts after the
+                # user's description.
                 self.compel = Compel(
                     tokenizer=self.pipe.tokenizer,
-                    text_encoder=self.pipe.text_encoder
+                    text_encoder=self.pipe.text_encoder,
+                    truncate_long_prompts=False,
                 )
-                
-                # Initialize tokenizer for prompt compression
-                self.tokenizer = CLIPTokenizer.from_pretrained(
-                    "openai/clip-vit-large-patch14"
-                )
+
+                # For token counting; the pipeline's own CLIP tokenizer.
+                self.tokenizer = self.pipe.tokenizer
                 
                 logger.info("Stable Diffusion model loaded successfully with Compel support")
                 
@@ -163,7 +170,7 @@ class AIImageService:
                 essential_parts.append(colors[0])
             
             # Reconstruct minimal prompt
-            compressed = f"dog house, {', '.join(essential_parts)}, photo, 8k"
+            compressed = f"house, {', '.join(essential_parts)}, photo, 8k"
         
         final_count = self.count_tokens(compressed)
         logger.info(f"Compressed from {token_count} to {final_count} tokens")
@@ -183,8 +190,29 @@ class AIImageService:
         progress_callback: Optional[callable] = None,
         generation_id: Optional[str] = None
     ) -> Dict[str, Any]:
+        async with self._lock:
+            return await self._generate_image_locked(
+                prompt, negative_prompt, width, height, num_inference_steps,
+                guidance_scale, num_images, progress_callback, generation_id,
+            )
+
+    async def _generate_image_locked(
+        self,
+        prompt: str,
+        negative_prompt: Optional[str],
+        width: int,
+        height: int,
+        num_inference_steps: int,
+        guidance_scale: float,
+        num_images: int,
+        progress_callback: Optional[callable],
+        generation_id: Optional[str],
+    ) -> Dict[str, Any]:
         try:
             await self.initialize_model()
+            # The pipeline runs in a worker thread, which has no event loop of its
+            # own; progress updates are handed back to this one.
+            loop = asyncio.get_running_loop()
 
             if negative_prompt is None:
                 negative_prompt = "cartoon, low quality, blurry, text"
@@ -202,12 +230,7 @@ class AIImageService:
                             "status": "generating"
                         }
                         
-                        # Schedule callback as a task on the running event loop
-                        try:
-                            loop = asyncio.get_running_loop()
-                            loop.create_task(progress_callback(progress_data))
-                        except RuntimeError:
-                            pass  # No running loop; skip callback
+                        asyncio.run_coroutine_threadsafe(progress_callback(progress_data), loop)
                     except Exception as e:
                         logger.warning(f"Callback failure: {e}")
 
@@ -229,10 +252,17 @@ class AIImageService:
             # Create synchronous generation function to run in thread pool
             def generate_sync():
                 if use_compel and self.compel is not None:
-                    logger.info("Using Compel path")
-                    prompt_embeds = self.compel.build_conditioning_tensor(prompt)
-                    negative_embeds = self.compel.build_conditioning_tensor(negative_prompt)
+                    logger.info(f"Using Compel path ({prompt_tokens} prompt tokens)")
                     with torch.no_grad():
+                        prompt_embeds = self.compel.build_conditioning_tensor(prompt)
+                        negative_embeds = self.compel.build_conditioning_tensor(negative_prompt)
+                        # Untruncated prompts are encoded in 77-token chunks; the
+                        # pipeline needs both embeddings the same length.
+                        prompt_embeds, negative_embeds = (
+                            self.compel.pad_conditioning_tensors_to_same_length(
+                                [prompt_embeds, negative_embeds]
+                            )
+                        )
                         return self.pipe(
                             prompt_embeds=prompt_embeds,
                             negative_prompt_embeds=negative_embeds,
@@ -248,7 +278,6 @@ class AIImageService:
                         )
             
             # Run SD generation in thread pool to avoid blocking event loop
-            loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(None, generate_sync)
 
             # Encode each image to base64 and save to disk
@@ -347,7 +376,7 @@ class AIImageService:
     ) -> str:
         """
         Build detailed architectural prompt from voice description.
-        Handles long descriptions using Compel (no token limit).
+        Long descriptions are fine: Compel encodes them without truncation.
         """
         
         # Time of day lighting presets
@@ -466,3 +495,14 @@ class AIImageService:
             details["view"] = "exterior"
         
         return details
+
+
+_shared_service: Optional[AIImageService] = None
+
+
+def get_image_service() -> AIImageService:
+    """The process-wide image service. Use this instead of ``AIImageService()``."""
+    global _shared_service
+    if _shared_service is None:
+        _shared_service = AIImageService()
+    return _shared_service

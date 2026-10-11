@@ -1,13 +1,14 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import HTMLResponse
+from starlette.websockets import WebSocketState
 import json
 import asyncio
 import logging
+import time
 from typing import Dict, List, Set, Any
 from datetime import datetime
 
-from ...database import get_db
-from sqlalchemy.orm import Session
+from ...config import settings
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -77,7 +78,8 @@ class ConnectionManager:
             return
 
         disconnected = []
-        for connection in self.active_connections[room_id]:
+        # A snapshot: each send awaits, and others may join or leave meanwhile.
+        for connection in list(self.active_connections[room_id]):
             if connection == exclude:
                 continue
 
@@ -108,6 +110,31 @@ image_generation_completed: Dict[str, Dict[str, Any]] = {}  # generation_id -> c
 image_generation_failed: Dict[str, Dict[str, Any]] = {}  # generation_id -> failure data
 progress_connections: Dict[str, List[WebSocket]] = {}  # generation_id -> list of connections
 
+# Finished generations are kept so a client that connects late still gets the
+# outcome, but only for this long — otherwise they accumulate for the life of
+# the process.
+FINISHED_GENERATION_TTL_SECONDS = 15 * 60
+_finished_at: Dict[str, float] = {}
+
+
+def _forget_old_generations() -> None:
+    cutoff = time.monotonic() - FINISHED_GENERATION_TTL_SECONDS
+    for gen_id in [g for g, t in _finished_at.items() if t < cutoff]:
+        _finished_at.pop(gen_id, None)
+        image_generation_completed.pop(gen_id, None)
+        image_generation_failed.pop(gen_id, None)
+
+
+def _client_result(result: Dict[str, Any]) -> Dict[str, Any]:
+    """The generation result as sent to clients: image URLs, not the base64 PNG
+    (hundreds of KB per image, unused by the headset and dashboard) or the
+    server's file paths."""
+    images = [
+        {k: v for k, v in img.items() if k not in ("image_data", "path")}
+        for img in result.get("images", []) or []
+    ]
+    return {**result, "images": images}
+
 
 @router.websocket("/room/{room_id}")
 async def room_websocket(
@@ -122,9 +149,13 @@ async def room_websocket(
     Supports real-time design updates, chat, and collaborative editing.
     """
     try:
-        # Basic authentication check (extend this for production)
         if not user_id:
             await websocket.close(code=4001, reason="User ID required")
+            return
+        # Room messages move and delete elements in every connected headset, so
+        # when a token is configured only clients that know it may join.
+        if settings.collab_token and token != settings.collab_token:
+            await websocket.close(code=4003, reason="Invalid token")
             return
 
         await manager.connect(websocket, room_id, user_id)
@@ -213,6 +244,9 @@ async def room_websocket(
                 )
             except Exception as e:
                 logger.error(f"WebSocket error: {e}")
+                # A dead socket fails every receive; stop instead of spinning on it.
+                if websocket.client_state != WebSocketState.CONNECTED:
+                    break
                 await manager.send_personal_message(
                     {
                         "type": "error",
@@ -286,7 +320,7 @@ async def websocket_test_page(room_id: str):
         <button onclick="sendDesignUpdate()">Send Design Update</button>
 
         <script>
-            const ws = new WebSocket('ws://localhost:8000/api/v1/ws/room/{room_id}?user_id=test_user');
+            const ws = new WebSocket(`ws://${{location.host}}/api/v1/ws/room/{room_id}?user_id=test_user`);
             const messages = document.getElementById('messages');
             const status = document.getElementById('status');
 
@@ -410,7 +444,7 @@ async def image_progress_test_page(generation_id: str):
                 }}
 
                 currentGenerationId = genId;
-                ws = new WebSocket(`ws://localhost:8000/api/v1/ws/image-progress/${{genId}}`);
+                ws = new WebSocket(`ws://${{location.host}}/api/v1/ws/image-progress/${{genId}}`);
 
                 ws.onopen = function(event) {{
                     status.textContent = `Connected to progress WebSocket for ${{genId}}`;
@@ -614,32 +648,29 @@ async def image_progress_websocket(websocket: WebSocket, generation_id: str):
         logger.info(f"Client disconnected from image progress WebSocket for generation {generation_id}")
 
 
+async def _send_to_generation(generation_id: str, message: Dict[str, Any]) -> None:
+    """Send ``message`` to every client watching ``generation_id``, dropping dead ones."""
+    connections = progress_connections.get(generation_id)
+    if not connections:
+        return
+    # A snapshot: each send awaits, and clients may connect or leave meanwhile.
+    for websocket in list(connections):
+        try:
+            await websocket.send_json(message)
+        except Exception as e:
+            logger.error(f"Failed to send {message.get('type')} for {generation_id}: {e}")
+            if websocket in connections:
+                connections.remove(websocket)
+
+
 async def send_image_progress_update(generation_id: str, progress_data: Dict[str, Any]):
     """
     Send progress update to all clients connected to a specific generation.
     """
-    if generation_id not in progress_connections:
-        return
-
-    # Update stored progress
+    # Stored even with no listeners, so a client that connects mid-generation
+    # starts from the current step rather than 0%.
     image_generation_progress[generation_id] = progress_data
-
-    # Send to all connected clients
-    disconnected = []
-    for websocket in progress_connections[generation_id]:
-        try:
-            await websocket.send_json({
-                "type": "progress",
-                **progress_data
-            })
-        except Exception as e:
-            logger.error(f"Failed to send progress update: {e}")
-            disconnected.append(websocket)
-
-    # Clean up disconnected clients
-    for websocket in disconnected:
-        if websocket in progress_connections[generation_id]:
-            progress_connections[generation_id].remove(websocket)
+    await _send_to_generation(generation_id, {"type": "progress", **progress_data})
 
 
 async def complete_image_generation(generation_id: str, result: Dict[str, Any]):
@@ -650,33 +681,17 @@ async def complete_image_generation(generation_id: str, result: Dict[str, Any]):
     completion_data = {
         "generation_id": generation_id,
         "status": "completed",
-        "result": result,
+        "result": _client_result(result),
         "timestamp": datetime.utcnow().isoformat()
     }
 
     # Persist result for any clients that connect after completion
+    _forget_old_generations()
     image_generation_completed[generation_id] = completion_data
+    _finished_at[generation_id] = time.monotonic()
+    image_generation_progress.pop(generation_id, None)
 
-    # Send to any already-connected clients
-    if generation_id in progress_connections:
-        disconnected = []
-        for websocket in progress_connections[generation_id]:
-            try:
-                await websocket.send_json({
-                    "type": "completed",
-                    **completion_data
-                })
-            except Exception as e:
-                logger.error(f"Failed to send completion message: {e}")
-                disconnected.append(websocket)
-
-        for websocket in disconnected:
-            if websocket in progress_connections[generation_id]:
-                progress_connections[generation_id].remove(websocket)
-
-    # Clean up in-progress tracking
-    if generation_id in image_generation_progress:
-        del image_generation_progress[generation_id]
+    await _send_to_generation(generation_id, {"type": "completed", **completion_data})
 
 
 async def fail_image_generation(generation_id: str, error: str):
@@ -693,22 +708,12 @@ async def fail_image_generation(generation_id: str, error: str):
     }
 
     # Persist failure for any clients that connect after the generation failed
+    _forget_old_generations()
     image_generation_failed[generation_id] = error_data
+    _finished_at[generation_id] = time.monotonic()
+    image_generation_progress.pop(generation_id, None)
 
-    # Send to any already-connected clients
-    if generation_id in progress_connections:
-        for websocket in progress_connections[generation_id]:
-            try:
-                await websocket.send_json({
-                    "type": "error",
-                    **error_data
-                })
-            except Exception as e:
-                logger.error(f"Failed to send error message: {e}")
-
-    # Clean up progress data on failure
-    if generation_id in image_generation_progress:
-        del image_generation_progress[generation_id]
+    await _send_to_generation(generation_id, {"type": "error", **error_data})
 
 
 @router.get("/image-progress/{generation_id}/status")
@@ -721,6 +726,12 @@ async def get_image_generation_status(generation_id: str):
             "progress": image_generation_progress[generation_id],
             "connections": len(progress_connections.get(generation_id, []))
         }
+    elif generation_id in image_generation_completed:
+        return {
+            "generation_id": generation_id,
+            "status": "completed",
+            "result": image_generation_completed[generation_id]["result"],
+        }
     elif generation_id in image_generation_failed:
         return {
             "generation_id": generation_id,
@@ -731,5 +742,5 @@ async def get_image_generation_status(generation_id: str):
         return {
             "generation_id": generation_id,
             "status": "not_found",
-            "message": "Generation not found or completed"
+            "message": "Generation not found (unknown id, or finished long ago)"
         }
