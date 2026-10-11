@@ -1,18 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Any, Optional
 from sqlalchemy import or_, func
 import logging
 
 from ...database import get_db
-from ...models import Project
+from ...models import Project, FloorPlan
 from ...schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
     ProjectListResponse, ProjectStats
 )
 from ...services import get_image_service
-from ...services.vr_geometry_service import build_geometry_from_rooms
+from ...services import floor_plan_service
+from ...services.floor_plan_service import FloorPlanError
 from .image_jobs import start_image_generation
 
 logger = logging.getLogger(__name__)
@@ -253,94 +255,24 @@ def generate_vr_geometry(
     db: Session = Depends(get_db)
 ):
     """
-    Generate VR geometry for a project.
+    VR geometry for the project's current floor plan.
 
-    This endpoint processes the project's construction phases and materials 
-    to generate optimized 3D geometry suitable for VR rendering on Quest devices.
-    
+    Built from the newest ``floor_plans`` version (projects saved before floor
+    plans existed fall back to their stored plan, then to phase names), named
+    after the house. ``geometry.floor_plan`` says which version it is.
     Returns JSON geometry that can be loaded directly into the VR application.
     """
     logger.info(f"🥽 VR geometry requested for project {project_id}")
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    logger.info(f"🏗️  Project found: '{project.name}' (id={project_id})")
+    project = _get_project(db, project_id)
 
     try:
-        from ...models import ConstructionPhase, Material, AIGeneration
-
-        materials = db.query(Material).filter(
-            Material.project_id == project_id
-        ).all()
-
-        # The newest plan wins if the project was ever re-planned.
-        ai_data = db.query(AIGeneration).filter(
-            AIGeneration.project_id == project_id
-        ).order_by(AIGeneration.id.desc()).first()
-        logger.info(
-            f"📦 {len(materials)} materials, AIGeneration record: {'found' if ai_data else 'not found'}"
+        geometry = floor_plan_service.geometry_for_project(
+            db, project, target_platform=target_platform, optimize_for_vr=optimize_for_vr,
         )
-
-        # Build rooms_ft — dimensions in feet, fed into the shared geometry helper.
-        rooms_ft: list[dict] = []
-        layout = None
-
-        # Path A: use AI-generated room structure
-        if ai_data and ai_data.output_data:
-            try:
-                response_data = ai_data.output_data if isinstance(ai_data.output_data, dict) else {}
-                project_structure = response_data.get("project_structure", {})
-                ai_rooms = project_structure.get("rooms", [])
-                logger.info(f"🏠 AI project_structure has {len(ai_rooms)} rooms")
-                rooms_ft = list(ai_rooms)
-                layout = project_structure.get("layout")
-            except Exception as e:
-                logger.warning(f"⚠️  AI room parse failed: {e} — falling back to phase-based parsing")
-                rooms_ft = []
-
-        # Path B: fallback — extract rooms from phase names
-        if not rooms_ft:
-            phases = db.query(ConstructionPhase).filter(
-                ConstructionPhase.project_id == project_id
-            ).order_by(ConstructionPhase.phase_order).all()
-            for phase in phases:
-                name_lower = phase.name.lower()
-                if any(kw in name_lower for kw in ("room", "bedroom", "kitchen", "bathroom", "garage")):
-                    dimensions_ft = {"length": 15.0, "width": 12.0, "height": 9.0}
-                    if "master" in name_lower:
-                        dimensions_ft = {"length": 17.0, "width": 15.0, "height": 9.0}
-                    elif "kitchen" in name_lower:
-                        dimensions_ft = {"length": 16.0, "width": 14.0, "height": 9.0}
-                    elif "bathroom" in name_lower:
-                        dimensions_ft = {"length": 10.0, "width": 8.0, "height": 9.0}
-                    elif "garage" in name_lower:
-                        dimensions_ft = {"length": 20.0, "width": 20.0, "height": 10.0}
-                    rooms_ft.append({"name": phase.name, "dimensions": dimensions_ft})
-            logger.info(f"🔄 Fallback: {len(phases)} phases → {len(rooms_ft)} rooms found")
-
-        if not rooms_ft:
-            logger.warning("⚠️  No rooms generated — VR scene will be empty")
-
-        materials_payload = [
-            {"material_type": m.material_type, "name": m.name} for m in materials
-        ]
-
-        geometry = build_geometry_from_rooms(
-            rooms_ft=rooms_ft,
-            layout=layout,
-            materials=materials_payload,
-            project_id=project_id,
-            project_name=project.name,
-            target_platform=target_platform,
-            optimize_for_vr=optimize_for_vr,
-        )
-
         logger.info(
-            f"🎉 VR geometry ready: {len(geometry['rooms'])} rooms, "
+            f"🎉 VR geometry ready: '{geometry['project_name']}' {len(geometry['rooms'])} rooms, "
             f"{len(geometry['doors'])} doors, {len(geometry['windows'])} windows → sending to Quest"
         )
-
         return {
             "success": True,
             "geometry": geometry,
@@ -354,3 +286,130 @@ def generate_vr_geometry(
             status_code=500,
             detail=f"Failed to generate VR geometry: {str(e)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Floor plans: every change is a new version; the newest is what VR shows.
+# ---------------------------------------------------------------------------
+
+class FloorPlanUpdate(BaseModel):
+    """A whole floor plan, as edited in the dashboard (sizes in feet)."""
+    name: Optional[str] = Field(None, max_length=255)
+    layout: Optional[dict[str, Any]] = None
+    rooms: list[dict[str, Any]]
+    note: Optional[str] = Field(None, max_length=2000)
+
+
+class FloorPlanRefineRequest(BaseModel):
+    """A change in words: "make the kitchen bigger", "add a laundry room"."""
+    instruction: str = Field(..., min_length=1, max_length=2000)
+
+
+class FloorPlanImageLink(BaseModel):
+    generation_id: str = Field(..., min_length=1, max_length=64)
+    image_url: str = Field(..., pattern=r"^/generated_images/[\w.-]+$")
+
+
+def _get_project(db: Session, project_id: int) -> Project:
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+def _current_plan(db: Session, project_id: int) -> FloorPlan:
+    _get_project(db, project_id)
+    plan = floor_plan_service.current_floor_plan(db, project_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="Project has no floor plan")
+    return plan
+
+
+def _new_version_response(db: Session, plan: FloorPlan) -> dict:
+    return {
+        "success": True,
+        "floor_plan": floor_plan_service.serialize(plan),
+        "geometry": floor_plan_service.geometry_for_project(db, plan.project),
+    }
+
+
+@router.get("/{project_id}/floor-plans")
+def list_floor_plans(project_id: int, db: Session = Depends(get_db)):
+    """All versions of the project's floor plan, newest first."""
+    _get_project(db, project_id)
+    plans = (
+        db.query(FloorPlan)
+        .filter(FloorPlan.project_id == project_id)
+        .order_by(FloorPlan.version.desc())
+        .all()
+    )
+    return {"project_id": project_id, "floor_plans": [floor_plan_service.serialize(p) for p in plans]}
+
+
+@router.get("/{project_id}/floor-plan")
+def get_floor_plan(project_id: int, db: Session = Depends(get_db)):
+    """The current floor plan (newest version)."""
+    return floor_plan_service.serialize(_current_plan(db, project_id))
+
+
+@router.put("/{project_id}/floor-plan")
+def update_floor_plan(project_id: int, update: FloorPlanUpdate, db: Session = Depends(get_db)):
+    """Save an edited floor plan as a new version and return its geometry.
+
+    Renaming the floor plan renames the project too — it is the house's name.
+    Returns 422 if the layout can't be built.
+    """
+    project = _get_project(db, project_id)
+    current = floor_plan_service.current_floor_plan(db, project_id)
+    name = (update.name or "").strip() or (current.name if current else project.name)
+    try:
+        plan = floor_plan_service.add_floor_plan_version(
+            db, project_id, name, {"layout": update.layout, "rooms": update.rooms},
+            change_type="edited", change_note=update.note or "Edited in the dashboard",
+            source="dashboard",
+        )
+    except FloorPlanError as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(e))
+    project.name = plan.name
+    db.commit()
+    db.refresh(plan)
+    return _new_version_response(db, plan)
+
+
+@router.post("/{project_id}/floor-plan/refine")
+async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db: Session = Depends(get_db)):
+    """Change the floor plan in words; the AI's revision is saved as a new version.
+
+    Used by the headset's in-house voice refinement and the dashboard.
+    """
+    from .ai_planning import planning_service  # one shared planner (and its Ollama probe state)
+
+    current = _current_plan(db, project_id)
+    logger.info(f"✏️  Refining project {project_id} v{current.version}: {refine.instruction[:160]}")
+    try:
+        result = await planning_service.refine_floor_plan(current.structure, refine.instruction)
+    except Exception as e:
+        logger.error(f"❌ Floor plan refinement failed: {e}")
+        raise HTTPException(status_code=502, detail=f"Refinement failed: {e}")
+
+    structure = (result.get("plan") or {}).get("project_structure") or {}
+    try:
+        plan = floor_plan_service.add_floor_plan_version(
+            db, project_id, current.name, structure,
+            change_type="refined", change_note=refine.instruction, source=result.get("source"),
+        )
+    except FloorPlanError as e:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=f"The revised plan is not buildable: {e}")
+    db.commit()
+    db.refresh(plan)
+    return _new_version_response(db, plan)
+
+
+@router.put("/{project_id}/floor-plan/image")
+def link_floor_plan_image(project_id: int, link: FloorPlanImageLink, db: Session = Depends(get_db)):
+    """Record an accepted render on the current floor plan."""
+    _current_plan(db, project_id)
+    plan = floor_plan_service.attach_image(db, project_id, link.generation_id, link.image_url)
+    return {"success": True, "floor_plan": floor_plan_service.serialize(plan)}

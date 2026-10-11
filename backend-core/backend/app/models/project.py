@@ -37,6 +37,10 @@ class Project(Base):
     designs = relationship("Design", back_populates="project", cascade="all, delete-orphan")
     materials = relationship("Material", back_populates="project", cascade="all, delete-orphan")
     ai_generations = relationship("AIGeneration", back_populates="project", cascade="all, delete-orphan")
+    floor_plans = relationship(
+        "FloorPlan", back_populates="project", cascade="all, delete-orphan",
+        order_by="FloorPlan.version", passive_deletes=True,
+    )
     phases = relationship("ConstructionPhase", back_populates="project", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
     labor_resources = relationship("LaborResource", back_populates="current_project")

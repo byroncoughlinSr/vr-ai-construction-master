@@ -9,6 +9,7 @@ import logging
 
 from ...services import AIPlanningService, get_image_service
 from ...services.vr_geometry_service import build_geometry_from_rooms
+from ...services import floor_plan_service
 from ...config import settings
 from ...database import SessionLocal
 from ...models import Project, ConstructionPhase, Task, Material, AIGeneration
@@ -156,17 +157,20 @@ async def list_available_models():
 
 
 def _save_project(prompt: str, budget: Optional[float], project_data: dict) -> dict:
-    """Save a generated project with its plan, phases, tasks and materials.
+    """Save a generated project with its plan, floor plan (version 1), phases,
+    tasks and materials.
 
     One transaction: either everything is saved or nothing is. Runs in a worker
     thread because the session is synchronous.
     """
     plan = project_data.get("plan", {}) or {}
     total_cost = plan.get("total_cost")
+    source = project_data.get("source") or "unknown"
+    name = (project_data.get("project_name") or "").strip() or "Unnamed Project"
     with SessionLocal() as db:
         try:
             project = Project(
-                name=project_data.get("project_name", "Unnamed Project"),
+                name=name,
                 description=prompt,
                 status="planning",
                 budget=budget,
@@ -176,14 +180,27 @@ def _save_project(prompt: str, budget: Optional[float], project_data: dict) -> d
             db.flush()  # assigns project.id
 
             # Kept for later VR geometry generation (rooms, layout tree).
+            # The full plan as the planner returned it.
             db.add(AIGeneration(
                 project_id=project.id,
                 prompt=prompt,
-                model_used=project_data.get("source", "unknown"),
+                source=source,
+                model_used=_model_name(source),
                 output_data=plan if isinstance(plan, dict) else {},
                 generation_type="construction_plan",
                 status="completed",
             ))
+
+            # The floor plan the house is built from; later edits add versions.
+            floor_plan_version = None
+            try:
+                floor_plan = floor_plan_service.add_floor_plan_version(
+                    db, project.id, name, plan.get("project_structure") or {},
+                    change_type="generated", change_note=prompt, source=source,
+                )
+                floor_plan_version = floor_plan.version
+            except floor_plan_service.FloorPlanError as e:
+                logger.warning(f"⚠️  Plan for project {project.id} has no usable floor plan: {e}")
 
             phases = plan.get("phases", []) or []
             for idx, phase_data in enumerate(phases):
@@ -234,7 +251,23 @@ def _save_project(prompt: str, budget: Optional[float], project_data: dict) -> d
             "estimated_cost": project.estimated_cost,
             "phases_count": len(phases),
             "materials_count": len(materials),
+            "floor_plan_version": floor_plan_version,
         }
+
+
+def _model_name(source: str) -> str:
+    """The configured model behind a planner source name."""
+    return {
+        "groq": settings.groq_model,
+        "ollama": settings.ollama_model,
+    }.get(source, source)
+
+
+def _project_geometry(project_id: int) -> dict:
+    """VR geometry for a saved project (worker thread)."""
+    with SessionLocal() as db:
+        project = db.get(Project, project_id)
+        return floor_plan_service.geometry_for_project(db, project)
 
 
 @router.post("/generate-project")
@@ -284,6 +317,7 @@ async def generate_complete_project(
             "project_id": saved["id"],
             "project_name": saved["name"],
             "description": saved["description"],
+            "floor_plan_version": saved["floor_plan_version"],
             "metadata": {
                 "total_cost": saved["estimated_cost"],
                 "total_duration_weeks": plan.get("total_duration_weeks", 0),
@@ -327,16 +361,18 @@ async def generate_vr_from_prompt(
     request: Request,
 ):
     """
-    Generate VR geometry directly from a floor-plan prompt, without creating
-    a DB Project / phases / tasks / materials.
+    Generate a house from a floor-plan prompt and save it as a project.
 
     Used by the first voice prompt in the VR two-prompt flow: the user
     describes the floor plan, walks the generated house, then speaks a second
     prompt for the 2D image. The optional ``image_prompt`` is prepended as
     grounding context so the planning AI keeps the style consistent with it.
 
-    This endpoint is fully stateless. The response has the same ``geometry``
-    shape as ``GET /projects/{id}/generate-vr``.
+    The plan is saved like ``/generate-project`` (project, floor plan v1,
+    phases, materials), so the house shows up in the dashboard and can be
+    refined later. If saving fails the geometry is still returned, without a
+    ``project_id``. The response has the same ``geometry`` shape as
+    ``GET /projects/{id}/generate-vr``.
     """
     try:
         if vr_request.image_prompt:
@@ -364,27 +400,37 @@ async def generate_vr_from_prompt(
 
         plan = project_data.get("plan", {}) or {}
         project_structure = plan.get("project_structure", {}) or {}
-        rooms_ft = list(project_structure.get("rooms", []) or [])
 
-        if not rooms_ft:
-            logger.warning("⚠️  AI plan returned no rooms — VR scene will be empty")
+        saved = None
+        try:
+            saved = await run_in_threadpool(_save_project, combined_prompt, None, project_data)
+        except Exception as e:
+            logger.error(f"⚠️  Could not save the voice-flow house, returning it unsaved: {e}", exc_info=True)
 
-        geometry = build_geometry_from_rooms(
-            rooms_ft=rooms_ft,
-            layout=project_structure.get("layout"),
-            materials=plan.get("material_list"),
-            project_id=None,
-            project_name=project_data.get("project_name", "Generated House"),
-        )
+        if saved and saved["floor_plan_version"]:
+            geometry = await run_in_threadpool(_project_geometry, saved["id"])
+        else:
+            if not project_structure.get("rooms"):
+                logger.warning("⚠️  AI plan returned no rooms — VR scene will be empty")
+            geometry = build_geometry_from_rooms(
+                rooms_ft=list(project_structure.get("rooms", []) or []),
+                layout=project_structure.get("layout"),
+                materials=plan.get("material_list"),
+                project_id=saved["id"] if saved else None,
+                project_name=project_data.get("project_name") or "Generated House",
+            )
 
         logger.info(
-            f"🎉 VR-from-prompt geometry ready: {len(geometry['rooms'])} rooms, "
+            f"🎉 VR-from-prompt geometry ready: '{geometry['project_name']}' "
+            f"(project {geometry['project_id']}), {len(geometry['rooms'])} rooms, "
             f"{len(geometry['doors'])} doors, {len(geometry['windows'])} windows"
         )
 
         return {
             "success": True,
             "geometry": geometry,
+            "project_id": geometry["project_id"],
+            "project_name": geometry["project_name"],
             "status": "ready",
         }
 

@@ -16,7 +16,7 @@ class AIGeneration(Base):
 
     # Generation type and source
     generation_type = Column(String(50), nullable=False)  # image, plan, voice_transcript
-    source = Column(String(50), default="ollama")  # ollama, gemini, stable_diffusion
+    source = Column(String(50))  # provider that produced it: groq, ollama, gemini, stable_diffusion
 
     # Input data
     prompt = Column(Text)
