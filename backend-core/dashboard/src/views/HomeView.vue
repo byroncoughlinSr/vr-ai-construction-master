@@ -142,7 +142,7 @@
       <!-- Floor Plan -->
       <div class="row q-col-gutter-md q-mb-lg">
         <div class="col-12">
-          <floor-plan-view :project-id="project?.id" />
+          <floor-plan-view :project-id="project?.id" @renamed="onHouseRenamed" />
         </div>
       </div>
 
@@ -290,6 +290,11 @@ const loadingMessage = ref('Loading dashboard data...')
 
 // Computed properties
 const project = computed<ProjectSummary | null>(() => projectsStore.currentProject)
+
+// Renaming the floor plan renames the house; keep the header in step.
+const onHouseRenamed = (name: string) => {
+  if (projectsStore.currentProject) projectsStore.currentProject.name = name
+}
 const sortedPhases = computed<ConstructionPhase[]>(() => {
   // This would come from a phases store in a full implementation
   return []

@@ -19,8 +19,48 @@ const geometry = {
   ]
 }
 
+// The saved plan behind it (sizes in feet), as GET /projects/{id}/floor-plan returns it.
+const floorPlan = {
+  id: 3,
+  version: 2,
+  name: 'Tiny Test House',
+  layout: {
+    length: 24, width: 12, entry: 'Entry Foyer', split: 'x',
+    parts: [{ size: 8, room: 'Entry Foyer' }, { size: 16, room: 'Living Room' }]
+  },
+  rooms: [
+    { name: 'Entry Foyer', connects_to: ['Living Room'] },
+    { name: 'Living Room', connects_to: ['Entry Foyer'] }
+  ],
+  change_type: 'edited',
+  change_note: null,
+  image_url: null
+}
+const savedGeometry = { ...geometry, floor_plan: { id: 3, version: 2, name: 'Tiny Test House' } }
+
 const get = vi.fn()
-vi.mock('src/services/api', () => ({ apiClient: { client: { get: (...args: unknown[]) => get(...args) } } }))
+const put = vi.fn()
+const post = vi.fn()
+vi.mock('src/services/api', () => ({
+  apiClient: {
+    client: {
+      defaults: { baseURL: 'http://host:8000/api/v1' },
+      get: (...args: unknown[]) => get(...args),
+      put: (...args: unknown[]) => put(...args),
+      post: (...args: unknown[]) => post(...args)
+    }
+  }
+}))
+
+// A saved project: geometry plus its editable floor plan.
+const savedProject = () => {
+  get.mockReset()
+  get.mockImplementation((url: string) => Promise.resolve(
+    url.endsWith('/floor-plan')
+      ? { data: JSON.parse(JSON.stringify(floorPlan)) }
+      : { data: { success: true, geometry: savedGeometry } }
+  ))
+}
 
 const mountPlan = () => mount(FloorPlanView, {
   props: { projectId: 7 },
@@ -57,5 +97,65 @@ describe('FloorPlanView', () => {
     const wrapper = mountPlan()
     await flushPromises()
     expect(wrapper.text()).toContain('No rooms in this project yet')
+  })
+
+  it('names the house and its version for a saved floor plan', async () => {
+    savedProject()
+    const wrapper = mountPlan()
+    await flushPromises()
+    expect(get).toHaveBeenCalledWith('/projects/7/floor-plan')
+    expect(wrapper.text()).toContain('Tiny Test House')
+    expect(wrapper.text()).toContain('v2')
+  })
+
+  it('renames a room everywhere and saves the edit as a new version', async () => {
+    savedProject()
+    put.mockResolvedValue({
+      data: { floor_plan: { ...floorPlan, version: 3, name: 'Renamed House' }, geometry: savedGeometry }
+    })
+    const wrapper = mountPlan()
+    await flushPromises()
+
+    const vm = wrapper.vm as any
+    vm.startEditing()
+    vm.draft.name = 'Renamed House'
+    vm.renameRoom(vm.draft.layout.parts[0], 'Front Hall')
+    await vm.saveDraft()
+    await flushPromises()
+
+    const [url, body] = put.mock.calls[0]
+    expect(url).toBe('/projects/7/floor-plan')
+    expect(body.name).toBe('Renamed House')
+    expect(body.layout.entry).toBe('Front Hall')
+    expect(body.layout.parts[0].room).toBe('Front Hall')
+    expect(body.rooms.map((r: any) => r.name)).toEqual(['Front Hall', 'Living Room'])
+    expect(body.rooms[1].connects_to).toEqual(['Front Hall'])
+    expect(wrapper.emitted('renamed')?.[0]).toEqual(['Renamed House'])
+    expect(wrapper.text()).toContain('v3')
+  })
+
+  it('removes a doorway from both rooms', async () => {
+    savedProject()
+    const wrapper = mountPlan()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.startEditing()
+    vm.setConnections('Living Room', [])
+    expect(vm.draft.rooms.map((r: any) => r.connects_to)).toEqual([[], []])
+  })
+
+  it('sends a described change to the AI', async () => {
+    savedProject()
+    post.mockResolvedValue({
+      data: { floor_plan: { ...floorPlan, version: 3, change_type: 'refined' }, geometry: savedGeometry }
+    })
+    const wrapper = mountPlan()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.instruction = 'make the living room bigger'
+    await vm.refine()
+    await flushPromises()
+    expect(post).toHaveBeenCalledWith('/projects/7/floor-plan/refine', { instruction: 'make the living room bigger' })
+    expect(wrapper.text()).toContain('v3')
   })
 })
