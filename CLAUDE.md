@@ -29,7 +29,8 @@ pytest                            # all backend tests
 pytest tests/test_api.py          # one file
 pytest tests/test_api.py::test_name   # one test
 alembic revision --autogenerate -m "msg"  # new migration
-alembic upgrade head                      # apply migrations
+alembic upgrade head                      # apply migrations (the backend also runs them on startup)
+python -m scripts.seed_example_floor_plan # migrate + add the example house "Maple Hollow Cottage"
 docker compose up -d postgres pgadmin   # DB only — the backend container would take port 8000 from
                                         # the native uvicorn (docker-compose.prod.yml has profiles)
 ```
@@ -107,7 +108,21 @@ not committed) must be present to build.
   `POST /image/generate` bounds width/height (256–1024, multiple of 8), steps (1–100) and guidance.
   Background jobs go through `image_jobs.start_image_generation` → `background.run_in_background`
   (holds a strong task reference); results/errors are kept 15 min for late WebSocket clients.
-- DB is PostgreSQL via SQLAlchemy 2.0; migrations with Alembic (`alembic.ini`, `alembic/`).
+- DB is PostgreSQL via SQLAlchemy 2.0; migrations with Alembic (`alembic.ini`, `alembic/`). Migrations are the
+  only thing that creates tables; revision `9a4e6c1f2b83` rebuilt the budget/permit/inspection/document tables,
+  which the initial migration had created with an older layout than the models. After changing a model,
+  autogenerate a migration and check `compare_metadata` comes back empty.
+- **Floor plans** (`models/floor_plan.py`, `services/floor_plan_service.py`): the `floor_plans` table holds
+  versioned plans per project — `name` (the house name), `layout` tree and `rooms` (feet), `change_type`
+  (`generated` / `edited` / `refined` / `example`), `change_note`, `source`, and the accepted `image_url`.
+  Every change inserts the next version; the highest is current and is what `GET /projects/{id}/generate-vr`
+  builds (via `geometry_for_project`, which falls back to the old `ai_generations` plan, then phase names, for
+  projects without one). Geometry carries `floor_plan: {id, version, name, image_url}`. Routes:
+  `GET /projects/{id}/floor-plan(s)`, `PUT /projects/{id}/floor-plan` (dashboard edit; renames the project
+  too; 422 if unbuildable), `POST /projects/{id}/floor-plan/refine` (`{instruction}` → planner chain via
+  `refine_floor_plan`, prompt in `_build_refine_prompt` — keep it in step with `_build_planning_prompt`),
+  `PUT /projects/{id}/floor-plan/image` (link an accepted render). `ai_generations.source` now records the
+  real provider (it used to default to "ollama"). The example plan lives in `services/example_floor_plans.py`.
 
 ### VR geometry — the cross-language contract that breaks silently
 `vr_geometry_service.py` builds the JSON that `HouseGenerator.kt` turns into 3D boxes. Three
@@ -164,7 +179,10 @@ fix-notes doc, not guidance) and `LOAD_TO_VR_FIX.md` — read these before touch
 Management UI for projects, materials, generated images, and run history. Vite + TypeScript
 (`npm run build` runs `vue-tsc` first, so type errors fail the build). `FloorPlanView.vue` on the home
 page draws the selected project's layout (rooms, doorways, windows, entry) as SVG from
-`GET /projects/{id}/generate-vr`, using each room's `bounds`; the street side is drawn at the bottom.
+`GET /projects/{id}/generate-vr`, using each room's `bounds`; the street side is drawn at the bottom. For a
+project with a floor plan it also edits it (house name, footprint, split sizes, room names, two-way doorways,
+entry → `PUT .../floor-plan`), applies typed changes (`.../floor-plan/refine`), lists versions with Restore,
+and shows the accepted rendering.
 
 ## Pipeline (the path through the code)
 The headset runs a **two-prompt voice flow**, a state machine on `VoiceState` in `ImmersiveActivity.kt`:
@@ -173,7 +191,8 @@ The headset runs a **two-prompt voice flow**, a state machine on `VoiceState` in
 1. **Prompt 1 — floor plan.** Hold Button A → record → `POST /api/v1/voice/transcribe` (Whisper) →
    WebView confirm panel (A confirm / B retry).
 2. `onConfirmPrompt1` → `fetchVRGeometryFromPrompt(text, null)` →
-   `POST /api/v1/planning/generate-vr-from-prompt` on an IO thread → `runOnUiThread { buildFromGeometry(...) }`.
+   `POST /api/v1/planning/generate-vr-from-prompt` on an IO thread (which now **saves the house as a project**
+   with floor plan v1, like `/generate-project`; the geometry carries its `project_id`/`project_name`) → `runOnUiThread { buildFromGeometry(...) }`.
    The player is moved to the spawn point, locomotion and room labels turn on, and `panelAnchor` is set to
    the spawn point so the prompt panel, progress bar and review panel follow the player into the house.
    On failure the flow returns to `IDLE`.
@@ -184,6 +203,13 @@ The headset runs a **two-prompt voice flow**, a state machine on `VoiceState` in
 5. **Review** on a large panel beside the prompt panel: **Accept** (A) moves the image to a grabbable
    walking panel (`WALKING`); **Edit Prompt** (B) deletes the image and re-records prompt 2;
    **Start Over** deletes the image and calls `clearHouse()` back to step 1.
+
+**House sign and voice refinement.** `enterHouse` records the house's `project_id`, name and floor-plan
+version from the geometry and shows a "NOW VIEWING" sign (`house_sign` panel) above the prompt panel.
+In a saved house, from `READY_FOR_PROMPT2` or `WALKING`, holding the **right grip** records a floor-plan
+change (`RECORDING_REFINE` → `CONFIRMING_REFINE` → `REFINING_GEOMETRY`, transcription phase 3); confirming
+posts it to `/floor-plan/refine` and rebuilds the house from the new version, returning to the state it
+started from (the walking image is re-spawned). Accepting an image links it to the floor plan.
 
 The two prompts are independent: neither is sent as grounding for the other (`image_prompt` on
 `generate-vr-from-prompt` is still supported but not used by the headset).
@@ -206,7 +232,7 @@ after the flow left `GENERATING_IMAGE` (watchdog abort, a different generation) 
 Progress bars are dismissed via `dismissProgressBar(delay)`, which captures the bar it was called for.
 
 Key endpoints for the headset: `POST /api/v1/voice/transcribe`,
-`POST /api/v1/planning/generate-vr-from-prompt` (stateless — no DB project), `POST /api/v1/image/generate`,
+`POST /api/v1/planning/generate-vr-from-prompt` (saves a project), `POST /api/v1/projects/{id}/floor-plan/refine`, `POST /api/v1/image/generate`,
 `WS /api/v1/ws/image-progress/{id}`, `GET /api/v1/projects/{id}/generate-vr` (dashboard path),
 `WS /api/v1/ws/room/{roomId}`. Interactive docs at `/docs`. `POST /api/v1/planning/generate-project`
 (full plan with phases, tasks, materials, cost, timeline) and `POST /api/v1/designs/{id}/generate-vr`

@@ -76,7 +76,9 @@ Key endpoints used by the VR app:
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | `POST` | `/api/v1/voice/transcribe` | Whisper transcription |
-| `POST` | `/api/v1/planning/generate-vr-from-prompt` | VR geometry from a floor-plan prompt (step 1) |
+| `POST` | `/api/v1/planning/generate-vr-from-prompt` | House from a floor-plan prompt, saved as a project (step 1) |
+| `POST` | `/api/v1/projects/{id}/floor-plan/refine` | Change the floor plan in words (grip in VR); saved as a new version |
+| `PUT`  | `/api/v1/projects/{id}/floor-plan` | Save a dashboard-edited floor plan as a new version |
 | `POST` | `/api/v1/image/generate` | Start 2D image generation (step 2) |
 | `WS`   | `/api/v1/ws/image-progress/{id}` | Image generation progress |
 | `GET`  | `/api/v1/projects/{id}/generate-vr` | VR geometry for a saved project (dashboard) |
@@ -84,11 +86,13 @@ Key endpoints used by the VR app:
 | `WS`   | `/api/v1/ws/room/{roomId}` | Real-time room collaboration |
 | `GET`  | `/docs` | Interactive OpenAPI docs |
 
+Floor plans are stored as versions per project (`floor_plans` table). On a fresh database, `python -m scripts.seed_example_floor_plan` (in `backend-core/backend`) adds the example house **Maple Hollow Cottage**.
+
 See [backend-core/backend/README.md](backend-core/backend/README.md) for setup details.
 
 ### Dashboard (`backend-core/dashboard`)
 
-Vue 3 + Quasar + Pinia management UI for projects, materials, generated images, and run history, plus a 2D floor plan of the selected project's house. Runs on port **3001**.
+Vue 3 + Quasar + Pinia management UI for projects, materials, generated images, and run history, plus the selected project's floor plan: drawn in 2D, editable (rooms, sizes, doorways, entry), changeable by description, with version history. Runs on port **3001**.
 
 ### Construction Quest VR App (`construction-quest`)
 
