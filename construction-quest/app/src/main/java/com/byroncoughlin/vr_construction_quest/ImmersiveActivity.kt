@@ -96,7 +96,10 @@ class ImmersiveActivity : AppSystemActivity() {
         CONFIRMING_TEXT2,     // prompt 2 transcribed, awaiting Confirm/Retry
         GENERATING_IMAGE,     // image being generated (WebSocket progress)
         REVIEWING_IMAGE,      // image shown with Accept / Edit / Start Over
-        WALKING               // image accepted, walking the floor plan with it
+        WALKING,              // image accepted, walking the floor plan with it
+        RECORDING_REFINE,     // grip held inside a saved house: recording a floor-plan change
+        CONFIRMING_REFINE,    // change transcribed, awaiting Confirm/Retry
+        REFINING_GEOMETRY     // backend revising the floor plan; the house is rebuilt after
     }
     private var voiceState = VoiceState.IDLE
     private var pendingTranscription = ""
@@ -122,6 +125,19 @@ class ImmersiveActivity : AppSystemActivity() {
     private var reviewImagePanelEntity: Entity? = null
     private var reviewImageWebView: WebView? = null
     private var pendingReviewImageUrl: String? = null
+
+    // The house on display. Houses from the voice flow and the dashboard are saved
+    // projects, so they can be refined by voice and their accepted image linked.
+    private var currentProjectId: Int? = null
+    private var currentHouseName: String? = null
+    private var currentFloorPlanVersion: Int? = null
+    // Server path of the accepted image (/generated_images/...), for linking.
+    private var currentImagePath: String? = null
+    // Where a floor-plan refinement returns to: READY_FOR_PROMPT2 or WALKING.
+    private var refineReturnState = VoiceState.READY_FOR_PROMPT2
+    // Name sign floating above the panels: which house is being displayed.
+    private var houseSignEntity: Entity? = null
+    private var houseSignWebView: WebView? = null
     
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
@@ -163,6 +179,12 @@ class ImmersiveActivity : AppSystemActivity() {
         private const val REVIEW_PANEL_X = 2.2f
         private const val REVIEW_PANEL_Y = 1.4f
         private const val REVIEW_PANEL_Z = -1.7f
+        // House name sign: above the prompt panel and the walking image panel.
+        private const val HOUSE_SIGN_WIDTH = 1.6f
+        private const val HOUSE_SIGN_HEIGHT = 0.4f
+        private const val HOUSE_SIGN_Y = 2.45f
+        // Prompt numbers passed through recording/transcription; 3 is a floor-plan change.
+        private const val PHASE_REFINE = 3
         // From gradle.properties (serverHost) via app/build.gradle.kts.
         private const val SERVER_URL = BuildConfig.SERVER_URL
         private const val WS_URL = BuildConfig.WS_URL
@@ -290,7 +312,7 @@ class ImmersiveActivity : AppSystemActivity() {
         Log.w(TAG, "⚠️ Transcription failed (prompt $phase): $reason")
         runOnUiThread {
             transcribing = false
-            voiceState = if (phase == 2) VoiceState.READY_FOR_PROMPT2 else VoiceState.IDLE
+            voiceState = readyStateFor(phase)
             showPanel()
             dashboardWebView?.let { loadVoiceRetryHtml(it, phase, reason) }
         }
@@ -298,16 +320,22 @@ class ImmersiveActivity : AppSystemActivity() {
 
     private fun loadVoiceRetryHtml(wv: WebView, phase: Int, reason: String) {
         val safe = reason.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        val what = if (phase == 1) "the floor plan" else "how the house should look"
+        val what = when (phase) {
+            1 -> "the floor plan"
+            PHASE_REFINE -> "the change to the floor plan"
+            else -> "how the house should look"
+        }
+        val button = if (phase == PHASE_REFINE) "the grip" else "A"
+        val step = if (phase == PHASE_REFINE) "Change the floor plan" else "Step $phase of 2"
         val html = """
             <!DOCTYPE html><html>
             <body style="margin:0;padding:32px;background:#1A1A2E;color:white;
                          font-family:sans-serif;display:flex;flex-direction:column;
                          align-items:center;justify-content:center;height:100vh;box-sizing:border-box;">
-              <p style="font-size:14px;color:#64B5F6;margin:0 0 8px;">Step $phase of 2</p>
+              <p style="font-size:14px;color:#64B5F6;margin:0 0 8px;">$step</p>
               <p style="font-size:24px;color:#F9A825;margin-bottom:12px;">🎙️ $safe</p>
               <p style="font-size:18px;color:#AAAAAA;text-align:center;">
-                Hold <strong style="color:white;">A</strong> and describe $what again.
+                Hold <strong style="color:white;">$button</strong> and describe $what again.
               </p>
             </body></html>
         """.trimIndent()
@@ -423,6 +451,7 @@ class ImmersiveActivity : AppSystemActivity() {
                                     if (imageUrl.isNotEmpty()) {
                                         val fullUrl = "$SERVER_URL$imageUrl"
                                         currentImageUrl = fullUrl
+                                        currentImagePath = imageUrl
                                         voiceState = VoiceState.REVIEWING_IMAGE
                                         displayReviewPanel(fullUrl)
                                     } else {
@@ -462,7 +491,7 @@ class ImmersiveActivity : AppSystemActivity() {
 
     private fun showConfirmationPanel(text: String, phase: Int) {
         pendingTranscription = text
-        voiceState = if (phase == 1) VoiceState.CONFIRMING_TEXT1 else VoiceState.CONFIRMING_TEXT2
+        voiceState = confirmingStateFor(phase)
         pendingConfirmationText = text
 
         val wv = dashboardWebView
@@ -479,8 +508,7 @@ class ImmersiveActivity : AppSystemActivity() {
     private fun pollForDashboardWebView(phase: Int) {
         val handler = android.os.Handler(Looper.getMainLooper())
         var attempts = 0
-        val expectedState =
-            if (phase == 1) VoiceState.CONFIRMING_TEXT1 else VoiceState.CONFIRMING_TEXT2
+        val expectedState = confirmingStateFor(phase)
 
         fun poll() {
             val text = pendingConfirmationText
@@ -504,7 +532,7 @@ class ImmersiveActivity : AppSystemActivity() {
             attempts++
             if (attempts >= 20) {
                 Log.e(TAG, "❌ Timed out waiting for dashboardWebView after ${attempts * 500}ms — panel { } never fired. Check that panel entity is in scene and ui_example.xml is correct.")
-                voiceState = if (phase == 1) VoiceState.IDLE else VoiceState.READY_FOR_PROMPT2
+                voiceState = readyStateFor(phase)
                 pendingConfirmationText = null
                 return
             }
@@ -518,11 +546,12 @@ class ImmersiveActivity : AppSystemActivity() {
 
     private fun loadConfirmationHtml(text: String, phase: Int) {
         val safe = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
-        val headline = if (phase == 1) {
-            "Describe the floor plan (walkable)"
-        } else {
-            "Describe the house look (2D image)"
+        val headline = when (phase) {
+            1 -> "Describe the floor plan (walkable)"
+            PHASE_REFINE -> "Change the floor plan"
+            else -> "Describe the house look (2D image)"
         }
+        val step = if (phase == PHASE_REFINE) "Floor plan change" else "Step $phase of 2"
         val html = """
             <!DOCTYPE html><html>
             <head>
@@ -531,7 +560,7 @@ class ImmersiveActivity : AppSystemActivity() {
             <body style="margin:0;padding:24px;background:#1A1A2E;color:white;
                          font-family:sans-serif;display:flex;flex-direction:column;
                          align-items:center;justify-content:center;height:100vh;box-sizing:border-box;">
-              <p style="color:#64B5F6;font-size:14px;margin:0 0 4px;">Step $phase of 2</p>
+              <p style="color:#64B5F6;font-size:14px;margin:0 0 4px;">$step</p>
               <p style="color:#AAAAAA;font-size:18px;margin:0 0 12px;">$headline — did you say?</p>
               <p style="font-size:26px;padding:16px;background:#2A2A4E;border-radius:8px;
                         width:100%;text-align:center;box-sizing:border-box;margin-bottom:20px;">$safe</p>
@@ -574,6 +603,19 @@ class ImmersiveActivity : AppSystemActivity() {
         Log.i(TAG, "🏠 Idle HTML loaded into dashboard panel")
     }
 
+    private fun confirmingStateFor(phase: Int) = when (phase) {
+        1 -> VoiceState.CONFIRMING_TEXT1
+        PHASE_REFINE -> VoiceState.CONFIRMING_REFINE
+        else -> VoiceState.CONFIRMING_TEXT2
+    }
+
+    /** The state to go back to when recording [phase] has to be repeated. */
+    private fun readyStateFor(phase: Int) = when (phase) {
+        1 -> VoiceState.IDLE
+        PHASE_REFINE -> refineReturnState
+        else -> VoiceState.READY_FOR_PROMPT2
+    }
+
     private fun hidePanel() {
         dashboardPanelEntity?.setComponent(Visible(false))
         Log.i(TAG, "👁️ Panel hidden")
@@ -588,6 +630,7 @@ class ImmersiveActivity : AppSystemActivity() {
         when (voiceState) {
             VoiceState.CONFIRMING_TEXT1 -> onConfirmPrompt1()
             VoiceState.CONFIRMING_TEXT2 -> onConfirmPrompt2()
+            VoiceState.CONFIRMING_REFINE -> onConfirmRefine()
             else -> Log.w(TAG, "⚠️ onConfirmTranscription in unexpected state: $voiceState")
         }
     }
@@ -641,6 +684,12 @@ class ImmersiveActivity : AppSystemActivity() {
         if (roomLabelsVisible) toggleRoomLabels()
         destroyWalkingImagePanel()
 
+        currentProjectId = geometry.optInt("project_id", 0).takeIf { it > 0 }
+        currentHouseName = geometry.optString("project_name", "").ifBlank { null }
+        currentFloorPlanVersion = geometry.optJSONObject("floor_plan")
+            ?.optInt("version", 0)?.takeIf { it > 0 }
+        Log.i(TAG, "🏡 Displaying '$currentHouseName' (project=$currentProjectId, plan v$currentFloorPlanVersion)")
+
         val spawnPos = houseGenerator?.buildFromGeometry(geometry)
         Log.i(TAG, "🏠 House built. Spawn: $spawnPos")
         if (spawnPos != null) {
@@ -651,6 +700,57 @@ class ImmersiveActivity : AppSystemActivity() {
 
         panelAnchor = spawnPos ?: Vector3(0f, 0f, 0f)
         placePromptPanel()
+        showHouseSign()
+    }
+
+    /**
+     * Show which house is on display on a sign above the panels. The panel { }
+     * callback fills it in (and refills it via [loadHouseSignHtml] when the name
+     * or version changes). UI thread only.
+     */
+    private fun showHouseSign() {
+        val pose = Pose(t = Vector3(panelAnchor.x + 0.3f, HOUSE_SIGN_Y, panelAnchor.z - 1.7f))
+        val existing = houseSignEntity
+        if (existing != null) {
+            existing.setComponent(Transform(pose))
+            existing.setComponent(Visible(true))
+            loadHouseSignHtml()
+            return
+        }
+        val entity = Entity.create()
+        entity.setComponent(Panel(R.layout.house_sign))
+        entity.setComponent(Transform(pose))
+        entity.setComponent(Grabbable())
+        entity.setComponent(Visible(true))
+        houseSignEntity = entity
+    }
+
+    private fun destroyHouseSign() {
+        houseSignEntity?.destroy()
+        houseSignEntity = null
+        houseSignWebView = null
+    }
+
+    private fun loadHouseSignHtml() {
+        val wv = houseSignWebView ?: return
+        // Names come from the LLM or the dashboard.
+        val name = (currentHouseName ?: "Generated House")
+            .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        val details = buildList {
+            currentFloorPlanVersion?.let { add("Floor plan v$it") }
+            if (currentProjectId != null) add("Hold grip to change the floor plan")
+        }.joinToString(" • ")
+        val html = """
+            <!DOCTYPE html><html>
+            <body style="margin:0;padding:10px 18px;background:rgba(20,20,40,0.9);
+                border-radius:14px;display:flex;flex-direction:column;justify-content:center;
+                align-items:center;height:100vh;box-sizing:border-box;font-family:sans-serif;color:#fff;">
+              <p style="margin:0;font-size:12px;letter-spacing:2px;color:#64B5F6;">NOW VIEWING</p>
+              <p style="margin:4px 0;font-size:30px;font-weight:bold;text-align:center;">🏠 $name</p>
+              <p style="margin:0;font-size:14px;opacity:0.75;text-align:center;">$details</p>
+            </body></html>
+        """.trimIndent()
+        wv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
     }
 
     /** A fresh progress bar in front of the player (at [panelAnchor]). */
@@ -745,8 +845,90 @@ class ImmersiveActivity : AppSystemActivity() {
         }
     }
 
+    /**
+     * Floor-plan change confirmed: the backend revises the saved plan (a new version)
+     * and the house is rebuilt from it. The player returns to the spawn point, since
+     * walls may now stand where they were. Failure keeps the current house.
+     */
+    private fun onConfirmRefine() {
+        val text = pendingTranscription
+        val projectId = currentProjectId
+        if (projectId == null) {
+            Log.w(TAG, "⚠️ Refinement confirmed without a saved house")
+            returnFromRefine()
+            return
+        }
+        Log.i(TAG, "✅ Floor-plan change confirmed: '$text'")
+        hidePanel()
+        voiceState = VoiceState.REFINING_GEOMETRY
+        showProgressBar()
+
+        activityScope.launch(Dispatchers.IO) {
+            val geometry = houseGenerator?.refineFloorPlan(projectId, text)
+            runOnUiThread {
+                if (voiceState != VoiceState.REFINING_GEOMETRY) return@runOnUiThread
+                if (geometry == null) {
+                    progressBar?.setStateColor(VRProgressBar.ProgressState.ERROR)
+                    dismissProgressBar(2000)
+                    returnFromRefine()
+                    showPanel()  // also while walking, so the error is seen
+                    dashboardWebView?.let { loadRefineHintHtml(it, "Could not change the floor plan") }
+                    return@runOnUiThread
+                }
+                enterHouse(geometry)
+                progressBar?.setProgressPercentage(100)
+                progressBar?.setStateColor(VRProgressBar.ProgressState.COMPLETE)
+                dismissProgressBar(1500)
+                returnFromRefine()
+                dashboardWebView?.let { loadRefineHintHtml(it, null) }
+            }
+        }
+    }
+
+    /**
+     * Back to where the refinement started: walking with the accepted image (re-spawned,
+     * since rebuilding the house removes it), or the prompt-2 panel. UI thread only.
+     */
+    private fun returnFromRefine() {
+        voiceState = refineReturnState
+        if (voiceState == VoiceState.WALKING && currentImageUrl != null) {
+            hidePanel()
+            if (walkingImagePanelEntity == null) spawnWalkingImagePanel(panelAnchor)
+        } else {
+            voiceState = VoiceState.READY_FOR_PROMPT2
+            showPanel()
+        }
+    }
+
+    /** Prompt-2 panel, with [error] (if any) from the last floor-plan change on top. */
+    private fun loadRefineHintHtml(wv: WebView, error: String?) {
+        if (error == null) {
+            loadPrompt2Html(wv)
+            return
+        }
+        val safe = error.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        val html = """
+            <!DOCTYPE html><html>
+            <body style="margin:0;padding:32px;background:#1A1A2E;color:white;
+                         font-family:sans-serif;display:flex;flex-direction:column;
+                         align-items:center;justify-content:center;height:100vh;box-sizing:border-box;">
+              <p style="font-size:24px;color:#EF5350;margin-bottom:12px;">⚠️ $safe</p>
+              <p style="font-size:18px;color:#AAAAAA;text-align:center;">
+                The house is unchanged. Hold the <strong style="color:white;">grip</strong> to try
+                another change, or <strong style="color:white;">A</strong> to describe the look.
+              </p>
+            </body></html>
+        """.trimIndent()
+        wv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+    }
+
     internal fun onRetryTranscription() {
         Log.i(TAG, "🔄 User retried — ready to record again")
+        if (voiceState == VoiceState.CONFIRMING_REFINE) {
+            returnFromRefine()
+            dashboardWebView?.let { loadRefineHintHtml(it, null) }
+            return
+        }
         val wasPrompt2 = voiceState == VoiceState.CONFIRMING_TEXT2
         voiceState = if (wasPrompt2) VoiceState.READY_FOR_PROMPT2 else VoiceState.IDLE
         val wv = dashboardWebView ?: return
@@ -869,7 +1051,8 @@ class ImmersiveActivity : AppSystemActivity() {
      */
     fun loadProjectById(projectId: Int, generationId: String? = null) {
         val busy = isRecording || transcribing ||
-            voiceState == VoiceState.GENERATING_GEOMETRY || voiceState == VoiceState.GENERATING_IMAGE
+            voiceState == VoiceState.GENERATING_GEOMETRY || voiceState == VoiceState.GENERATING_IMAGE ||
+            voiceState == VoiceState.REFINING_GEOMETRY
         if (busy) {
             Log.w(TAG, "⏭️ loadProjectById($projectId) ignored — busy ($voiceState)")
             return
@@ -906,6 +1089,21 @@ class ImmersiveActivity : AppSystemActivity() {
                 Log.e(TAG, "❌ loadProjectById($projectId) failed", e)
             }
         }
+    }
+
+    private fun loadListeningHtml(wv: WebView) {
+        val html = """
+            <!DOCTYPE html><html>
+            <body style="margin:0;padding:32px;background:#1A1A2E;color:white;
+                         font-family:sans-serif;display:flex;flex-direction:column;
+                         align-items:center;justify-content:center;height:100vh;box-sizing:border-box;">
+              <p style="font-size:24px;color:#EF5350;margin-bottom:16px;">🎙️ Listening…</p>
+              <p style="font-size:18px;color:#AAAAAA;text-align:center;">
+                Say what to change in the floor plan, then release the grip.
+              </p>
+            </body></html>
+        """.trimIndent()
+        wv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
     }
 
     private fun loadRenderingHtml(wv: WebView) {
@@ -1032,6 +1230,33 @@ class ImmersiveActivity : AppSystemActivity() {
         hidePanel()
         spawnWalkingImagePanel(panelAnchor)
         voiceState = VoiceState.WALKING
+        linkAcceptedImage()
+    }
+
+    /** Record the accepted image on the house's current floor plan (fire-and-forget). */
+    private fun linkAcceptedImage() {
+        val projectId = currentProjectId ?: return
+        val generationId = currentImageGenerationId ?: return
+        val path = currentImagePath ?: return
+        activityScope.launch(Dispatchers.IO) {
+            try {
+                val body = JSONObject()
+                    .put("generation_id", generationId)
+                    .put("image_url", path)
+                    .toString()
+                    .toRequestBody("application/json".toMediaType())
+                httpClient.newCall(
+                    Request.Builder()
+                        .url("$SERVER_URL/api/v1/projects/$projectId/floor-plan/image")
+                        .put(body)
+                        .build()
+                ).execute().use { response ->
+                    Log.i(TAG, "🔗 Image $generationId linked to project $projectId → HTTP ${response.code}")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ Could not link image to project $projectId: ${e.message}")
+            }
+        }
     }
 
     internal fun onEditPrompt() {
@@ -1053,6 +1278,7 @@ class ImmersiveActivity : AppSystemActivity() {
         currentImageGenerationId = null
         currentImagePrompt = null
         currentImageUrl = null
+        currentImagePath = null
     }
 
     /** Remove the generated house and its panels and return to step 1. UI thread only. */
@@ -1068,6 +1294,11 @@ class ImmersiveActivity : AppSystemActivity() {
         currentImageGenerationId = null
         currentImagePrompt = null
         currentImageUrl = null
+        currentImagePath = null
+        currentProjectId = null
+        currentHouseName = null
+        currentFloorPlanVersion = null
+        destroyHouseSign()
         panelAnchor = Vector3(0f, 0f, 0f)
         placePromptPanel()
         webPanelEntity?.setComponent(Transform(Pose(t = Vector3(-1.9f, 1.1f, -1.7f))))
@@ -1084,6 +1315,11 @@ class ImmersiveActivity : AppSystemActivity() {
     private fun progressBarPosition() = Vector3(panelAnchor.x, 1.5f, panelAnchor.z - 1.0f)
 
     private fun loadPrompt2Html(wv: WebView) {
+        val refineHint = if (currentProjectId != null) """
+              <p style="font-size:15px;color:#888;text-align:center;margin-top:14px;">
+                Want a different layout? Hold the <strong style="color:white;">grip</strong> and say
+                what to change — "make the kitchen bigger".
+              </p>""" else ""
         val html = """
             <!DOCTYPE html><html>
             <body style="margin:0;padding:32px;background:#1A1A2E;color:white;
@@ -1095,6 +1331,7 @@ class ImmersiveActivity : AppSystemActivity() {
                 Hold <strong style="color:white;">A</strong> and describe how the house
                 should look — style, materials, colours.
               </p>
+              $refineHint
             </body></html>
         """.trimIndent()
         wv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
@@ -1384,6 +1621,7 @@ class ImmersiveActivity : AppSystemActivity() {
         private var teleportDebounceTimer = 0L
         private var roomLabelDebounceTimer = 0L
         private var prevButtonB = false
+        private var gripDebounceTimer = 0L
 
         override fun execute() {
             if (!isLibraryLoaded) return
@@ -1510,9 +1748,26 @@ class ImmersiveActivity : AppSystemActivity() {
                 return
             }
 
+            // Text confirmation of a floor-plan change: same buttons.
+            if (voiceState == VoiceState.CONFIRMING_REFINE) {
+                if (state.buttonA && (now - buttonADebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
+                    buttonADebounceTimer = now
+                    onConfirmTranscription()
+                }
+                if (state.buttonB && (now - buttonBDebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
+                    buttonBDebounceTimer = now
+                    onRetryTranscription()
+                }
+                return
+            }
+
             // Block input while generating image or geometry
             if (voiceState == VoiceState.GENERATING_IMAGE ||
-                voiceState == VoiceState.GENERATING_GEOMETRY) return
+                voiceState == VoiceState.GENERATING_GEOMETRY ||
+                voiceState == VoiceState.REFINING_GEOMETRY) return
+
+            // Hold the right grip inside a saved house to say how to change its floor plan.
+            if (handleRefineRecording(state, controllerEntity, now)) return
 
             // Voice recording in IDLE (prompt 1) or READY_FOR_PROMPT2 (prompt 2).
             // Also allow the active RECORDING_* states through so we can detect button release.
@@ -1555,6 +1810,43 @@ class ImmersiveActivity : AppSystemActivity() {
                 }
             }
 
+        }
+
+        /** Returns true when the grip recording consumed this frame's input. */
+        private fun handleRefineRecording(state: ControllerState, controllerEntity: Entity, now: Long): Boolean {
+            if (voiceState == VoiceState.RECORDING_REFINE) {
+                // Released and stopped: wait here for the transcription.
+                if (!isRecording) return true
+                if (state.grip) {
+                    gripDebounceTimer = now
+                } else if (now - gripDebounceTimer > DEBOUNCE_TIMEOUT_MS) {
+                    isRecording = false
+                    transcribing = true
+                    val controller = voiceController
+                    if (controller == null) {
+                        failTranscription(PHASE_REFINE, "Microphone unavailable")
+                    } else {
+                        controller.stopRecording { audio ->
+                            transcribeAudio(audio, controller.sampleRate, PHASE_REFINE)
+                        }
+                    }
+                    showVoiceIndicator(null, state.pose, false)
+                }
+                return true
+            }
+            val canRefine = currentProjectId != null && !isRecording && !transcribing &&
+                (voiceState == VoiceState.READY_FOR_PROMPT2 || voiceState == VoiceState.WALKING)
+            if (!canRefine || !state.grip || state.buttonA) return false
+            gripDebounceTimer = now
+            isRecording = true
+            refineReturnState = voiceState
+            voiceState = VoiceState.RECORDING_REFINE
+            Log.i(TAG, "🎙️ Grip held — recording a floor-plan change")
+            voiceController?.startRecording()
+            showVoiceIndicator(controllerEntity, state.pose, true)
+            if (refineReturnState == VoiceState.WALKING) showPanel()
+            dashboardWebView?.let { loadListeningHtml(it) }
+            return true
         }
 
         private fun handleGrabAndMove(state: ControllerState) {
@@ -1941,8 +2233,11 @@ class ImmersiveActivity : AppSystemActivity() {
                     val queued = pendingConfirmationText
                     if (queued != null) {
                         pendingConfirmationText = null
-                        val queuedPhase =
-                            if (voiceState == VoiceState.CONFIRMING_TEXT2) 2 else 1
+                        val queuedPhase = when (voiceState) {
+                            VoiceState.CONFIRMING_TEXT2 -> 2
+                            VoiceState.CONFIRMING_REFINE -> PHASE_REFINE
+                            else -> 1
+                        }
                         Log.i(TAG, "📋 Panel now ready — displaying queued confirmation (phase $queuedPhase): '$queued'")
                         loadConfirmationHtml(queued, queuedPhase)
                     } else {
@@ -1980,6 +2275,20 @@ class ImmersiveActivity : AppSystemActivity() {
                     walkingImageWebView = wv
                     Log.i(TAG, "🖼️ Walking image panel ready")
                     currentImageUrl?.let { loadWalkingImageHtml(it) }
+                }
+            },
+            PanelRegistration(R.layout.house_sign) {
+                config {
+                    width = HOUSE_SIGN_WIDTH
+                    height = HOUSE_SIGN_HEIGHT
+                    layoutDpi = 300
+                }
+                panel {
+                    val wv = rootView?.findViewById<WebView>(R.id.house_sign_web_view) ?: return@panel
+                    wv.settings.javaScriptEnabled = false
+                    wv.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    houseSignWebView = wv
+                    loadHouseSignHtml()
                 }
             },
             PanelRegistration(R.layout.room_label) {

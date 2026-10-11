@@ -101,7 +101,8 @@ class HouseGenerator(private val serverUrl: String) {
     }
 
     /**
-     * Fetch VR geometry JSON directly from a prompt, without a DB project.
+     * Fetch VR geometry JSON for a floor-plan prompt; the backend saves the house as a
+     * project, and the geometry carries its project_id / project_name.
      * Used by the first voice prompt in the two-prompt flow (the floor-plan
      * description); imagePrompt optionally adds style grounding (the voice flow passes null).
      * Must be called from an IO/background thread.
@@ -132,6 +133,33 @@ class HouseGenerator(private val serverUrl: String) {
             json.optJSONObject("geometry")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to fetch VR geometry from prompt", e)
+            null
+        }
+    }
+
+    /**
+     * Ask the backend to change project [projectId]'s floor plan as described in
+     * [instruction] ("make the kitchen bigger"). The revision is saved as a new
+     * floor-plan version; returns its geometry, or null on failure.
+     * Must be called from an IO/background thread.
+     */
+    fun refineFloorPlan(projectId: Int, instruction: String): JSONObject? {
+        return try {
+            Log.i(TAG, "✏️ Refining floor plan of project $projectId: '$instruction'")
+            val body = JSONObject().put("instruction", instruction)
+            val request = Request.Builder()
+                .url("$serverUrl/api/v1/projects/$projectId/floor-plan/refine")
+                .post(body.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+            longPlanClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Log.e(TAG, "❌ Floor plan refinement failed: HTTP ${response.code}")
+                    return null
+                }
+                JSONObject(response.body?.string() ?: "{}").optJSONObject("geometry")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to refine floor plan", e)
             null
         }
     }
