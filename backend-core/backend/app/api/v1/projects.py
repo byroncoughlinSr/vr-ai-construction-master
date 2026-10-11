@@ -1,11 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from typing import Optional, List
-from sqlalchemy import or_, and_, func
+from typing import Optional
+from sqlalchemy import or_, func
 import logging
-import uuid
-import asyncio
 
 from ...database import get_db
 from ...models import Project
@@ -13,17 +11,17 @@ from ...schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
     ProjectListResponse, ProjectStats
 )
-from ...services import AIImageService
+from ...services import get_image_service
 from ...services.vr_geometry_service import build_geometry_from_rooms
-from .websocket import send_image_progress_update, complete_image_generation, fail_image_generation
+from .image_jobs import start_image_generation
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-image_service = AIImageService()
+image_service = get_image_service()
 
 
 @router.post("/", response_model=ProjectResponse)
-async def create_project(
+def create_project(
     project: ProjectCreate,
     db: Session = Depends(get_db)
 ):
@@ -43,7 +41,7 @@ async def create_project(
 
 
 @router.get("/stats", response_model=ProjectStats)
-async def get_project_stats(db: Session = Depends(get_db)):
+def get_project_stats(db: Session = Depends(get_db)):
     """Get project statistics summary."""
     total_projects = db.query(Project).count()
     active_projects = db.query(Project).filter(Project.status == "active").count()
@@ -75,7 +73,7 @@ async def get_project_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/latest")
-async def get_latest_project(db: Session = Depends(get_db)):
+def get_latest_project(db: Session = Depends(get_db)):
     """Return the most recently created project ID and name (for VR auto-load)."""
     project = db.query(Project).order_by(Project.id.desc()).first()
     if not project:
@@ -85,7 +83,7 @@ async def get_latest_project(db: Session = Depends(get_db)):
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
-async def get_project(
+def get_project(
     project_id: int,
     db: Session = Depends(get_db)
 ):
@@ -97,7 +95,7 @@ async def get_project(
 
 
 @router.get("/", response_model=ProjectListResponse)
-async def list_projects(
+def list_projects(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=100),
     search: Optional[str] = None,
@@ -123,6 +121,9 @@ async def list_projects(
     # Get total count
     total = query.count()
 
+    # Newest first: the dashboard auto-selects the first project in the list.
+    query = query.order_by(Project.created_at.desc(), Project.id.desc())
+
     # Apply pagination
     projects = query.offset((page - 1) * page_size).limit(page_size).all()
 
@@ -139,7 +140,7 @@ async def list_projects(
 
 
 @router.put("/{project_id}", response_model=ProjectResponse)
-async def update_project(
+def update_project(
     project_id: int,
     project_update: ProjectUpdate,
     db: Session = Depends(get_db)
@@ -167,7 +168,7 @@ async def update_project(
 
 
 @router.delete("/{project_id}")
-async def delete_project(
+def delete_project(
     project_id: int,
     db: Session = Depends(get_db)
 ):
@@ -191,7 +192,6 @@ async def delete_project(
 @router.post("/{project_id}/load-to-vr")
 async def load_project_to_vr(
     project_id: int,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
@@ -204,6 +204,8 @@ async def load_project_to_vr(
     4. Returns generation_id for tracking
     
     Use WebSocket /api/v1/ws/image-progress/{generation_id} for progress updates.
+    The dashboard passes the generation_id to the headset (Android.loadProjectWithImage),
+    which builds the house and shows this image for review once it is ready.
     """
     logger.info(f"🎮 Load-to-VR requested for project {project_id}")
     
@@ -214,71 +216,35 @@ async def load_project_to_vr(
     
     logger.info(f"📦 Project found: '{project.name}' (id={project_id})")
     
-    try:
-        # Generate unique ID for image generation tracking
-        generation_id = str(uuid.uuid4())
-        
-        # Get project description for image generation
-        project_description = project.description or project.name
-        
-        # Start background image generation
-        async def background_image_generation():
-            try:
-                logger.info(f"🖼️ Starting image generation for project {project_id}")
-                
-                # Progress callback for WebSocket updates
-                async def progress_callback(progress_data):
-                    await send_image_progress_update(generation_id, progress_data)
-                
-                # Generate architectural visualization
-                result = await image_service.generate_architectural_visualization(
-                    design_description=project_description,
-                    style="modern",
-                    time_of_day="day",
-                    progress_callback=progress_callback,
-                    generation_id=generation_id
-                )
-                
-                if result["success"]:
-                    await complete_image_generation(generation_id, result)
-                    logger.info(f"✅ Image generation completed for project {project_id}")
-                else:
-                    error_msg = result.get('error', 'Unknown error')
-                    await fail_image_generation(generation_id, error_msg)
-                    logger.error(f"❌ Image generation failed: {error_msg}")
-                    
-            except Exception as e:
-                logger.error(f"❌ Background image generation error: {e}", exc_info=True)
-                await fail_image_generation(generation_id, str(e))
-        
-        # Start background task
-        asyncio.create_task(background_image_generation())
-        
-        # Return response immediately
-        return JSONResponse(
-            status_code=202,  # Accepted - processing in background
-            content={
-                "success": True,
-                "project_id": project_id,
-                "project_name": project.name,
-                "generation_id": generation_id,
-                "status": "processing",
-                "message": "Project loading to VR initiated. Image generation in progress.",
-                "websocket_url": f"/api/v1/ws/image-progress/{generation_id}",
-                "vr_geometry_url": f"/api/v1/projects/{project_id}/generate-vr"
-            }
-        )
-        
-    except Exception as e:
-        logger.error(f"❌ Load-to-VR failed for project {project_id}: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to load project to VR: {str(e)}"
-        )
+    project_description = project.description or project.name
+    generation_id = start_image_generation(
+        lambda progress, gen_id: image_service.generate_architectural_visualization(
+            design_description=project_description,
+            style="modern",
+            time_of_day="day",
+            progress_callback=progress,
+            generation_id=gen_id,
+        ),
+        label=f"project {project_id} image",
+    )
+
+    return JSONResponse(
+        status_code=202,  # Accepted - processing in background
+        content={
+            "success": True,
+            "project_id": project_id,
+            "project_name": project.name,
+            "generation_id": generation_id,
+            "status": "processing",
+            "message": "Project loading to VR initiated. Image generation in progress.",
+            "websocket_url": f"/api/v1/ws/image-progress/{generation_id}",
+            "vr_geometry_url": f"/api/v1/projects/{project_id}/generate-vr"
+        }
+    )
 
 
 @router.get("/{project_id}/generate-vr")
-async def generate_vr_geometry(
+def generate_vr_geometry(
     project_id: int,
     include_materials: bool = Query(True),
     include_textures: bool = Query(True),
@@ -304,23 +270,21 @@ async def generate_vr_geometry(
     try:
         from ...models import ConstructionPhase, Material, AIGeneration
 
-        phases = db.query(ConstructionPhase).filter(
-            ConstructionPhase.project_id == project_id
-        ).order_by(ConstructionPhase.phase_order).all()
-
         materials = db.query(Material).filter(
             Material.project_id == project_id
         ).all()
 
-        logger.info(f"📦 DB records: {len(phases)} phases, {len(materials)} materials")
-
+        # The newest plan wins if the project was ever re-planned.
         ai_data = db.query(AIGeneration).filter(
             AIGeneration.project_id == project_id
-        ).first()
-        logger.info(f"🤖 AIGeneration record: {'found' if ai_data else 'not found'}")
+        ).order_by(AIGeneration.id.desc()).first()
+        logger.info(
+            f"📦 {len(materials)} materials, AIGeneration record: {'found' if ai_data else 'not found'}"
+        )
 
         # Build rooms_ft — dimensions in feet, fed into the shared geometry helper.
         rooms_ft: list[dict] = []
+        layout = None
 
         # Path A: use AI-generated room structure
         if ai_data and ai_data.output_data:
@@ -330,12 +294,16 @@ async def generate_vr_geometry(
                 ai_rooms = project_structure.get("rooms", [])
                 logger.info(f"🏠 AI project_structure has {len(ai_rooms)} rooms")
                 rooms_ft = list(ai_rooms)
+                layout = project_structure.get("layout")
             except Exception as e:
                 logger.warning(f"⚠️  AI room parse failed: {e} — falling back to phase-based parsing")
                 rooms_ft = []
 
         # Path B: fallback — extract rooms from phase names
         if not rooms_ft:
+            phases = db.query(ConstructionPhase).filter(
+                ConstructionPhase.project_id == project_id
+            ).order_by(ConstructionPhase.phase_order).all()
             for phase in phases:
                 name_lower = phase.name.lower()
                 if any(kw in name_lower for kw in ("room", "bedroom", "kitchen", "bathroom", "garage")):
@@ -360,6 +328,7 @@ async def generate_vr_geometry(
 
         geometry = build_geometry_from_rooms(
             rooms_ft=rooms_ft,
+            layout=layout,
             materials=materials_payload,
             project_id=project_id,
             project_name=project.name,
