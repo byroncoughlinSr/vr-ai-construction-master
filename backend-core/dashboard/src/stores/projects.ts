@@ -212,24 +212,6 @@ export const useProjectsStore = defineStore('projects', {
       }
     },
 
-    async duplicateProject(projectId: number, newName?: string): Promise<Project> {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await apiClient.post<Project>(`/projects/${projectId}/duplicate`, {
-          name: newName
-        })
-        this.projects.push(response)
-        return response
-      } catch (error) {
-        this.error = (error as Error).message
-        console.error('Error duplicating project:', error)
-        throw error
-      } finally {
-        this.loading = false
-      }
-    },
-
     setCurrentProject(project: ProjectSummary | null): void {
       this.currentProject = project
     },

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ImageProgressService, type ImageProgress } from '../imageProgress';
+import { ImageProgressService } from '../imageProgress';
 
 describe('ImageProgressService', () => {
   let service: ImageProgressService;
