@@ -25,6 +25,14 @@ android {
         ndk {
             abiFilters += "arm64-v8a"
         }
+
+        // Network endpoints, from gradle.properties (serverHost, collabToken).
+        val serverHost = (project.findProperty("serverHost") as String?) ?: "192.168.4.249"
+        val collabToken = (project.findProperty("collabToken") as String?) ?: ""
+        buildConfigField("String", "SERVER_URL", "\"http://$serverHost:8000\"")
+        buildConfigField("String", "WS_URL", "\"ws://$serverHost:8000/api/v1/ws\"")
+        buildConfigField("String", "DASHBOARD_URL", "\"http://$serverHost:3001\"")
+        buildConfigField("String", "COLLAB_TOKEN", "\"$collabToken\"")
     }
 
     buildTypes {
@@ -53,6 +61,7 @@ android {
     buildFeatures {
         viewBinding = true
         compose = true
+        buildConfig = true
     }
 }
 
@@ -88,4 +97,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation(libs.androidx.scenecore)
+
+    // Unit tests (app/src/test)
+    testImplementation("junit:junit:4.13.2")
 }
