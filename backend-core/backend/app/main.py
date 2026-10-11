@@ -9,11 +9,12 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 import logging
+import os
 import time
 import uuid
 
 from .config import settings
-from .database import create_tables, get_db
+from .database import run_migrations, get_db
 from .logging_config import setup_logging, get_logger
 from .health import comprehensive_health_check, readiness_check, liveness_check
 
@@ -53,7 +54,7 @@ app.add_middleware(SlowAPIMiddleware)
 # Security middleware
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["*"] if settings.environment == "development" else ["yourdomain.com"]
+    allowed_hosts=settings.allowed_hosts
 )
 
 # Compression middleware
@@ -62,8 +63,9 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.environment == "development" else ["https://yourfrontend.com"],
-    allow_credentials=True,
+    allow_origins=settings.cors_origins,
+    # Credentialed requests can't use a wildcard origin; the dashboard sends none.
+    allow_credentials="*" not in settings.cors_origins,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     max_age=86400,  # 24 hours
@@ -109,7 +111,9 @@ async def log_requests(request: Request, call_next):
 
     return response
 
-# Mount static file directories
+# Mount static file directories (StaticFiles refuses a missing directory)
+for _directory in (settings.generated_images_dir, settings.exports_dir, settings.uploads_dir):
+    os.makedirs(_directory, exist_ok=True)
 app.mount("/generated_images", StaticFiles(directory=settings.generated_images_dir), name="generated_images")
 app.mount("/exports", StaticFiles(directory=settings.exports_dir), name="exports")
 app.mount("/uploads", StaticFiles(directory=settings.uploads_dir), name="uploads")
@@ -185,16 +189,16 @@ async def detailed_health_check(db: Session = Depends(get_db)):
 @app.on_event("startup")
 async def startup_event():
     """Application startup event."""
-    # Create database tables on startup
-    create_tables()
-    print("Database tables created successfully")
+    # Alembic is the single source of schema; runs synchronously before serving.
+    run_migrations()
+    logger.info("Database schema is up to date")
 
 
 if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "main:app",
+        "app.main:app",  # run as `python -m app.main` from backend-core/backend
         host="0.0.0.0",
         port=8000,
         reload=settings.environment == "development",

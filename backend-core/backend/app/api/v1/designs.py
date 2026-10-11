@@ -14,7 +14,7 @@ router = APIRouter()
 
 
 @router.post("/", response_model=DesignResponse)
-async def create_design(
+def create_design(
     design: DesignCreate,
     db: Session = Depends(get_db)
 ):
@@ -34,7 +34,7 @@ async def create_design(
 
 
 @router.get("/{design_id}", response_model=DesignResponse)
-async def get_design(
+def get_design(
     design_id: int,
     db: Session = Depends(get_db)
 ):
@@ -46,7 +46,7 @@ async def get_design(
 
 
 @router.get("/", response_model=List[DesignResponse])
-async def list_designs(
+def list_designs(
     project_id: Optional[int] = Query(None),
     design_type: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
@@ -67,7 +67,7 @@ async def list_designs(
 
 
 @router.put("/{design_id}", response_model=DesignResponse)
-async def update_design(
+def update_design(
     design_id: int,
     design_update: DesignUpdate,
     db: Session = Depends(get_db)
@@ -94,7 +94,7 @@ async def update_design(
 
 
 @router.delete("/{design_id}")
-async def delete_design(
+def delete_design(
     design_id: int,
     db: Session = Depends(get_db)
 ):
@@ -117,7 +117,7 @@ async def delete_design(
 
 # Design Elements endpoints
 @router.post("/{design_id}/elements", response_model=DesignElementResponse)
-async def create_design_element(
+def create_design_element(
     design_id: int,
     element: DesignElementCreate,
     db: Session = Depends(get_db)
@@ -143,7 +143,7 @@ async def create_design_element(
 
 
 @router.get("/{design_id}/elements", response_model=List[DesignElementResponse])
-async def list_design_elements(
+def list_design_elements(
     design_id: int,
     element_type: Optional[str] = Query(None),
     db: Session = Depends(get_db)
@@ -159,7 +159,7 @@ async def list_design_elements(
 
 
 @router.put("/{design_id}/elements/{element_id}", response_model=DesignElementResponse)
-async def update_design_element(
+def update_design_element(
     design_id: int,
     element_id: int,
     element_update: DesignElementUpdate,
@@ -191,7 +191,7 @@ async def update_design_element(
 
 
 @router.delete("/{design_id}/elements/{element_id}")
-async def delete_design_element(
+def delete_design_element(
     design_id: int,
     element_id: int,
     db: Session = Depends(get_db)
@@ -218,7 +218,7 @@ async def delete_design_element(
 
 
 @router.post("/{design_id}/generate-vr", response_model=VRGeometryResponse)
-async def generate_vr_geometry(
+def generate_vr_geometry(
     design_id: int,
     request: VRGeometryRequest,
     db: Session = Depends(get_db)
@@ -233,19 +233,9 @@ async def generate_vr_geometry(
     if not design:
         raise HTTPException(status_code=404, detail="Design not found")
 
-    # TODO: Implement actual VR geometry generation
-    # For now, return a placeholder response
-    return VRGeometryResponse(
-        success=True,
-        geometry_data={
-            "vertices": [],
-            "faces": [],
-            "materials": [],
-            "textures": []
-        },
-        material_count=0,
-        vertex_count=0,
-        triangle_count=0,
-        file_size_mb=0.0,
-        download_url=None
+    # Not implemented: designs are free-form elements, not the room lists that
+    # vr_geometry_service builds from. Say so instead of returning empty geometry.
+    raise HTTPException(
+        status_code=501,
+        detail="VR geometry for designs is not implemented; use /projects/{id}/generate-vr",
     )

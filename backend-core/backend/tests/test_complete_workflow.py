@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from app.main import app
 from app.database import Base, get_db
 from app.models import Project, ConstructionPhase, Task, Material
@@ -15,8 +16,12 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 # Test database setup
-TEST_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+TEST_DATABASE_URL = "sqlite:///:memory:"
+engine = create_engine(
+    TEST_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def override_get_db():
@@ -26,18 +31,22 @@ def override_get_db():
     finally:
         db.close()
 
-app.dependency_overrides[get_db] = override_get_db
-
 # Create a mock limiter for tests (disabled but with proper structure)
 test_limiter = Limiter(key_func=get_remote_address, enabled=False)
 app.state.limiter = test_limiter
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_database():
-    """Create test database tables"""
+    """Create test database tables.
+
+    The get_db override is installed here (not at import) and removed afterwards,
+    so it can't leak into or be clobbered by other test modules' overrides.
+    """
+    app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+    app.dependency_overrides.pop(get_db, None)
 
 client = TestClient(app)
 

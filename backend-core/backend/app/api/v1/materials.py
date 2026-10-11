@@ -15,7 +15,7 @@ router = APIRouter()
 
 
 @router.post("/", response_model=MaterialResponse)
-async def create_material(
+def create_material(
     material: MaterialCreate,
     db: Session = Depends(get_db)
 ):
@@ -34,8 +34,75 @@ async def create_material(
         )
 
 
+# Static paths must be declared before "/{material_id}", or FastAPI matches
+# "categories"/"suppliers" as an id and answers 422.
+@router.post("/categories", response_model=MaterialCategoryResponse)
+def create_material_category(
+    category: MaterialCategoryCreate,
+    db: Session = Depends(get_db)
+):
+    """Create a new material category."""
+    try:
+        db_category = MaterialCategory(**category.dict())
+        db.add(db_category)
+        db.commit()
+        db.refresh(db_category)
+        return MaterialCategoryResponse.from_orm(db_category)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to create material category: {str(e)}"
+        )
+
+
+@router.get("/categories", response_model=List[MaterialCategoryResponse])
+def list_material_categories(
+    category_type: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """List all material categories."""
+    query = db.query(MaterialCategory)
+
+    if category_type:
+        query = query.filter(MaterialCategory.category_type == category_type)
+
+    categories = query.all()
+    return [MaterialCategoryResponse.from_orm(c) for c in categories]
+
+
+@router.get("/suppliers", response_model=List[SupplierInfo])
+def list_suppliers(db: Session = Depends(get_db)):
+    """List all suppliers with material counts."""
+    # This is a simplified implementation
+    # In a real app, you'd aggregate this data from the database
+    suppliers = db.query(
+        Material.supplier_name,
+        Material.supplier_contact,
+        Material.supplier_website,
+        func.count(Material.id).label("total_materials")
+    ).filter(
+        Material.supplier_name.isnot(None)
+    ).group_by(
+        Material.supplier_name,
+        Material.supplier_contact,
+        Material.supplier_website
+    ).all()
+
+    return [
+        SupplierInfo(
+            name=supplier.supplier_name,
+            contact=supplier.supplier_contact,
+            website=supplier.supplier_website,
+            total_materials=supplier.total_materials,
+            average_rating=None  # Would need a rating system
+        )
+        for supplier in suppliers
+    ]
+
+
 @router.get("/{material_id}", response_model=MaterialResponse)
-async def get_material(
+def get_material(
     material_id: int,
     db: Session = Depends(get_db)
 ):
@@ -47,7 +114,7 @@ async def get_material(
 
 
 @router.get("/", response_model=MaterialListResponse)
-async def list_materials(
+def list_materials(
     project_id: Optional[int] = Query(None),
     category_id: Optional[int] = Query(None),
     material_type: Optional[str] = Query(None),
@@ -91,7 +158,7 @@ async def list_materials(
 
 
 @router.put("/{material_id}", response_model=MaterialResponse)
-async def update_material(
+def update_material(
     material_id: int,
     material_update: MaterialUpdate,
     db: Session = Depends(get_db)
@@ -118,7 +185,7 @@ async def update_material(
 
 
 @router.delete("/{material_id}")
-async def delete_material(
+def delete_material(
     material_id: int,
     db: Session = Depends(get_db)
 ):
@@ -140,73 +207,8 @@ async def delete_material(
 
 
 # Material Categories endpoints
-@router.post("/categories", response_model=MaterialCategoryResponse)
-async def create_material_category(
-    category: MaterialCategoryCreate,
-    db: Session = Depends(get_db)
-):
-    """Create a new material category."""
-    try:
-        db_category = MaterialCategory(**category.dict())
-        db.add(db_category)
-        db.commit()
-        db.refresh(db_category)
-        return MaterialCategoryResponse.from_orm(db_category)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=400,
-            detail=f"Failed to create material category: {str(e)}"
-        )
-
-
-@router.get("/categories", response_model=List[MaterialCategoryResponse])
-async def list_material_categories(
-    category_type: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """List all material categories."""
-    query = db.query(MaterialCategory)
-
-    if category_type:
-        query = query.filter(MaterialCategory.category_type == category_type)
-
-    categories = query.all()
-    return [MaterialCategoryResponse.from_orm(c) for c in categories]
-
-
-@router.get("/suppliers", response_model=List[SupplierInfo])
-async def list_suppliers(db: Session = Depends(get_db)):
-    """List all suppliers with material counts."""
-    # This is a simplified implementation
-    # In a real app, you'd aggregate this data from the database
-    suppliers = db.query(
-        Material.supplier_name,
-        Material.supplier_contact,
-        Material.supplier_website,
-        db.func.count(Material.id).label("total_materials")
-    ).filter(
-        Material.supplier_name.isnot(None)
-    ).group_by(
-        Material.supplier_name,
-        Material.supplier_contact,
-        Material.supplier_website
-    ).all()
-
-    return [
-        SupplierInfo(
-            name=supplier.supplier_name,
-            contact=supplier.supplier_contact,
-            website=supplier.supplier_website,
-            total_materials=supplier.total_materials,
-            average_rating=None  # Would need a rating system
-        )
-        for supplier in suppliers
-    ]
-
-
 @router.get("/project/{project_id}/summary")
-async def get_project_material_summary(
+def get_project_material_summary(
     project_id: int,
     db: Session = Depends(get_db)
 ):
