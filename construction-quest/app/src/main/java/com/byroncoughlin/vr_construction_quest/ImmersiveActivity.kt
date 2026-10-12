@@ -170,6 +170,9 @@ class ImmersiveActivity : AppSystemActivity() {
         // The server pings an idle progress socket every 30s, so any live connection
         // produces traffic well inside this window.
         private const val GENERATION_STALL_TIMEOUT_MS = 90_000L
+        // How far in front of the player (along -z) the panels sit. 1.7 m was close
+        // enough that the panels were hard to grab and move.
+        private const val PANEL_DISTANCE = 2.6f
         // Prompt panel: 1.2 x 1.2 centred at x=0.3 (so it spans x -0.3 .. 0.9).
         private const val PROMPT_PANEL_SIZE = 1.2f
         // Review image panel: twice the prompt panel in each dimension, parked to its
@@ -178,7 +181,7 @@ class ImmersiveActivity : AppSystemActivity() {
         private const val REVIEW_PANEL_SIZE = PROMPT_PANEL_SIZE * 2f
         private const val REVIEW_PANEL_X = 2.2f
         private const val REVIEW_PANEL_Y = 1.4f
-        private const val REVIEW_PANEL_Z = -1.7f
+        private const val REVIEW_PANEL_Z = -PANEL_DISTANCE
         // House name sign: above the prompt panel and the walking image panel.
         private const val HOUSE_SIGN_WIDTH = 1.6f
         private const val HOUSE_SIGN_HEIGHT = 0.4f
@@ -709,7 +712,7 @@ class ImmersiveActivity : AppSystemActivity() {
      * or version changes). UI thread only.
      */
     private fun showHouseSign() {
-        val pose = Pose(t = Vector3(panelAnchor.x + 0.3f, HOUSE_SIGN_Y, panelAnchor.z - 1.7f))
+        val pose = Pose(t = Vector3(panelAnchor.x + 0.3f, HOUSE_SIGN_Y, panelAnchor.z - PANEL_DISTANCE))
         val existing = houseSignEntity
         if (existing != null) {
             existing.setComponent(Transform(pose))
@@ -949,13 +952,13 @@ class ImmersiveActivity : AppSystemActivity() {
         val entity = Entity.create()
         entity.setComponent(Panel(R.layout.image_panel))
         entity.setComponent(Transform(Pose(
-            t = Vector3(anchor.x, 1.6f, anchor.z - 1.5f),
+            t = Vector3(anchor.x, 1.6f, anchor.z - (PANEL_DISTANCE - 0.2f)),
             q = com.meta.spatial.core.Quaternion(0f, 0f, 0f)
         )))
         entity.setComponent(Grabbable())
         entity.setComponent(Visible(true))
         walkingImagePanelEntity = entity
-        Log.i(TAG, "🖼️ Walking image panel entity spawned at (${anchor.x}, 1.6, ${anchor.z - 1.5f})")
+        Log.i(TAG, "🖼️ Walking image panel entity spawned at (${anchor.x}, 1.6, ${anchor.z - (PANEL_DISTANCE - 0.2f)})")
     }
 
     private fun loadWalkingImageHtml(imageUrl: String) {
@@ -1301,14 +1304,14 @@ class ImmersiveActivity : AppSystemActivity() {
         destroyHouseSign()
         panelAnchor = Vector3(0f, 0f, 0f)
         placePromptPanel()
-        webPanelEntity?.setComponent(Transform(Pose(t = Vector3(-1.9f, 1.1f, -1.7f))))
+        webPanelEntity?.setComponent(Transform(Pose(t = Vector3(-1.9f, 1.1f, -PANEL_DISTANCE))))
         showPanel()
         dashboardWebView?.let { loadIdleHtml(it) }
     }
 
     private fun placePromptPanel() {
         dashboardPanelEntity?.setComponent(Transform(Pose(
-            t = Vector3(panelAnchor.x + 0.3f, 1.1f, panelAnchor.z - 1.7f)
+            t = Vector3(panelAnchor.x + 0.3f, 1.1f, panelAnchor.z - PANEL_DISTANCE)
         )))
     }
 
@@ -1594,7 +1597,7 @@ class ImmersiveActivity : AppSystemActivity() {
         Log.i(TAG, "📺 Creating dashboard panel entity programmatically")
         val panelEntity = Entity.create()
         panelEntity.setComponent(Panel(R.layout.ui_example))
-        panelEntity.setComponent(Transform(Pose(t = Vector3(0.3f, 1.1f, -1.7f))))
+        panelEntity.setComponent(Transform(Pose(t = Vector3(0.3f, 1.1f, -PANEL_DISTANCE))))
         panelEntity.setComponent(Grabbable())
         panelEntity.setComponent(Visible(true))
         dashboardPanelEntity = panelEntity
@@ -1605,7 +1608,7 @@ class ImmersiveActivity : AppSystemActivity() {
         Log.i(TAG, "🌐 Creating web panel entity programmatically")
         val webPanelEntityLocal = Entity.create()
         webPanelEntityLocal.setComponent(Panel(R.layout.web_panel))
-        webPanelEntityLocal.setComponent(Transform(Pose(t = Vector3(-1.9f, 1.1f, -1.7f))))
+        webPanelEntityLocal.setComponent(Transform(Pose(t = Vector3(-1.9f, 1.1f, -PANEL_DISTANCE))))
         webPanelEntityLocal.setComponent(Grabbable())
         webPanelEntityLocal.setComponent(Visible(true))
         webPanelEntity = webPanelEntityLocal
