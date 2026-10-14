@@ -1,9 +1,11 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+from fastapi.concurrency import run_in_threadpool
 from typing import Optional
 import logging
 import tempfile
 import os
 import traceback
+import threading
 import wave
 import struct
 from pathlib import Path
@@ -12,9 +14,16 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 WHISPER_MODEL = None
+# get_whisper_model runs in worker threads; don't let two requests load it at once.
+_WHISPER_LOCK = threading.Lock()
 
 def get_whisper_model():
     """Load faster-whisper model (lazy loading)"""
+    with _WHISPER_LOCK:
+        return _load_whisper_model_locked()
+
+
+def _load_whisper_model_locked():
     global WHISPER_MODEL
     if WHISPER_MODEL is None:
         try:
@@ -77,12 +86,13 @@ async def transcribe_audio(
             raise HTTPException(status_code=400, detail="Empty audio file")
         
         # Check if it's raw PCM (audio/l16) and convert to WAV
-        if audio_file.content_type == "audio/l16" or audio_file.filename.endswith('.pcm'):
+        filename = audio_file.filename or ""
+        if audio_file.content_type == "audio/l16" or filename.endswith('.pcm'):
             logger.info("🔄 Detected PCM format, converting to WAV...")
             audio_bytes = pcm_to_wav(audio_bytes, sample_rate=sample_rate)
             suffix = ".wav"
         else:
-            suffix = Path(audio_file.filename).suffix or ".wav"
+            suffix = Path(filename).suffix or ".wav"
         
         # Save to temporary file
         logger.info(f"💾 Creating temp file with suffix: {suffix}")
@@ -92,33 +102,20 @@ async def transcribe_audio(
         
         logger.info(f"💾 Saved to temp file: {temp_path}")
         
-        # Load Whisper model
-        logger.info("🔄 Loading Whisper model...")
-        whisper_model = get_whisper_model()
-        logger.info("✅ Model loaded, starting transcription...")
-        
-        # Transcribe with automatic language detection
-        transcribe_kwargs = {
-            "beam_size": 5
-        }
+        # Whisper is CPU-bound for seconds (and segments decode lazily as they are
+        # iterated), so all of it runs in a worker thread, not on the event loop.
+        def transcribe_sync():
+            whisper_model = get_whisper_model()
+            segments, info = whisper_model.transcribe(temp_path, beam_size=5)
+            collected = [
+                {"id": i, "text": seg.text, "start": seg.start, "end": seg.end}
+                for i, seg in enumerate(segments)
+            ]
+            return collected, info
 
-        segments, info = whisper_model.transcribe(
-            temp_path,
-            **transcribe_kwargs
-        )
-        
-        logger.info("🔄 Processing segments...")
-        all_segments = []
-        full_text = []
-        
-        for i, segment in enumerate(segments):
-            all_segments.append({
-                "id": i,
-                "text": segment.text,
-                "start": segment.start,
-                "end": segment.end
-            })
-            full_text.append(segment.text)
+        logger.info("🔄 Transcribing...")
+        all_segments, info = await run_in_threadpool(transcribe_sync)
+        full_text = [seg["text"] for seg in all_segments]
         
         transcribed_text = " ".join(full_text).strip()
         detected_language = info.language
@@ -226,12 +223,10 @@ async def generate_image_from_prompt(text: str, project_id: Optional[int] = None
     logger.info(f"🖼️  Generating image from prompt: '{text}' (ID: {generation_id})")
 
     try:
-        # Import AI Image Service and WebSocket functions
-        from app.services.ai_image_service import AIImageService
+        from app.services import get_image_service
         from app.api.v1.websocket import send_image_progress_update, complete_image_generation, fail_image_generation
 
-        # Create service instance
-        ai_service = AIImageService()
+        ai_service = get_image_service()
 
         # Enhance prompt for architectural rendering
         enhanced_prompt = f"architectural rendering: {text}, photorealistic, professional, detailed, 8k, high quality"
@@ -270,7 +265,7 @@ async def generate_image_from_prompt(text: str, project_id: Optional[int] = None
                 "image_data": first_image.get("image_data"),  # Base64 for immediate display
                 "filename": first_image.get("filename"),
                 "message": f"Generated image from: {text}",
-                "metadata": result["metadata"]
+                "metadata": result.get("metadata", {})
             }
         else:
             logger.error(f"❌ Image generation failed: {result.get('error')}")
@@ -284,6 +279,8 @@ async def generate_image_from_prompt(text: str, project_id: Optional[int] = None
                 detail=result.get("error", "Image generation failed")
             )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Image generation error: {e}")
         logger.error(traceback.format_exc())
@@ -432,13 +429,13 @@ async def get_status():
     """Check if voice service is healthy"""
     try:
         logger.info("🔍 Checking Whisper model status...")
-        model = get_whisper_model()
+        await run_in_threadpool(get_whisper_model)
         logger.info("✅ Whisper model is available")
         
         # Check if AI Image Service is available
         ai_image_available = False
         try:
-            from app.services.ai_image_service import AIImageService
+            from app.services import get_image_service  # noqa: F401 — import check only
             ai_image_available = True
         except Exception as e:
             logger.warning(f"⚠️  AI Image Service not available: {e}")

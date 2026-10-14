@@ -3,8 +3,6 @@
 #include <vector>
 #include <android/log.h>
 #include "construction_engine.h"
-#include "voice_bridge.h"
-#include "network_client.h"
 
 // Note: In a real production app, you would include OpenXR headers here.
 // For the Meta Spatial SDK, input state is often passed via the VrActivity lifecycle
@@ -20,12 +18,6 @@
 // ============================================================================
 
 static ConstructionEngine* g_engine = nullptr;
-static VoiceBridge* g_voiceBridge = nullptr;
-static NetworkClient* g_networkClient = nullptr;
-
-// Global references for JNI callbacks
-JavaVM* g_javaVM = nullptr;
-jobject g_activityObj = nullptr;
 
 // Controller state storage (mocked for this implementation, typically populated via OpenXR)
 struct ControllerInput {
@@ -42,33 +34,15 @@ static ControllerInput g_inputs[2] = {0};
 
 extern "C" {
 
-JNIEXPORT jint JNICALL
-JNI_OnLoad(JavaVM* vm, void* reserved) {
-    g_javaVM = vm;
-    LOGI("JNI_OnLoad: JavaVM stored");
-    return JNI_VERSION_1_6;
-}
-
 JNIEXPORT void JNICALL
 Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_initNative(
-        JNIEnv* env,
-        jobject obj) {
+        JNIEnv* /* env */,
+        jobject /* this */) {
 
     LOGI("Initializing native components...");
 
-    if (g_activityObj != nullptr) {
-        env->DeleteGlobalRef(g_activityObj);
-    }
-    g_activityObj = env->NewGlobalRef(obj);
-
     if (g_engine == nullptr) {
         g_engine = new ConstructionEngine();
-    }
-    if (g_voiceBridge == nullptr) {
-        g_voiceBridge = new VoiceBridge();
-    }
-    if (g_networkClient == nullptr) {
-        g_networkClient = new NetworkClient("http://192.168.4.249:8000");
     }
 
     LOGI("Native initialization complete");
@@ -241,39 +215,6 @@ Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_nativeGetContro
 
     env->SetFloatArrayRegion(result, 0, 7, poseData);
     return result;
-}
-
-// ============================================================================
-// VOICE & CLEANUP
-// ============================================================================
-
-JNIEXPORT void JNICALL
-Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_nativePushAudio(
-        JNIEnv* env,
-        jobject /* this */,
-        jshortArray audioData,
-        jint size) {
-
-    if (g_voiceBridge == nullptr) return;
-    jshort* samples = env->GetShortArrayElements(audioData, nullptr);
-    if (samples) {
-        g_voiceBridge->ProcessAudioData(reinterpret_cast<int16_t*>(samples), static_cast<size_t>(size));
-        env->ReleaseShortArrayElements(audioData, samples, JNI_ABORT);
-    }
-}
-
-JNIEXPORT void JNICALL
-Java_com_byroncoughlin_vr_1construction_1quest_ImmersiveActivity_nativeFinishRecording(
-        JNIEnv* env,
-        jobject /* this */) {
-
-    if (g_voiceBridge && g_networkClient) {
-        std::vector<int16_t> fullBuffer = g_voiceBridge->FinishRecording();
-        if (!fullBuffer.empty()) {
-            // ✅ FIX: Pass the JNIEnv to PostAudio - don't let it attach/detach
-            g_networkClient->PostAudio(env, fullBuffer, 16000);
-        }
-    }
 }
 
 } // extern "C"

@@ -128,8 +128,8 @@ export const useMaterialsStore = defineStore('materials', {
       this.error = null
       try {
         const response = await apiClient.post<ProjectMaterial>(
-          `/projects/${projectId}/materials`,
-          materialData
+          `/materials/`,
+          { ...materialData, project_id: projectId }
         )
         this.projectMaterials.push(response)
         return response
@@ -147,7 +147,7 @@ export const useMaterialsStore = defineStore('materials', {
       this.error = null
       try {
         const response = await apiClient.put<ProjectMaterial>(
-          `/project-materials/${materialId}`,
+          `/materials/${materialId}`,
           materialData
         )
 
@@ -170,7 +170,7 @@ export const useMaterialsStore = defineStore('materials', {
       this.loading = true
       this.error = null
       try {
-        await apiClient.delete(`/project-materials/${materialId}`)
+        await apiClient.delete(`/materials/${materialId}`)
         this.projectMaterials = this.projectMaterials.filter(m => m.id !== materialId)
       } catch (error) {
         this.error = (error as Error).message
@@ -190,7 +190,7 @@ export const useMaterialsStore = defineStore('materials', {
       this.error = null
       try {
         const promises = materialIds.map(id =>
-          apiClient.put<ProjectMaterial>(`/project-materials/${id}`, { status })
+          apiClient.put<ProjectMaterial>(`/materials/${id}`, { status })
         )
         const responses = await Promise.all(promises)
 

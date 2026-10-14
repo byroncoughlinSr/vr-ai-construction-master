@@ -43,7 +43,7 @@ class VRProgressBar(
         backgroundBar = Entity.create().apply {
             setComponent(Transform(Pose(t = position)))
             setComponent(Mesh(mesh = "mesh://box".toUri()))
-            setComponent(com.meta.spatial.toolkit.Box(Vector3(width / 2f, height / 2f, depth / 2f)))
+            setComponent(centeredBox(Vector3(width, height, depth)))
             setComponent(Material().apply {
                 baseColor = Color4(0.3f, 0.3f, 0.3f, 0.8f)
                 unlit = true
@@ -55,7 +55,7 @@ class VRProgressBar(
         fillBar = Entity.create().apply {
             setComponent(Transform(Pose(t = fillBarPosition(0f))))
             setComponent(Mesh(mesh = "mesh://box".toUri()))
-            setComponent(com.meta.spatial.toolkit.Box(Vector3(0.001f, height / 2f, depth / 2f)))
+            setComponent(centeredBox(Vector3(0.002f, height, depth)))
             setComponent(Material().apply {
                 baseColor = Color4(0.2f, 0.8f, 0.3f, 1.0f)
                 unlit = true
@@ -96,7 +96,7 @@ class VRProgressBar(
         val fillWidth = maxOf(width * clamped, 0.002f) // keep a minimum so Box stays valid
         fillBar?.let { bar ->
             bar.setComponent(Transform(Pose(t = fillBarPosition(clamped))))
-            bar.setComponent(com.meta.spatial.toolkit.Box(Vector3(fillWidth / 2f, height / 2f, depth / 2f)))
+            bar.setComponent(centeredBox(Vector3(fillWidth, height, depth)))
         }
         Log.i(TAG, "📈 Progress: ${(clamped * 100).toInt()}%")
     }

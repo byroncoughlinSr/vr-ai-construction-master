@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios'
-import type { ApiResponse, PaginatedResponse } from 'src/types/models'
+import type { PaginatedResponse } from 'src/types/models'
 
 export interface ApiClientConfig {
   baseURL: string

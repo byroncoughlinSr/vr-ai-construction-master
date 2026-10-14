@@ -30,8 +30,6 @@ def override_get_db():
     finally:
         db.close()
 
-app.dependency_overrides[get_db] = override_get_db
-
 # Create a mock limiter for tests (disabled but with proper structure)
 test_limiter = Limiter(key_func=get_remote_address, enabled=False)
 app.state.limiter = test_limiter
@@ -43,14 +41,14 @@ client = TestClient(app)
 def setup_database():
     """Create tables before each test and drop after.
 
-    Re-asserts the dependency override each time because other test modules
-    (e.g. test_complete_workflow.py) set their own override at module level,
-    which would otherwise clobber this file's in-memory engine.
+    The get_db override is installed per test and removed afterwards so it
+    never leaks into other test modules that use their own engine.
     """
     app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+    app.dependency_overrides.pop(get_db, None)
 
 def test_health_check():
     """Test the health check endpoint."""

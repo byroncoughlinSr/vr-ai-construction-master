@@ -2,6 +2,7 @@ import asyncio
 import logging
 import json
 import re
+import time
 from typing import Optional, Dict, Any, List
 import ollama
 import google.generativeai as genai
@@ -17,7 +18,8 @@ class AIPlanningService:
 
     def __init__(self):
         self.groq_available = False
-        self.ollama_available = False
+        self._ollama_up = False
+        self._ollama_checked_at = 0.0
         self.gemini_available = False
 
         # Initialize Groq client (primary planner) if API key is available
@@ -30,26 +32,43 @@ class AIPlanningService:
             except Exception as e:
                 logger.warning(f"Failed to initialize Groq API: {e}")
 
-        # Initialize Ollama client with custom host
+        # Initialize Ollama client with custom host. Generation can take minutes, so
+        # only the availability probe (which runs on the event loop) gets a timeout.
         self.ollama_client = ollama.Client(host=settings.ollama_url)
+        self._ollama_probe_client = ollama.Client(host=settings.ollama_url, timeout=3.0)
 
         # Initialize Gemini if API key is available
         if settings.gemini_api_key:
             try:
                 genai.configure(api_key=settings.gemini_api_key)
-                self.gemini_model = genai.GenerativeModel('gemini-pro')
+                self.gemini_model = genai.GenerativeModel(settings.gemini_model)
                 self.gemini_available = True
-                logger.info("Gemini API initialized")
+                logger.info(f"Gemini API initialized (model: {settings.gemini_model})")
             except Exception as e:
                 logger.warning(f"Failed to initialize Gemini API: {e}")
 
-        # Check Ollama availability
+        self._probe_ollama()
+
+    # Seconds between re-checks while Ollama is down.
+    OLLAMA_REPROBE_S = 30.0
+
+    def _probe_ollama(self) -> None:
+        self._ollama_checked_at = time.monotonic()
         try:
-            self.ollama_client.list()
-            self.ollama_available = True
-            logger.info(f"Ollama service is available at {settings.ollama_url}")
+            self._ollama_probe_client.list()
+            self._ollama_up = True
+            logger.info(f"Ollama service is available at {settings.ollama_url} (model: {settings.ollama_model})")
         except Exception as e:
+            self._ollama_up = False
             logger.warning(f"Ollama service not available at {settings.ollama_url}: {e}")
+
+    @property
+    def ollama_available(self) -> bool:
+        # Re-probe while down, so an Ollama started after uvicorn is picked up
+        # without restarting the backend.
+        if not self._ollama_up and time.monotonic() - self._ollama_checked_at > self.OLLAMA_REPROBE_S:
+            self._probe_ollama()
+        return self._ollama_up
 
     async def generate_construction_plan(
         self,
@@ -73,43 +92,62 @@ class AIPlanningService:
         prompt = self._build_planning_prompt(
             project_description, budget, timeline_weeks, constraints
         )
+        return await self._run_provider_chain(prompt, "Plan")
 
-        last_error = None
+    async def refine_floor_plan(self, structure: Dict[str, Any], instruction: str) -> Dict[str, Any]:
+        """Apply a spoken/typed change ("make the kitchen bigger") to a floor plan.
 
-        # Priority chain: Groq (primary) -> Ollama -> Gemini
-        if self.groq_available:
+        ``structure`` is a ``project_structure`` (``layout`` + ``rooms``, feet).
+        Returns the provider result; on success ``plan["project_structure"]`` is
+        the whole revised floor plan.
+        """
+        prompt = self._build_refine_prompt(structure, instruction)
+        return await self._run_provider_chain(prompt, "Floor plan refinement")
+
+    async def _run_provider_chain(self, prompt: str, what: str) -> Dict[str, Any]:
+        """Send ``prompt`` to Groq, then Ollama, then Gemini until one returns
+        output that parses into a plan."""
+        # One time budget for the whole chain, so falling back from a slow Groq
+        # to a slower Ollama can't outlast the client waiting for the plan.
+        deadline = time.monotonic() + settings.planning_timeout_seconds
+        # Availability is read lazily: checking Ollama is a network probe, wasted
+        # whenever Groq answers first.
+        providers = [
+            ("Groq", lambda: self.groq_available, self._generate_with_groq),
+            ("Ollama", lambda: self.ollama_available, self._generate_with_ollama),
+            ("Gemini", lambda: self.gemini_available, self._generate_with_gemini),
+        ]
+        last_error: Optional[Exception] = None
+        for name, available, generate in providers:
+            if not available():
+                continue
+            remaining = deadline - time.monotonic()
+            if remaining < 5:
+                logger.warning(f"Planning time budget used up before trying {name}")
+                break
             try:
-                return await self._generate_with_groq(prompt)
+                result = await asyncio.wait_for(generate(prompt), timeout=remaining)
+                if result.get("success"):
+                    logger.info(f"🧠 {what} generated by {name}")
+                    return result
+                # Unparseable output: another model may do better.
+                last_error = Exception(f"{name}: {result.get('error', 'invalid plan')}")
+                logger.warning(f"{last_error}; trying next provider")
+            except asyncio.TimeoutError:
+                last_error = Exception(f"{name} planning timed out after {remaining:.0f}s")
+                logger.warning(f"{last_error}; trying next provider")
             except Exception as e:
                 last_error = e
-                logger.warning(f"Groq planning failed, trying Ollama: {e}")
+                logger.warning(f"{name} planning failed, trying next provider: {e}")
 
-        if self.ollama_available:
-            try:
-                return await self._generate_with_ollama(prompt)
-            except Exception as e:
-                last_error = e
-                logger.warning(f"Ollama planning failed, trying Gemini: {e}")
-
-        if self.gemini_available:
-            try:
-                return await self._generate_with_gemini(prompt)
-            except Exception as gemini_error:
-                logger.error(f"Gemini planning also failed: {gemini_error}")
-                raise gemini_error
-
-        # If no service is available or all failed
-        if last_error:
-            raise last_error
-        else:
-            raise Exception("No AI services available for planning")
+        raise last_error or Exception("No AI services available for planning")
 
     async def _generate_with_groq(self, prompt: str) -> Dict[str, Any]:
         """Generate construction plan using the Groq cloud API (primary planner)."""
         try:
             logger.info(f"Generating construction plan with Groq ({settings.groq_model})...")
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
             def _groq_generate():
                 return self.groq_client.chat.completions.create(
@@ -145,16 +183,17 @@ class AIPlanningService:
         try:
             logger.info("Generating construction plan with Ollama...")
 
-            # Run Ollama in executor to avoid blocking and add timeout
-            loop = asyncio.get_event_loop()
+            # Run Ollama in executor to avoid blocking; the caller's deadline bounds it
+            loop = asyncio.get_running_loop()
             
             def _ollama_generate():
                 return self.ollama_client.chat(
-                    model='llama3.1:8b',  # Using 8B model instead of latest (70B)
+                    model=settings.ollama_model,
                     messages=[{
                         'role': 'user',
                         'content': prompt
                     }],
+                    format='json',  # constrain output to JSON, like Groq's json_object mode
                     options={
                         'temperature': 0.7,
                         'top_p': 0.9,
@@ -164,11 +203,7 @@ class AIPlanningService:
                     }
                 )
             
-            # Add 1200 second timeout
-            response = await asyncio.wait_for(
-                loop.run_in_executor(None, _ollama_generate),
-                timeout=1200.0
-            )
+            response = await loop.run_in_executor(None, _ollama_generate)
 
             content = response['message']['content']
             logger.info("Ollama response received successfully")
@@ -176,9 +211,6 @@ class AIPlanningService:
             # Parse the structured response
             return self._parse_structured_plan(content, "ollama")
 
-        except asyncio.TimeoutError:
-            logger.error("Ollama generation timed out after 600 seconds")
-            raise Exception("Ollama generation timed out")
         except Exception as e:
             logger.error(f"Ollama generation failed: {e}")
             raise
@@ -188,14 +220,18 @@ class AIPlanningService:
         try:
             logger.info("Generating construction plan with Gemini...")
 
-            response = self.gemini_model.generate_content(
+            # The SDK call is blocking; keep it off the event loop.
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(None, lambda: self.gemini_model.generate_content(
                 prompt,
                 generation_config=genai.types.GenerationConfig(
                     temperature=0.7,
                     top_p=0.9,
-                    max_output_tokens=2048,
+                    # The plan (phases, materials, layout tree) needs room; 2048 truncated it.
+                    max_output_tokens=8192,
+                    response_mime_type="application/json",
                 )
-            )
+            ))
 
             content = response.text
             logger.info("Gemini response received")
@@ -219,12 +255,12 @@ class AIPlanningService:
         This is the main entry point for creating a full project from a single prompt.
         """
         try:
-            # Generate project name from description
-            project_name = await self._generate_project_name(project_description)
-            
-            # Generate construction plan
-            plan_result = await self.generate_construction_plan(
-                project_description, budget, timeline_weeks, constraints
+            # Name and plan are independent; ask for both at once.
+            project_name, plan_result = await asyncio.gather(
+                self._generate_project_name(project_description),
+                self.generate_construction_plan(
+                    project_description, budget, timeline_weeks, constraints
+                ),
             )
             
             if not plan_result.get("success"):
@@ -274,7 +310,7 @@ Return ONLY the project name, nothing else."""
             # Priority chain: Groq (primary) -> Ollama -> Gemini
             if self.groq_available:
                 try:
-                    loop = asyncio.get_event_loop()
+                    loop = asyncio.get_running_loop()
                     response = await asyncio.wait_for(
                         loop.run_in_executor(
                             None,
@@ -282,36 +318,41 @@ Return ONLY the project name, nothing else."""
                                 model=settings.groq_model,
                                 messages=[{'role': 'user', 'content': prompt}],
                                 temperature=0.8,
-                                max_tokens=50,
+                                # Reasoning models (gpt-oss) spend tokens before answering.
+                                max_tokens=512,
                             )
                         ),
                         timeout=15.0
                     )
-                    name = response.choices[0].message.content.strip().strip('"\'')
+                    name = (response.choices[0].message.content or "").strip().strip('"\'') or None
                 except Exception as groq_err:
                     logger.warning(f"Groq name generation failed: {groq_err}")
 
             if name is None and self.ollama_available:
                 try:
-                    loop = asyncio.get_event_loop()
+                    loop = asyncio.get_running_loop()
                     response = await asyncio.wait_for(
                         loop.run_in_executor(
                             None,
                             lambda: self.ollama_client.chat(
-                                model='llama3.1:8b',  # Using 8B model
+                                model=settings.ollama_model,
                                 messages=[{'role': 'user', 'content': prompt}],
                                 options={'temperature': 0.8, 'num_predict': 50, 'num_ctx': 1024}
                             )
                         ),
                         timeout=15.0
                     )
-                    name = response['message']['content'].strip().strip('"\'')
+                    name = response['message']['content'].strip().strip('"\'') or None
                 except Exception as ollama_err:
                     logger.warning(f"Ollama name generation failed: {ollama_err}")
 
             if name is None and self.gemini_available:
-                response = self.gemini_model.generate_content(prompt)
-                name = response.text.strip().strip('"\'')
+                loop = asyncio.get_running_loop()
+                response = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: self.gemini_model.generate_content(prompt)),
+                    timeout=15.0
+                )
+                name = response.text.strip().strip('"\'') or None
 
             if name is None:
                 # Fallback: extract key words
@@ -334,7 +375,7 @@ Return ONLY the project name, nothing else."""
     ) -> str:
         """Build a structured prompt for construction planning."""
 
-        prompt = f"""You are an expert construction project manager. Generate a detailed construction plan for the following project:
+        prompt = f"""You are an experienced residential architectural designer and construction project manager. First design the house as a real, livable floor plan, then plan its construction.
 
 PROJECT DESCRIPTION: {project_description}
 
@@ -353,11 +394,53 @@ PROJECT DESCRIPTION: {project_description}
 
 Reply with ONLY a JSON object (no markdown, no explanation). Use this exact structure with 4-5 phases, 2 tasks per phase, and 6-8 materials:
 
-{"project_structure":{"total_area_sqft":0,"rooms":[{"name":"Room","dimensions":{"length":0,"width":0,"height":9},"floor_material":"carpet","wall_material":"drywall"}]},"phases":[{"name":"Phase","duration_weeks":2,"description":"desc","tasks":[{"name":"Task","duration_days":5,"description":"desc","estimated_cost":0}],"estimated_cost":0}],"total_cost":0,"total_duration_weeks":0,"material_list":[{"name":"Material","material_type":"wood","quantity":0,"unit":"sqft","unit_cost":0,"total_cost":0,"supplier_type":"local"}]}
+{"project_structure":{"total_area_sqft":0,"layout":{"length":0,"width":0,"entry":"Room","split":"z","parts":[{"size":0,"room":"Room"},{"size":0,"split":"x","parts":[{"size":0,"room":"Other Room"}]}]},"rooms":[{"name":"Room","dimensions":{"length":0,"width":0,"height":9},"floor_material":"carpet","wall_material":"drywall","connects_to":["Other Room"]}]},"phases":[{"name":"Phase","duration_weeks":2,"description":"desc","tasks":[{"name":"Task","duration_days":5,"description":"desc","estimated_cost":0}],"estimated_cost":0}],"total_cost":0,"total_duration_weeks":0,"material_list":[{"name":"Material","material_type":"wood","quantity":0,"unit":"sqft","unit_cost":0,"total_cost":0,"supplier_type":"local"}]}
 
-Fill in realistic values based on the project description above. Include room dimensions for VR."""
+Fill in realistic values based on the project description above. Include room dimensions for VR.
+
+FLOOR PLAN DESIGN (all sizes in feet):
+- Design it the way an architect would: a coherent house with a natural flow, not a random collection of rooms.
+- Include every space a real home of this kind needs: an entry, circulation (hallway) where rooms would otherwise be cut off, and kitchen/bathroom/storage as appropriate.
+- Zone the house: public spaces (entry, living, dining, kitchen) together; private spaces (bedrooms, bathrooms) grouped away from the entry; kitchen next to dining; bathrooms reachable from bedrooms and from the hallway.
+- Use realistic residential sizes (e.g. bedroom 10-14 ft, living room 14-20 ft, bathroom 5-9 ft, hallway 4-5 ft wide).
+- "layout" is the floor plan, drawn by repeatedly dividing the house's rectangular footprint:
+  - "length" is the footprint's left-to-right size and "width" its front-to-back depth. The front (street side, where the front door is) is at the start of the depth.
+  - A split node has "split": "x" (parts placed left to right) or "z" (parts placed front to back, first part at the street), and a list of "parts".
+  - Each part has a "size" in feet along that split, and is either a room ({"size": n, "room": "Name"}), an open outdoor area ({"size": n, "open": true}), or another split.
+  - The house is a plain rectangle unless the description asks for another shape. For an L, U or T shape, a courtyard or an inset porch, mark the parts outside the house as open; walls, windows and doors go around them.
+  - A part spans the full extent of its parent in the other direction, so nest splits to get rooms of different depths. For example, a full-length hallway between a front zone and a back zone is a "z" split of [front zone, hallway, back zone], with each zone split by "x" into rooms.
+  - The sizes of a node's parts should add up to its parent's extent. Every room appears in the layout exactly once.
+  - "entry" is the name of the room the front door opens into; it must have an outside wall (the edge of the footprint or of an open area), preferably facing the street.
+- "rooms" lists every room in the layout with the same names, its height, materials, and "connects_to".
+- DOORWAYS: "connects_to" lists the exact names of the rooms this room opens into through a doorway. Only connect rooms whose rectangles share a wall. Design the circulation: guests walk from the entry into the living area, bedrooms open off a hallway or the living area (never through another bedroom), and a bathroom opens off a hallway or the bedroom it serves. Every room must be reachable from the entry. Each connection only needs listing once.
+- BAY WINDOWS: only when the description asks for one, give that room "bay_window": {"side": "front"|"back"|"left"|"right", "width": 8, "depth": 2.5, "style": "angled"|"box"} (feet; "angled" is the classic three-sided bay). The side must be one where the room has an outside wall: the edge of the footprint or of an open area. Leave the key out of every other room.
+- Use descriptive room names (e.g. "Entry Foyer", "Primary Bedroom", "Hall Bathroom")."""
 
         return prompt
+
+    def _build_refine_prompt(self, structure: Dict[str, Any], instruction: str) -> str:
+        """Prompt for changing an existing floor plan. Uses the same layout format
+        as ``_build_planning_prompt`` — change both together."""
+        current = json.dumps(
+            {"layout": structure.get("layout"), "rooms": structure.get("rooms", [])},
+            separators=(",", ":"),
+        )
+        return f"""You are a residential architectural designer revising an existing floor plan.
+
+CURRENT FLOOR PLAN (JSON, all sizes in feet):
+{current}
+
+REQUESTED CHANGE: {instruction}
+
+Apply the requested change and nothing else: keep every room, name, size, material and doorway the change does not affect. Keep the plan livable — every room reachable from the entry, bedrooms never only reachable through another bedroom.
+
+The format is the one used above:
+- "layout" is the footprint ("length" left to right, "width" front to back, street side first) recursively divided by "split": "x" (left to right) or "z" (front to back) into "parts". Each part has a "size" in feet along that split and is either a room ({{"size": n, "room": "Name"}}), an open outdoor area ({{"size": n, "open": true}}; this is how the house gets an L, U or T shape, a courtyard or an inset porch) or another split. Part sizes should add up to the parent's extent. Every room appears in the layout exactly once. "entry" names the room the front door opens into.
+- To make a room bigger or smaller, change its part's "size" and the neighbouring parts (or the footprint) so the sizes still add up.
+- "rooms" lists every room in the layout with the same names, its "dimensions" (height 8-10), "floor_material", "wall_material" and "connects_to" (names of rooms it opens into through a doorway; only rooms that share a wall).
+- A room may have a bay window: "bay_window": {{"side": "front"|"back"|"left"|"right", "width": 8, "depth": 2.5, "style": "angled"|"box"}} (feet; front is the street side, left/right along the layout's length). It must be on a side where the room has an outside wall (the edge of the footprint or of an open area). Keep existing bay windows unless the change is about them; to remove one, leave the key out.
+
+Reply with ONLY a JSON object (no markdown, no explanation): {{"project_structure": {{"layout": {{...}}, "rooms": [...]}}}}"""
 
     def _clean_json_string(self, json_str: str) -> str:
         """Fix common LLM JSON formatting issues before parsing."""
@@ -536,11 +619,17 @@ Fill in realistic values based on the project description above. Include room di
         parse_attempts = []
         
         try:
-            # Strategy 1: Extract and clean JSON normally
+            # Strategy 1: the JSON as returned (JSON mode usually gets it right), else
+            # with the regex repairs. Never clean valid JSON: the repairs work on raw
+            # text and corrupt strings ("Bedroom 2" -> "Bedroom 2,", "True" -> "true").
             try:
                 json_str = self._extract_and_repair_json(content)
-                json_str = self._clean_json_string(json_str)
-                plan_data = json.loads(json_str)
+                try:
+                    plan_data = json.loads(json_str)
+                except json.JSONDecodeError:
+                    plan_data = json.loads(self._clean_json_string(json_str))
+                if not isinstance(plan_data, dict):
+                    raise json.JSONDecodeError("plan is not a JSON object", json_str, 0)
                 logger.info(f"Successfully parsed JSON on first attempt (Strategy 1)")
                 
                 # Validate and fill required fields

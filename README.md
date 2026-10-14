@@ -18,7 +18,7 @@ End-to-end pipeline that turns a spoken prompt into a walkable VR house on Meta 
 │                 │    │                  │    │                 │
 │ • Kotlin        │    │ • FastAPI        │    │ • Vue 3         │
 │ • Meta Spatial  │    │ • PostgreSQL     │    │ • Quasar        │
-│ • OpenXR        │    │ • Ollama         │    │ • Pinia         │
+│ • OpenXR        │    │ • Groq / Ollama  │    │ • Pinia         │
 │ • Voice / WS    │    │ • Stable Diff.   │    │ • Charts        │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
@@ -27,17 +27,37 @@ End-to-end pipeline that turns a spoken prompt into a walkable VR house on Meta 
 - **Dashboard dev server:** `http://localhost:3001`
 - **WebSocket base:** `ws://192.168.4.249:8000/api/v1/ws`
 
+The headset reaches the backend by LAN IP. Set it once in `construction-quest/gradle.properties`
+(`serverHost=…`, or `-PserverHost=…` on the command line); the app's `SERVER_URL`, `WS_URL` and
+dashboard URL are generated from it into `BuildConfig`.
+
 ## Voice-to-VR Pipeline
 
 The implemented end-to-end flow in [ImmersiveActivity.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/ImmersiveActivity.kt):
 
-1. **Record** — Hold Button A to capture a voice prompt.
-2. **Transcribe** — Audio is sent to `POST /api/v1/voice/transcribe` (Whisper).
-3. **Confirm** — A WebView HTML panel shows the transcription; Button A confirms, Button B retries.
-4. **Plan** — `POST /api/v1/planning/generate-project` returns a full AI project: phases, tasks, materials, cost, timeline, and a generated image prompt.
-5. **Display plan** — Project info panel renders name, cost, timeline, phases, and materials.
-6. **Watch image generation** — VR [ProgressBar.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/ProgressBar.kt) connects to the image WebSocket and animates until the rendered house image is shown on a panel.
-7. **Walk the house** — [HouseGenerator.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/HouseGenerator.kt) fetches geometry from `GET /api/v1/projects/{id}/generate-vr` on an IO thread, then builds Meta Spatial entities on the main thread.
+The headset uses two voice prompts — **floor plan first, then the look of the house**. Each prompt is recorded by holding Button A, transcribed by Whisper (`POST /api/v1/voice/transcribe`), and shown on a WebView panel to confirm (Button A) or retry (Button B).
+
+**Step 1 — Floor plan**
+
+1. Describe the rooms, layout and size. The planner acts as a residential architect: it zones the house, draws the floor plan by dividing the house's footprint into zones and rooms (so hallways can run the length of the house and rooms keep their own sizes) and lists which rooms open into each other, and the backend cuts real doorways (and windows on outside walls) into the walls so you can walk through the house from the front door.
+2. [HouseGenerator.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/HouseGenerator.kt) calls `POST /api/v1/planning/generate-vr-from-prompt` on an IO thread, then builds the Meta Spatial entities on the main thread.
+3. You are placed inside the house with room labels on; the prompt panel moves with you.
+
+**Step 2 — House look**
+
+4. From inside the house, describe the style, materials and colours.
+5. `POST /api/v1/image/generate` starts Stable Diffusion; [ProgressBar.kt](construction-quest/app/src/main/java/com/byroncoughlin/vr_construction_quest/ProgressBar.kt) follows `WS /api/v1/ws/image-progress/{id}` until the image is ready.
+6. Review the image on a large panel:
+   - **Accept** (A) — the image moves to a small grabbable panel you can keep while walking.
+   - **Edit Prompt** (B) — the image is deleted and you re-record step 2; the house stays.
+   - **Start Over** — the image and the house are cleared and you return to step 1.
+
+While walking: right trigger teleports, B clears the house, left X toggles x-ray, left Y toggles room labels.
+
+Projects can also be sent to the headset from the dashboard panel in VR: **Load to VR** calls
+`POST /api/v1/projects/{id}/load-to-vr`, which starts a rendering and returns its `generation_id`; the
+dashboard hands both ids to the headset (`Android.loadProjectWithImage`), which replaces the current
+house with `GET /api/v1/projects/{id}/generate-vr` and shows the rendering for review when it is ready.
 
 ## Components
 
@@ -47,26 +67,32 @@ FastAPI service that coordinates AI planning, image generation, voice transcript
 
 - **Framework:** FastAPI, SQLAlchemy 2.0, Pydantic, Alembic
 - **Database:** PostgreSQL
-- **AI:** Ollama (Llama 3.1) for planning, Stable Diffusion for renderings, Whisper for speech-to-text
+- **AI:** Groq (`openai/gpt-oss-120b` by default) for planning with Ollama (`llama3.1:8b`) and Gemini fallbacks, Stable Diffusion (Realistic Vision 5.1 + Compel for long prompts) for renderings, faster-whisper for speech-to-text
 - **Realtime:** WebSockets for image-generation progress and room collaboration
-- **Deployment:** Docker Compose with optional GPU profile
+- **Deployment:** runs natively for development (`start_all.sh`); Docker Compose provides PostgreSQL/pgAdmin (and `docker-compose.prod.yml` a production stack)
 
 Key endpoints used by the VR app:
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| `POST` | `/api/v1/planning/generate-project` | Full AI project generation |
-| `GET`  | `/api/v1/projects/{id}/generate-vr` | VR geometry JSON |
 | `POST` | `/api/v1/voice/transcribe` | Whisper transcription |
+| `POST` | `/api/v1/planning/generate-vr-from-prompt` | House from a floor-plan prompt, saved as a project (step 1) |
+| `POST` | `/api/v1/projects/{id}/floor-plan/refine` | Change the floor plan in words (grip in VR); saved as a new version |
+| `PUT`  | `/api/v1/projects/{id}/floor-plan` | Save a dashboard-edited floor plan as a new version |
+| `POST` | `/api/v1/image/generate` | Start 2D image generation (step 2) |
 | `WS`   | `/api/v1/ws/image-progress/{id}` | Image generation progress |
+| `GET`  | `/api/v1/projects/{id}/generate-vr` | VR geometry for a saved project (dashboard) |
+| `POST` | `/api/v1/planning/generate-project` | Full AI project (phases, tasks, materials, cost) |
 | `WS`   | `/api/v1/ws/room/{roomId}` | Real-time room collaboration |
 | `GET`  | `/docs` | Interactive OpenAPI docs |
+
+Floor plans are stored as versions per project (`floor_plans` table). On a fresh database, `python -m scripts.seed_example_floor_plan` (in `backend-core/backend`) adds the example house **Maple Hollow Cottage**.
 
 See [backend-core/backend/README.md](backend-core/backend/README.md) for setup details.
 
 ### Dashboard (`backend-core/dashboard`)
 
-Vue 3 + Quasar + Pinia management UI for projects, materials, generated images, and run history. Runs on port **3001**.
+Vue 3 + Quasar + Pinia management UI for projects, materials, generated images, and run history, plus the selected project's floor plan: drawn in 2D, editable (rooms, sizes, doorways, entry), changeable by description, with version history. Runs on port **3001**.
 
 ### Construction Quest VR App (`construction-quest`)
 
@@ -97,23 +123,21 @@ Technical notes live in [construction-quest/documents/](construction-quest/docum
 - Docker (recommended for backend)
 - NVIDIA GPU (recommended for Stable Diffusion)
 
-### Backend
+### Backend + dashboard
 
 ```bash
 cd backend-core/backend
-cp .env.example .env      # edit DB + AI settings
-docker compose --profile dev up -d
-open http://localhost:8000/docs
+cp .env.example .env                  # DB settings, GROQ_API_KEY (and optional GEMINI_API_KEY)
+python3.12 -m venv venv && venv/bin/pip install -r requirements.txt
+docker compose up -d postgres pgadmin # database only; the backend runs natively
+
+cd ../..
+./start_all.sh                        # uvicorn on :8000 + Vite on :3001; Ctrl+C stops both
 ```
 
-### Dashboard
-
-```bash
-cd backend-core/dashboard
-npm install
-npm run dev
-open http://localhost:3001
-```
+`start_all.sh` frees ports 8000/3001, waits for the backend to answer, then starts the dashboard; the
+backend log goes to `backend-core/backend/backend.log`. Use `./restart_backend.sh` to restart only the
+backend. API docs: `http://localhost:8000/docs`; dashboard: `http://localhost:3001`.
 
 ### VR App
 
@@ -123,7 +147,7 @@ cd construction-quest
 ./gradlew installDebug     # with Quest connected via adb
 ```
 
-Or open `construction-quest/` in Android Studio and Run.
+Or open `construction-quest/` in Android Studio and Run. The `gradlew` script is not committed; generate it with `gradle wrapper` (Gradle 9.x) or build from Android Studio.
 
 ## Project Structure
 
@@ -141,11 +165,11 @@ vr-ai-construction-project/
 ## Testing
 
 ```bash
-# Backend
+# Backend (venv active)
 cd backend-core/backend && pytest
 
 # Dashboard
-cd backend-core/dashboard && npm run test
+cd backend-core/dashboard && npx vitest run && npx vue-tsc --noEmit && npm run lint
 
 # VR app
 cd construction-quest && ./gradlew test
@@ -166,7 +190,7 @@ MIT — see [LICENSE](LICENSE).
 ## Acknowledgments
 
 - **Meta Spatial SDK** and **OpenXR** for the VR runtime
-- **Ollama** for local Llama 3.1 hosting
+- **Groq** and **Ollama** for LLM planning
 - **Stability AI** for Stable Diffusion
 - **OpenAI Whisper** for speech-to-text
 - **FastAPI**, **Vue 3**, and **Quasar** communities

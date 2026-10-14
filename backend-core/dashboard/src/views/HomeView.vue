@@ -139,6 +139,13 @@
         </div>
       </div>
 
+      <!-- Floor Plan -->
+      <div class="row q-col-gutter-md q-mb-lg">
+        <div class="col-12">
+          <floor-plan-view :project-id="project?.id" @renamed="onHouseRenamed" />
+        </div>
+      </div>
+
       <!-- Charts Row -->
       <div class="row q-col-gutter-md q-mb-lg">
         <!-- Budget Breakdown -->
@@ -269,6 +276,7 @@ import { apiClient } from 'src/services/api'
 import BudgetPieChart from 'components/BudgetPieChart.vue'
 import CostTrendChart from 'components/CostTrendChart.vue'
 import TimelineGantt from 'components/TimelineGantt.vue'
+import FloorPlanView from 'components/FloorPlanView.vue'
 import type { ProjectSummary, ConstructionPhase, ProjectMaterial } from 'src/types/models'
 
 const $q = useQuasar()
@@ -282,6 +290,11 @@ const loadingMessage = ref('Loading dashboard data...')
 
 // Computed properties
 const project = computed<ProjectSummary | null>(() => projectsStore.currentProject)
+
+// Renaming the floor plan renames the house; keep the header in step.
+const onHouseRenamed = (name: string) => {
+  if (projectsStore.currentProject) projectsStore.currentProject.name = name
+}
 const sortedPhases = computed<ConstructionPhase[]>(() => {
   // This would come from a phases store in a full implementation
   return []
@@ -455,11 +468,21 @@ const loadProjectToVR = (): void => {
       
       // Trigger VR Quest app to load the project
       try {
-        // Check if running in VR Quest WebView with Android interface
-        if (typeof (window as any).Android !== 'undefined' && 
-            typeof (window as any).Android.loadProject === 'function') {
+        // In the headset's WebView, ImmersiveActivity exposes `Android`. Pass the
+        // generation id so the headset shows the image this request started.
+        const android = (window as any).Android
+        if (android && typeof android.loadProjectWithImage === 'function' && response.generation_id) {
+          console.log(`📲 Calling Android.loadProjectWithImage(${projectId}, ${response.generation_id})`)
+          android.loadProjectWithImage(projectId, response.generation_id)
+          $q.notify({
+            type: 'positive',
+            message: 'VR loading...',
+            caption: 'Check your Quest headset!',
+            timeout: 3000
+          })
+        } else if (android && typeof android.loadProject === 'function') {
           console.log(`📲 Calling Android.loadProject(${projectId})`)
-          ;(window as any).Android.loadProject(projectId)
+          android.loadProject(projectId)
           $q.notify({
             type: 'positive',
             message: 'VR loading...',

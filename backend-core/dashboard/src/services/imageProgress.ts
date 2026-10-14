@@ -102,7 +102,7 @@ export class ImageProgressService {
    */
   private handleMessage(
     data: any,
-    generationId: string,
+    _generationId: string,
     onProgress: (progress: ImageProgress) => void
   ): void {
     switch (data.type) {

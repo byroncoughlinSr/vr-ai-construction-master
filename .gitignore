@@ -266,7 +266,7 @@ ehthumbs.db
 Thumbs.db
 
 # Generated images and uploads (uncomment if you want to ignore)
-# generated_images/
+generated_images/
 # uploads/
 # exports/
 
