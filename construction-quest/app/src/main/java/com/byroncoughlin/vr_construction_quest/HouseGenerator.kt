@@ -253,6 +253,12 @@ class HouseGenerator(private val serverUrl: String) {
         if (ceiling != null) {
             generateCeiling(ceiling, roomName)
         }
+
+        // A bay window's walls come with the room's; its bump-out has its own floor and ceiling.
+        roomJson.optJSONObject("bay_window")?.let { bay ->
+            bay.optJSONObject("floor")?.let { generateFloor(it, roomName) }
+            bay.optJSONObject("ceiling")?.let { generateCeiling(it, roomName) }
+        }
     }
 
     /**
@@ -293,9 +299,7 @@ class HouseGenerator(private val serverUrl: String) {
             unlit = false
         })
 
-        // Calculate rotation angle — atan2 returns radians, Quaternion expects degrees
-        val angleDeg = Math.toDegrees(Math.atan2(dz.toDouble(), dx.toDouble())).toFloat()
-        val quat = com.meta.spatial.core.Quaternion(0f, angleDeg, 0f)
+        val quat = yawAlong(Math.toDegrees(Math.atan2(dz.toDouble(), dx.toDouble())).toFloat())
 
         entity.setComponent(Transform(Pose(
             t = Vector3(centerX, centerY, centerZ),
@@ -399,7 +403,7 @@ class HouseGenerator(private val serverUrl: String) {
         val rad = Math.toRadians(rotationDeg.toDouble())
         val dirX = Math.cos(rad).toFloat()
         val dirZ = Math.sin(rad).toFloat()
-        val quat = com.meta.spatial.core.Quaternion(0f, rotationDeg, 0f)
+        val quat = yawAlong(rotationDeg)
         val isExterior = doorJson.optString("door_type") == "exterior"
         val color = if (isExterior) Color4(0.25f, 0.18f, 0.12f, 1.0f) else Color4(0.4f, 0.3f, 0.2f, 1.0f)
 
@@ -450,12 +454,20 @@ class HouseGenerator(private val serverUrl: String) {
             metallic = 0.1f
             unlit = false
         })
-        val windowQuat = com.meta.spatial.core.Quaternion(0f, rotationDeg, 0f)
+        val windowQuat = yawAlong(rotationDeg)
         entity.setComponent(Transform(Pose(t = Vector3(x, y, z), q = windowQuat)))
         entity.setComponent(Visible(true))
 
         windowEntities.add(entity)
     }
+
+    /**
+     * Rotation that turns a box's local x axis to run along [degrees], measured the
+     * backend's way: atan2(dz, dx), so 90 points along +z. The SDK's yaw turns +x
+     * toward (cos θ, -sin θ), so the angle is negated. (At 0/90/180 the sign makes no
+     * visible difference; the diagonal faces of a bay window need it.)
+     */
+    private fun yawAlong(degrees: Float) = com.meta.spatial.core.Quaternion(0f, -degrees, 0f)
 
     /**
      * Get material color based on material type.

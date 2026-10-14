@@ -247,6 +247,7 @@ def test_tiny_parts_get_minimum_size():
     {"length": 30, "width": 30, "split": "x", "parts": []},
     {"length": 30, "width": 30, "split": "x", "parts": [{"room": "A"}, {"room": "a"}]},
     {"length": 3, "width": 30, "split": "x", "parts": [{"room": "A"}, {"room": "B"}, {"room": "C"}]},
+    {"length": 30, "width": 30, "split": "x", "parts": [{"open": True}, {"open": True}]},
     "not a layout",
 ])
 def test_bad_layout_falls_back_to_grid(layout):
@@ -260,3 +261,163 @@ def test_rooms_missing_from_layout_are_dropped():
     g = geo.build_geometry_from_rooms(rooms, layout=ranch_layout())
     assert "Sunroom" not in by_name(g)
     assert len(g["rooms"]) == 8
+
+
+def l_shape_layout():
+    # Street side at the top of this sketch:
+    #   Living Room | (open)
+    #   Kitchen     | Bedroom
+    return {"length": 40, "width": 30, "entry": "Living Room", "split": "z", "parts": [
+        {"size": 15, "split": "x", "parts": [
+            {"size": 20, "room": "Living Room"}, {"size": 20, "open": True}]},
+        {"size": 15, "split": "x", "parts": [
+            {"size": 20, "room": "Kitchen"}, {"size": 20, "room": "Bedroom"}]},
+    ]}
+
+
+def test_open_part_leaves_a_notch_in_the_house():
+    g = geo.build_geometry_from_rooms([], layout=l_shape_layout())
+    assert g["metadata"]["layout"] == "split"
+    assert sorted(by_name(g)) == ["Bedroom", "Kitchen", "Living Room"]
+    ft = geo.FT_TO_M
+    assert g["open_areas"] == [{"bounds": pytest.approx(
+        {"x0": 20 * ft, "x1": 40 * ft, "z0": 0.0, "z1": 15 * ft}, abs=1e-3)}]
+    area = sum(
+        (r["bounds"]["x1"] - r["bounds"]["x0"]) * (r["bounds"]["z1"] - r["bounds"]["z0"])
+        for r in g["rooms"]
+    )
+    assert area == pytest.approx(3 * 20 * 15 * ft ** 2, rel=1e-3)
+
+
+def test_walls_facing_an_open_part_are_exterior():
+    g = geo.build_geometry_from_rooms([], layout=l_shape_layout())
+    rooms = by_name(g)
+    rects = [r["bounds"] for r in g["rooms"]]
+    shared = geo.find_shared_walls(rects)
+    # Living Room's east side and Bedroom's front side face the yard.
+    living_east = geo._room_sides(rooms["Living Room"]["bounds"])[1]
+    bedroom_front = geo._room_sides(rooms["Bedroom"]["bounds"])[0]
+    assert geo.exterior_intervals(living_east, shared) == [pytest.approx(living_east[2:])]
+    assert geo.exterior_intervals(bedroom_front, shared) == [pytest.approx(bedroom_front[2:])]
+    # The bedroom gets its window on that wall: it is the longest outside stretch it has.
+    window = next(w for w in g["windows"] if w["room"] == rooms["Bedroom"]["id"])
+    assert window["position"]["z"] == pytest.approx(15 * geo.FT_TO_M, abs=1e-3)
+
+
+def test_open_parts_are_not_rooms_in_the_tree():
+    rooms = geo.layout_rects_from_tree(l_shape_layout())
+    assert [n for n, _ in rooms] == ["Living Room", "Kitchen", "Bedroom"]
+    assert len(geo.layout_open_rects(l_shape_layout())) == 1
+
+
+def test_rectangular_house_has_no_open_areas():
+    g = geo.build_geometry_from_rooms(ranch_rooms(), layout=ranch_layout())
+    assert g["open_areas"] == []
+
+
+def test_spawn_stays_out_of_the_room_across_a_courtyard():
+    # Front door facing +x at x = 0, another room 4 m away across an open area.
+    rects = [{"x0": 4.0, "x1": 8.0, "z0": -2.0, "z1": 2.0}]
+    assert geo._spawn_distance(0.0, 0.0, 1, 0, rects) == pytest.approx(2.0)
+    # Nothing across: the usual distance.
+    assert geo._spawn_distance(0.0, 0.0, -1, 0, rects) == pytest.approx(geo.SPAWN_DISTANCE)
+    assert geo._spawn_distance(0.0, 5.0, 1, 0, rects) == pytest.approx(geo.SPAWN_DISTANCE)
+
+
+def bay_house(bay):
+    # Living Room (entry) | Kitchen, both 20 x 14 ft, street side in front.
+    layout = {"length": 40, "width": 14, "entry": "Living Room", "split": "x", "parts": [
+        {"size": 20, "room": "Living Room"}, {"size": 20, "room": "Kitchen"}]}
+    rooms = [
+        {"name": "Living Room", "dimensions": {"height": 9}, "connects_to": ["Kitchen"], "bay_window": bay},
+        {"name": "Kitchen", "dimensions": {"height": 9}},
+    ]
+    return geo.build_geometry_from_rooms(rooms, layout=layout)
+
+
+def test_angled_bay_window_has_three_glazed_faces():
+    g = bay_house({"side": "back", "width": 8, "depth": 2.5})
+    living = by_name(g)["Living Room"]
+    bay = living["bay_window"]
+    assert bay["style"] == "angled" and bay["side"] == "back"
+    assert bay["width"] == pytest.approx(8 * geo.FT_TO_M, abs=1e-3)
+    assert bay["depth"] == pytest.approx(2.5 * geo.FT_TO_M, abs=1e-3)
+    back = 14 * geo.FT_TO_M
+    assert [p["z"] for p in bay["outline"]] == pytest.approx([back, back + bay["depth"], back + bay["depth"], back])
+    glass = [w for w in g["windows"] if w["room"] == living["id"]]
+    assert all(w["bay"] for w in glass)  # replaces the room's ordinary window
+    assert sorted(w["rotation"] for w in glass) == [-45, 0, 45]
+    # Its own floor and ceiling slabs reach past the back wall.
+    assert bay["floor"]["vertices"][2]["z"] > back + bay["depth"]
+    assert bay["ceiling"]["vertices"][0]["y"] == pytest.approx(living["dimensions"]["height"])
+
+
+def test_bay_window_opens_up_the_room_wall():
+    g = bay_house({"side": "back", "style": "box"})
+    living = by_name(g)["Living Room"]
+    outline = living["bay_window"]["outline"]
+    lo, hi = outline[0]["x"], outline[-1]["x"]
+    back = living["bounds"]["z1"]
+    on_back_wall = [
+        w for w in living["walls"]
+        if w["start"]["z"] == pytest.approx(back) and w["end"]["z"] == pytest.approx(back)
+    ]
+    for w in on_back_wall:
+        a, b = sorted((w["start"]["x"], w["end"]["x"]))
+        assert b <= lo + 1e-3 or a >= hi - 1e-3, "a wall piece still crosses the bay opening"
+    # Box bay: side faces run straight out, front parallel to the wall.
+    assert outline[1]["x"] == pytest.approx(lo) and outline[2]["x"] == pytest.approx(hi)
+
+
+def test_bay_window_keeps_clear_of_the_front_door():
+    g = bay_house({"side": "front", "width": 16})
+    door = next(d for d in g["doors"] if d["door_type"] == "exterior")
+    outline = by_name(g)["Living Room"]["bay_window"]["outline"]
+    lo, hi = outline[0]["x"], outline[-1]["x"]
+    door_lo, door_hi = door["position"]["x"] - geo.DOOR_W / 2, door["position"]["x"] + geo.DOOR_W / 2
+    assert door_hi <= lo or door_lo >= hi
+    assert hi - lo < 16 * geo.FT_TO_M  # shrank to fit beside the door
+
+
+def test_bay_window_on_an_inside_wall_is_skipped():
+    g = bay_house({"side": "right"})  # the Living Room's right side is the Kitchen
+    living = by_name(g)["Living Room"]
+    assert living["bay_window"] is None
+    assert any(w["room"] == living["id"] and not w.get("bay") for w in g["windows"])
+
+
+def test_bay_window_stops_short_of_a_room_across_a_courtyard():
+    layout = {"length": 30, "width": 30, "entry": "Den", "split": "z", "parts": [
+        {"size": 12, "room": "Den"},
+        {"size": 6, "open": True},
+        {"size": 12, "room": "Studio"},
+    ]}
+    rooms = [{"name": "Den", "bay_window": {"side": "back", "depth": 6}}, {"name": "Studio"}]
+    g = geo.build_geometry_from_rooms(rooms, layout=layout)
+    depth = by_name(g)["Den"]["bay_window"]["depth"]
+    assert depth < 3 * geo.FT_TO_M  # at most half the 6 ft courtyard
+
+
+@pytest.mark.parametrize("raw, expected", [
+    (True, ("front", "angled")),
+    ({"side": "Rear", "style": "BOX"}, ("back", "box")),
+    ({"side": "diagonal"}, None),
+    ("yes", None),
+    (None, None),
+])
+def test_bay_spec_parsing(raw, expected):
+    spec = geo.bay_spec({"bay_window": raw})
+    assert (spec and (spec["side"], spec["style"])) == expected
+
+
+def test_deep_angled_bay_steepens_its_sides_instead_of_turning_into_a_box():
+    g = bay_house({"side": "back", "width": 8, "depth": 5})
+    bay = by_name(g)["Living Room"]["bay_window"]
+    assert bay["style"] == "angled"
+    lo, front_lo, front_hi, hi = (p["x"] for p in bay["outline"])
+    assert front_hi - front_lo == pytest.approx(geo.BAY_MIN_W / 2, abs=1e-3)
+    inset = front_lo - lo
+    assert inset < bay["depth"]  # steeper than 45°
+    living = by_name(g)["Living Room"]["id"]
+    rotations = sorted(abs(w["rotation"]) for w in g["windows"] if w["room"] == living)
+    assert rotations[0] == 0 and 45 < rotations[1] < 90

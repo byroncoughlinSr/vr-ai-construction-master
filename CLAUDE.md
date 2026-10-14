@@ -138,9 +138,12 @@ constants **must** stay in sync across the language boundary or the house develo
 
 **Layout is a nested-split tree** the AI returns as `project_structure.layout`: a footprint
 (`length` along x, `width` along z, street side at z = 0) recursively divided by `"split": "x"|"z"` into
-`parts`, each with a relative `size` and either a `room` name or another split
-(`layout_rects_from_tree`). Part sizes are rescaled to fill their parent, with a `MIN_PART` floor, so
-rooms always tile the footprint with no gaps or overlaps. `project_structure.rooms` then only supplies
+`parts`, each with a relative `size` and either a `room` name, `"open": true` (outdoors: how the house
+gets an L/U/T shape, a courtyard or an inset porch) or another split (`layout_rects_from_tree`; open
+parts via `layout_open_rects`). Part sizes are rescaled to fill their parent, with a `MIN_PART` floor, so
+rooms and open parts always tile the footprint with no gaps or overlaps. Walls facing an open part count
+as exterior (windows, front door); the geometry lists open parts as `open_areas` (the dashboard draws them
+as "Outside"), and the spawn point stops halfway across one if a room is on the far side. `project_structure.rooms` then only supplies
 height, materials and `connects_to`. `layout.entry` names the room that gets the front door (it becomes
 room id 1). The prompt in `_build_planning_prompt` describes this format — change both together.
 If the tree is missing or malformed (`LayoutError`), it falls back to the old grid:
@@ -154,8 +157,18 @@ wall (street side first, then sides, then back) and `spawn_position` is 3 m outs
 (none in hallways/closets, small ones in bathrooms). Openings are **cut out of the walls backend-side**:
 every wall on the opening's line (i.e. both rooms' walls) is split into pieces around it, and each
 piece's `start.y` is its base height (0, or the door/window top for headers). Rotation values are sent in
-**degrees** in the JSON — `HouseGenerator.kt` must `Math.toDegrees(atan2(...))` because
-`Quaternion(...)` expects degrees, and must apply each element's `rotation` field. The history of
+**degrees** in the JSON, measured as `atan2(dz, dx)` (0 = along x, 90 = along z). The SDK's yaw turns
++x toward `(cos θ, −sin θ)`, so `HouseGenerator.kt` builds every rotation through `yawAlong(deg)`, which
+negates it; at 0/90° the sign is invisible, but diagonal walls (angled bay windows) come out mirrored
+without it.
+
+**Bay windows**: a room in the plan may carry `"bay_window": {side: front|back|left|right, width, depth
+(ft), style: angled|box}` (`bay_spec`). `build_bay` puts it on the longest clear outside stretch of that
+side (shrinking to fit beside the front door, never into another room or bay), cuts a full-height opening
+in the room's wall, and adds the bump-out's walls (any angle, `_segment_wall`) with tall windows
+(`"bay": true`, replacing the room's ordinary window). The room's `bay_window` in the geometry has the
+`outline` (dashboard) and its own `floor`/`ceiling` slabs (bounding box; an angled bay shows a small ledge
+and eave), which `HouseGenerator.generateRoom` builds. A side with no outside wall is skipped. The history of
 seam/rotation bugs and the exact fixes is documented in `claude.md` (despite the name, it is a
 fix-notes doc, not guidance) and `LOAD_TO_VR_FIX.md` — read these before touching geometry.
 

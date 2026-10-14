@@ -51,6 +51,36 @@
               role="img"
               :aria-label="`Floor plan with ${rooms.length} rooms`"
             >
+              <!-- Open (outdoor) parts of the footprint: an L/U/T-shaped house -->
+              <g v-for="(area, i) in openAreas" :key="`o${i}`">
+                <rect
+                  :x="area.bounds.x0"
+                  :y="svgY(area.bounds.z1)"
+                  :width="area.bounds.x1 - area.bounds.x0"
+                  :height="area.bounds.z1 - area.bounds.z0"
+                  fill="#F1F8E9"
+                  stroke="#AED581"
+                  stroke-width="0.06"
+                  stroke-dasharray="0.3 0.2"
+                />
+                <text
+                  :x="(area.bounds.x0 + area.bounds.x1) / 2"
+                  :y="svgY((area.bounds.z0 + area.bounds.z1) / 2) + 0.15"
+                  text-anchor="middle"
+                  class="open-name"
+                >Outside</text>
+              </g>
+
+              <!-- Bay window bump-outs -->
+              <polygon
+                v-for="room in baysToDraw" :key="`bay${room.id}`"
+                :points="bayPoints(room)"
+                :fill="roomColor(room.name)"
+                stroke="#37474F"
+                :stroke-width="WALL"
+                stroke-linejoin="miter"
+              />
+
               <!-- Rooms -->
               <g v-for="room in rooms" :key="room.id">
                 <rect
@@ -164,10 +194,20 @@
                   :aria-label="`Name of room ${i + 1}`"
                   @update:model-value="name => renameRoom(row.part, String(name ?? ''))"
                 />
+                <span v-else-if="row.part.open" class="text-green-8">Outside (open area)</span>
                 <span v-else class="text-grey-8">
                   {{ row.part.split === 'x' ? 'Side-by-side group' : 'Front-to-back group' }}
                 </span>
               </div>
+              <q-btn
+                v-if="row.part.room !== undefined || row.part.open"
+                flat dense round size="sm" class="q-mr-xs"
+                :icon="row.part.open ? 'meeting_room' : 'park'"
+                :disable="row.part.room !== undefined && draft.rooms.length <= 1"
+                @click="row.part.open ? makeRoom(row.part) : makeOpen(row.part)"
+              >
+                <q-tooltip>{{ row.part.open ? 'Make this a room' : 'Make this outside (changes the house shape)' }}</q-tooltip>
+              </q-btn>
               <q-input
                 v-model.number="row.part.size" type="number" dense outlined style="width: 90px"
                 :suffix="row.axis === 'x' ? 'wide' : 'deep'" min="1"
@@ -182,6 +222,36 @@
                 :label="room.name" multiple use-chips dense outlined
                 @update:model-value="names => setConnections(room.name, names as string[])"
               />
+            </div>
+
+            <div class="text-subtitle2 q-mt-md">Bay windows</div>
+            <div class="text-caption text-grey-7 q-mb-xs">
+              Only on an outside wall; sizes in feet. A bay replaces the room's ordinary window.
+            </div>
+            <div v-for="(room, i) in draft.rooms" :key="`bay${i}`" class="row items-center q-gutter-xs q-mb-xs">
+              <div class="ellipsis" style="width: 120px">{{ room.name }}</div>
+              <q-select
+                :model-value="room.bay_window?.side ?? 'none'"
+                :options="BAY_SIDES" emit-value map-options dense outlined style="width: 90px"
+                :aria-label="`Bay window side for ${room.name}`"
+                @update:model-value="side => setBaySide(room, side)"
+              />
+              <template v-if="room.bay_window">
+                <q-select
+                  v-model="room.bay_window.style" :options="BAY_STYLES"
+                  emit-value map-options dense outlined style="width: 95px"
+                />
+                <q-input
+                  v-model.number="room.bay_window.width" type="number" dense outlined
+                  style="width: 120px" suffix="ft wide" min="4" step="0.5"
+                  :aria-label="`Bay window width for ${room.name}`"
+                />
+                <q-input
+                  v-model.number="room.bay_window.depth" type="number" dense outlined
+                  style="width: 120px" suffix="ft deep" min="1" max="6" step="0.5"
+                  :aria-label="`Bay window depth for ${room.name}`"
+                />
+              </template>
             </div>
 
             <div class="row q-gutter-sm q-mt-md">
@@ -227,6 +297,7 @@ interface PlanRoom {
   bounds: Bounds
   dimensions: { length: number; width: number; height: number }
   connects_to?: number[]
+  bay_window?: { outline: { x: number; z: number }[] } | null
 }
 interface Opening {
   id: number
@@ -239,15 +310,24 @@ interface Opening {
 interface LayoutNode {
   size?: number
   room?: string
+  // An outdoor part of the footprint (gives the house an L/U/T shape).
+  open?: boolean
   split?: 'x' | 'z'
   parts?: LayoutNode[]
   length?: number
   width?: number
   entry?: string
 }
+interface BayWindowSpec {
+  side: 'front' | 'back' | 'left' | 'right'
+  style?: 'angled' | 'box'
+  width?: number
+  depth?: number
+}
 interface PlanRoomSpec {
   name: string
   connects_to?: string[]
+  bay_window?: BayWindowSpec
   [key: string]: unknown
 }
 interface FloorPlan {
@@ -281,6 +361,7 @@ const saveError = ref<string | null>(null)
 const rooms = ref<PlanRoom[]>([])
 const doors = ref<Opening[]>([])
 const windows = ref<Opening[]>([])
+const openAreas = ref<{ bounds: Bounds }[]>([])
 const floorPlan = ref<FloorPlan | null>(null)
 const history = ref<FloorPlan[]>([])
 const showHistory = ref(false)
@@ -292,7 +373,10 @@ const frontDoor = computed(() => doors.value.find(d => d.door_type === 'exterior
 const interiorDoorCount = computed(() => doors.value.filter(d => d.door_type !== 'exterior').length)
 
 const extent = computed(() => {
-  const b = rooms.value.map(r => r.bounds)
+  const b = [...rooms.value, ...openAreas.value].map(r => r.bounds)
+  for (const room of rooms.value) {
+    for (const p of room.bay_window?.outline ?? []) b.push({ x0: p.x, x1: p.x, z0: p.z, z1: p.z })
+  }
   return {
     x0: Math.min(...b.map(r => r.x0)),
     x1: Math.max(...b.map(r => r.x1)),
@@ -309,8 +393,16 @@ const viewBox = computed(() => {
   return `${e.x0 - MARGIN} ${-MARGIN} ${e.x1 - e.x0 + 2 * MARGIN} ${e.z1 - e.z0 + 2 * MARGIN}`
 })
 
-// rotation 0 = wall runs along x, 90 = along z (same convention as the headset).
-const along = (o: Opening) => (o.rotation % 180 === 0 ? { dx: 1, dz: 0 } : { dx: 0, dz: 1 })
+// rotation is the wall's direction in degrees: 0 = along x, 90 = along z, and the
+// faces of an angled bay window in between (same convention as the headset).
+const along = (o: Opening) => {
+  const rad = (o.rotation * Math.PI) / 180
+  return { dx: Math.cos(rad), dz: Math.sin(rad) }
+}
+
+const baysToDraw = computed(() => rooms.value.filter(r => r.bay_window?.outline?.length))
+const bayPoints = (room: PlanRoom) =>
+  (room.bay_window?.outline ?? []).map(p => `${p.x},${svgY(p.z)}`).join(' ')
 
 const span = (o: Opening) => {
   const { dx, dz } = along(o)
@@ -328,7 +420,8 @@ const jambs = (o: Opening) => {
   return [-1, 1].map(side => {
     const x = o.position.x + dx * h * side
     const z = o.position.z + dz * h * side
-    return { x1: x - dz * t, y1: svgY(z - dx * t), x2: x + dz * t, y2: svgY(z + dx * t) }
+    // Across the wall: perpendicular to (dx, dz).
+    return { x1: x - dz * t, y1: svgY(z + dx * t), x2: x + dz * t, y2: svgY(z - dx * t) }
   })
 }
 
@@ -364,6 +457,7 @@ const showGeometry = (geometry: any) => {
   rooms.value = (geometry?.rooms ?? []).filter((r: PlanRoom) => r.bounds)
   doors.value = geometry?.doors ?? []
   windows.value = geometry?.windows ?? []
+  openAreas.value = (geometry?.open_areas ?? []).filter((a: { bounds?: Bounds }) => a.bounds)
 }
 
 const load = async () => {
@@ -446,6 +540,56 @@ const renameRoom = (part: LayoutNode, name: string) => {
     room.connects_to = (room.connects_to ?? []).map(n => (same(n, old) ? name : n))
   }
   if (d.layout.entry && same(d.layout.entry, old)) d.layout.entry = name
+}
+
+const BAY_SIDES = [
+  { label: 'None', value: 'none' },
+  { label: 'Front', value: 'front' },
+  { label: 'Back', value: 'back' },
+  { label: 'Left', value: 'left' },
+  { label: 'Right', value: 'right' }
+]
+const BAY_STYLES = [
+  { label: 'Angled', value: 'angled' },
+  { label: 'Box', value: 'box' }
+]
+
+/** Add, move or remove a room's bay window. */
+const setBaySide = (room: PlanRoomSpec, side: string) => {
+  if (side === 'none') {
+    delete room.bay_window
+    return
+  }
+  room.bay_window = {
+    style: 'angled', width: 8, depth: 2.5,
+    ...room.bay_window,
+    side: side as BayWindowSpec['side']
+  }
+}
+
+/** Turn a room into an outdoor part of the footprint, dropping it from the room list. */
+const makeOpen = (part: LayoutNode) => {
+  const d = draft.value
+  const name = part.room
+  if (!d || name === undefined) return
+  delete part.room
+  part.open = true
+  d.rooms = d.rooms.filter(r => !same(r.name, name))
+  for (const room of d.rooms) {
+    room.connects_to = (room.connects_to ?? []).filter(n => !same(n, name))
+  }
+  if (d.layout.entry && same(d.layout.entry, name)) d.layout.entry = d.rooms[0]?.name
+}
+
+/** Turn an outdoor part back into a (new, unconnected) room. */
+const makeRoom = (part: LayoutNode) => {
+  const d = draft.value
+  if (!d) return
+  let n = d.rooms.length + 1
+  while (d.rooms.some(r => same(r.name, `Room ${n}`))) n++
+  delete part.open
+  part.room = `Room ${n}`
+  d.rooms.push({ name: part.room, dimensions: { height: 9 }, connects_to: [] })
 }
 
 /** Doorways are two-way: adding or removing one updates both rooms. */
@@ -544,6 +688,11 @@ watch(() => props.projectId, load, { immediate: true })
   font-size: 0.42px;
   font-weight: 600;
   fill: #263238;
+}
+.open-name {
+  font-size: 0.45px;
+  fill: #7CB342;
+  font-style: italic;
 }
 .room-size {
   font-size: 0.32px;

@@ -9,6 +9,7 @@ same geometry JSON for ``HouseGenerator.kt``.
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -108,17 +109,32 @@ def layout_rects_from_tree(layout: dict) -> list[tuple[str, dict]]:
     """Turn the AI's nested-split floor plan into room rectangles (metres).
 
     ``layout`` is ``{"length": ft, "width": ft, "split": "x"|"z", "parts": [...]}``.
-    Each part has a relative ``size`` and is either a leaf ``{"room": name}`` or
-    another split. ``"x"`` lays parts left to right; ``"z"`` front to back, so the
-    first part is on the street side (z = 0). Part sizes are rescaled to fill
-    their parent exactly, so the result never has gaps or overlaps.
+    Each part has a relative ``size`` and is either a leaf ``{"room": name}``, an
+    open leaf ``{"open": true}`` (outdoors: a yard or notch that gives the house an
+    L/U/T shape) or another split. ``"x"`` lays parts left to right; ``"z"`` front
+    to back, so the first part is on the street side (z = 0). Part sizes are
+    rescaled to fill their parent exactly, so rooms and open areas together tile
+    the footprint with no gaps or overlaps.
 
-    Returns ``[(room_name, rect), ...]`` in reading order. Raises LayoutError
-    when the tree is malformed.
+    Returns ``[(room_name, rect), ...]`` in reading order (open areas are left
+    out; see ``layout_open_rects``). Raises LayoutError when the tree is malformed.
 
     NOTE: the planning prompt (`_build_planning_prompt` in ai_planning_service.py)
     describes this format to the AI. Change both together.
     """
+    return _walk_layout(layout)[0]
+
+
+def layout_open_rects(layout: dict) -> list[dict]:
+    """Rectangles (metres) of the layout's open, outdoor parts."""
+    return _walk_layout(layout)[1]
+
+
+def _is_open(node: dict) -> bool:
+    return node.get("open") is True and not node.get("room")
+
+
+def _walk_layout(layout: dict) -> tuple[list[tuple[str, dict]], list[dict]]:
     if not isinstance(layout, dict):
         raise LayoutError("layout is not an object")
     try:
@@ -130,12 +146,16 @@ def layout_rects_from_tree(layout: dict) -> list[tuple[str, dict]]:
         raise LayoutError("footprint must be positive")
 
     out: list[tuple[str, dict]] = []
+    open_out: list[dict] = []
 
     def walk(node: dict, rect: dict, depth: int):
         if depth > 8:
             raise LayoutError("layout nested too deeply")
         if not isinstance(node, dict):
             raise LayoutError("layout node is not an object")
+        if depth > 0 and _is_open(node):
+            open_out.append(rect)
+            return
         name = node.get("room")
         if isinstance(name, str) and _clean_name(name):
             out.append((_clean_name(name), rect))
@@ -159,10 +179,12 @@ def layout_rects_from_tree(layout: dict) -> list[tuple[str, dict]]:
 
     walk(layout, {"x0": 0.0, "x1": length, "z0": 0.0, "z1": width}, 0)
 
+    if not out:
+        raise LayoutError("layout has no rooms")
     names = [_normalize(n) for n, _ in out]
     if len(set(names)) != len(names):
         raise LayoutError("a room appears more than once in the layout")
-    return out
+    return out, open_out
 
 
 # Opening sizes, metres. A door or window is only placed where the wall leaves at
@@ -175,6 +197,18 @@ WINDOW_H = round(4.0 * FT_TO_M, 3)
 WINDOW_SILL = round(3.0 * FT_TO_M, 3)
 EDGE_MARGIN = 0.25
 _EPS = 1e-3
+
+# Bay windows: a walk-in bump-out of a room's outside wall, glazed on every face.
+BAY_DEFAULT_W = round(8.0 * FT_TO_M, 3)
+BAY_DEFAULT_D = round(2.5 * FT_TO_M, 3)
+BAY_MIN_W = round(4.0 * FT_TO_M, 3)
+BAY_MIN_D = round(1.0 * FT_TO_M, 3)
+BAY_MAX_D = round(6.0 * FT_TO_M, 3)
+BAY_SILL = round(1.5 * FT_TO_M, 3)
+BAY_MIN_INSET = round(0.5 * FT_TO_M, 3)  # an angled side narrower than this becomes a box
+BAY_GLASS_MARGIN = 0.12  # solid wall left at each end of a bay face
+# Side → (index into _room_sides, outward direction (dx, dz)).
+_BAY_SIDES = {"front": (0, (0, -1)), "right": (1, (1, 0)), "back": (2, (0, 1)), "left": (3, (-1, 0))}
 
 # Rooms that get no window (interior circulation and storage).
 _NO_WINDOW_KEYWORDS = ("hall", "corridor", "closet", "pantry", "stair")
@@ -383,6 +417,199 @@ def generate_walls(rect: dict, height: float, openings: list[dict]) -> list:
     return pieces
 
 
+def _segment_wall(
+    a: tuple[float, float], b: tuple[float, float], height: float,
+    hole: tuple[float, float, float, float] | None = None,
+) -> list[dict]:
+    """Wall pieces along the straight segment ``a → b`` (``(x, z)`` points, any angle).
+
+    ``hole`` is ``(lo, hi, bottom, top)``: a window between ``lo`` and ``hi`` metres
+    from ``a``. Pieces use the same shape as ``generate_walls``.
+    """
+    length = ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5
+    if length <= _EPS:
+        return []
+    ux, uz = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+    pieces = []
+
+    def piece(t0: float, t1: float, y0: float, y1: float):
+        if t1 - t0 > _EPS and y1 - y0 > _EPS:
+            pieces.append({
+                "start": {"x": round(a[0] + ux * t0, 4), "y": round(y0, 4), "z": round(a[1] + uz * t0, 4)},
+                "end": {"x": round(a[0] + ux * t1, 4), "y": round(y0, 4), "z": round(a[1] + uz * t1, 4)},
+                "height": round(y1 - y0, 4),
+                "material": "drywall",
+            })
+
+    if hole is None:
+        piece(0.0, length, 0.0, height)
+        return pieces
+    lo, hi, bottom, top = hole
+    piece(0.0, lo, 0.0, height)
+    piece(lo, hi, 0.0, bottom)
+    piece(lo, hi, top, height)
+    piece(hi, length, 0.0, height)
+    return pieces
+
+
+def _slab(x0: float, x1: float, z0: float, z1: float, y: float, material: str) -> dict:
+    """An axis-aligned floor/ceiling slab in the ``generate_floor`` vertex format."""
+    return {
+        "vertices": [
+            {"x": round(x0, 4), "y": y, "z": round(z0, 4)},
+            {"x": round(x1, 4), "y": y, "z": round(z0, 4)},
+            {"x": round(x1, 4), "y": y, "z": round(z1, 4)},
+            {"x": round(x0, 4), "y": y, "z": round(z1, 4)},
+        ],
+        "material": material,
+    }
+
+
+def bay_spec(room: dict) -> dict | None:
+    """The room's requested bay window, cleaned up (sizes in metres), or None.
+
+    The floor plan stores ``{"side": "front"|"back"|"left"|"right", "width": ft,
+    "depth": ft, "style": "angled"|"box"}``; side defaults to front, style to angled.
+    """
+    raw = room.get("bay_window")
+    if raw is True:
+        raw = {}
+    if not isinstance(raw, dict):
+        return None
+    side = str(raw.get("side") or "front").strip().lower()
+    side = {"street": "front", "rear": "back", "east": "right", "west": "left"}.get(side, side)
+    if side not in _BAY_SIDES:
+        return None
+    style = "box" if str(raw.get("style") or "").strip().lower() == "box" else "angled"
+    return {
+        "side": side,
+        "style": style,
+        "width": max(BAY_MIN_W, _feet(raw.get("width"), BAY_DEFAULT_W / FT_TO_M) * FT_TO_M),
+        "depth": min(BAY_MAX_D, max(BAY_MIN_D, _feet(raw.get("depth"), BAY_DEFAULT_D / FT_TO_M) * FT_TO_M)),
+    }
+
+
+def _gap_outward(axis: str, line: float, lo: float, hi: float, n: int, rects: list[dict]) -> float | None:
+    """Clear distance from a wall (``axis``/``line``, over ``lo..hi``) outward (``n`` = ±1)
+    to the nearest rectangle in the way, or None when nothing is."""
+    gap = None
+    for r in rects:
+        if axis == "x":  # wall runs along x at z = line
+            overlaps = r["x0"] < hi - _EPS and r["x1"] > lo + _EPS
+            d = (r["z0"] - line) if n > 0 else (line - r["z1"])
+        else:
+            overlaps = r["z0"] < hi - _EPS and r["z1"] > lo + _EPS
+            d = (r["x0"] - line) if n > 0 else (line - r["x1"])
+        if overlaps and d > -_EPS and (gap is None or d < gap):
+            gap = d
+    return gap
+
+
+def build_bay(
+    rect: dict, spec: dict, height: float, openings: list[dict],
+    shared: dict, obstacles: list[dict], floor_material: str, ceiling_material: str,
+) -> dict | None:
+    """Place a bay window on one side of a room, or return None if it doesn't fit.
+
+    It goes on the longest stretch of outside wall on that side that is clear of
+    other openings, shrinking to fit; it never pushes into ``obstacles`` (other rooms
+    and bays). Returns the opening to cut in the room's wall plus the bay's walls,
+    windows, floor and ceiling, and its outline for drawing.
+    """
+    index, (dx, dz) = _BAY_SIDES[spec["side"]]
+    side = _room_sides(rect)[index]
+    axis, line, _, _ = side
+    n = dx + dz  # +1 or -1: which way "out" is along the wall's normal
+    near = [(o["lo"] - EDGE_MARGIN, o["hi"] + EDGE_MARGIN) for o in _opening_on(side, openings)]
+    spans = [
+        piece
+        for ext_lo, ext_hi in exterior_intervals(side, shared)
+        for piece in _free_intervals(ext_lo + EDGE_MARGIN, ext_hi - EDGE_MARGIN, near)
+    ]
+    if not spans:
+        return None
+    s_lo, s_hi = max(spans, key=lambda iv: iv[1] - iv[0])
+    width = min(spec["width"], s_hi - s_lo)
+    if width < BAY_MIN_W - _EPS:
+        return None
+    center = (s_lo + s_hi) / 2
+    lo, hi = center - width / 2, center + width / 2
+
+    depth = spec["depth"]
+    gap = _gap_outward(axis, line, lo - WALL_T, hi + WALL_T, n, obstacles)
+    if gap is not None:
+        depth = min(depth, gap / 2 - WALL_T)
+    if depth < BAY_MIN_D - _EPS:
+        return None
+    style = spec["style"]
+    inset = 0.0
+    if style == "angled":
+        # Sides at 45° (inset = depth), steepened when the bay is deep for its width
+        # so the front keeps at least half the minimum bay width.
+        inset = min(depth, (width - BAY_MIN_W / 2) / 2)
+        if inset < BAY_MIN_INSET:
+            style, inset = "box", 0.0
+
+    def pt(along: float, out: float) -> tuple[float, float]:
+        p = _point(axis, line + n * out, along)
+        return (p["x"], p["z"])
+
+    corners = [pt(lo, 0), pt(lo + inset, depth), pt(hi - inset, depth), pt(hi, 0)]
+    top = min(WINDOW_SILL + WINDOW_H, height - 0.15)
+    walls, windows = [], []
+    # Run each face past its ends so the joints close up: a wall-thickness into the
+    # room's wall at the base, and past the bay's own corners by tan(turn / 2) of it,
+    # where turn is the angle between a side face and the front (90° on a box bay).
+    turn = math.atan2(depth, inset)
+    corner_ext = WALL_T * math.tan(turn / 2)
+    for k, (a, b) in enumerate(zip(corners, corners[1:])):
+        length = ((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5
+        ux, uz = (b[0] - a[0]) / length, (b[1] - a[1]) / length
+        ext_a = WALL_T if k == 0 else corner_ext
+        ext_b = WALL_T if k == 2 else corner_ext
+        a2 = (a[0] - ux * ext_a, a[1] - uz * ext_a)
+        b2 = (b[0] + ux * ext_b, b[1] + uz * ext_b)
+        glass = length - 2 * BAY_GLASS_MARGIN
+        if glass >= 0.3 and top - BAY_SILL > 0.3:
+            g_lo = ext_a + BAY_GLASS_MARGIN
+            walls += _segment_wall(a2, b2, height, (g_lo, g_lo + glass, BAY_SILL, top))
+            windows.append({
+                "position": {
+                    "x": round((a[0] + b[0]) / 2, 4),
+                    "y": round((BAY_SILL + top) / 2, 4),
+                    "z": round((a[1] + b[1]) / 2, 4),
+                },
+                "width": round(glass, 4),
+                "height": round(top - BAY_SILL, 4),
+                # Degrees, same convention as the axis-aligned walls (0 = along x).
+                "rotation": round(math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])), 2),
+            })
+        else:
+            walls += _segment_wall(a2, b2, height)
+
+    xs = [c[0] for c in corners]
+    zs = [c[1] for c in corners]
+    # The slabs cover the bay's bounding box; on an angled bay the corners outside
+    # the angled faces show as a small ledge and eave.
+    x0, x1 = min(xs) - WALL_T, max(xs) + WALL_T
+    z0, z1 = min(zs) - WALL_T, max(zs) + WALL_T
+    return {
+        "opening": {"axis": axis, "line": line, "lo": lo, "hi": hi, "bottom": 0.0, "top": height + 1.0},
+        "walls": walls,
+        "windows": windows,
+        "bounds": {"x0": x0, "x1": x1, "z0": z0, "z1": z1},
+        "info": {
+            "side": spec["side"],
+            "style": style,
+            "width": round(width, 3),
+            "depth": round(depth, 3),
+            "outline": [{"x": round(c[0], 4), "z": round(c[1], 4)} for c in corners],
+            "floor": _slab(x0, x1, z0, z1, 0, floor_material),
+            "ceiling": _slab(x0, x1, z0, z1, height, ceiling_material),
+        },
+    }
+
+
 def generate_floor(dimensions: dict, x_offset: float, z_offset: float, material: str = "carpet") -> dict:
     """Generate floor geometry for a room.
 
@@ -462,11 +689,14 @@ def _clean_name(name: Any) -> str:
     return str(name or "").strip().rstrip(",;:.").strip()
 
 
-def _rooms_and_rects(rooms_ft: list[dict], layout: dict | None) -> tuple[list[dict], list[dict], str]:
+def _rooms_and_rects(
+    rooms_ft: list[dict], layout: dict | None
+) -> tuple[list[dict], list[dict], list[dict], str]:
     """Pair each room (dimensions converted to metres) with its rectangle.
 
     Uses the AI's nested-split ``layout`` when it is valid, else packs
-    ``rooms_ft`` on the 3-wide grid. Room 0 of the result is the entry.
+    ``rooms_ft`` on the 3-wide grid. Room 0 of the result is the entry. Also
+    returns the layout's open (outdoor) rectangles, which the grid never has.
     """
     rooms_ft = [
         {**r, "name": _clean_name(r.get("name"))} if r.get("name") else r
@@ -476,7 +706,7 @@ def _rooms_and_rects(rooms_ft: list[dict], layout: dict | None) -> tuple[list[di
     by_name = {_normalize(r.get("name", "")): r for r in rooms_ft}
     if layout:
         try:
-            placed = layout_rects_from_tree(layout)
+            placed, open_rects = _walk_layout(layout)
             rooms, rects = [], []
             for name, rect in placed:
                 src = by_name.get(_normalize(name), {})
@@ -493,7 +723,7 @@ def _rooms_and_rects(rooms_ft: list[dict], layout: dict | None) -> tuple[list[di
             entry = _pick_entry(rooms, rects, (layout or {}).get("entry"))
             order = [entry] + [i for i in range(len(rooms)) if i != entry]
             logger.info(f"📐 Using nested-split layout: {len(rooms)} rooms, entry '{rooms[entry]['name']}'")
-            return [rooms[i] for i in order], [rects[i] for i in order], "split"
+            return [rooms[i] for i in order], [rects[i] for i in order], open_rects, "split"
         except LayoutError as e:
             logger.warning(f"⚠️  Layout tree rejected ({e}) — falling back to grid layout")
 
@@ -502,10 +732,30 @@ def _rooms_and_rects(rooms_ft: list[dict], layout: dict | None) -> tuple[list[di
     for room, (x, z, eff_width) in zip(rooms, compute_packed_positions(rooms)):
         rects.append(_room_rect(x, z, room["dimensions"]["length"], eff_width))
         room["dimensions"] = {**room["dimensions"], "width": eff_width}
-    return rooms, rects, "grid"
+    return rooms, rects, [], "grid"
 
 
 _ENTRY_KEYWORDS = ("entry", "foyer", "mudroom", "living", "great", "family")
+
+
+SPAWN_DISTANCE = 3.0
+
+
+def _spawn_distance(x: float, z: float, dx: int, dz: int, rects: list[dict]) -> float:
+    """How far outside the front door at ``(x, z)`` to put the player, walking
+    ``(dx, dz)``: SPAWN_DISTANCE, or half the gap when the door opens into an
+    open area with another room across it (the inside corner of an L)."""
+    gap = None
+    for r in rects:
+        if dz and r["x0"] - _EPS <= x <= r["x1"] + _EPS:
+            d = (r["z0"] - z) if dz > 0 else (z - r["z1"])
+        elif dx and r["z0"] - _EPS <= z <= r["z1"] + _EPS:
+            d = (r["x0"] - x) if dx > 0 else (x - r["x1"])
+        else:
+            continue
+        if d > -_EPS and (gap is None or d < gap):
+            gap = d
+    return SPAWN_DISTANCE if gap is None else min(SPAWN_DISTANCE, gap / 2)
 
 
 def _pick_entry(rooms: list[dict], rects: list[dict], named: str | None) -> int:
@@ -557,7 +807,7 @@ def build_geometry_from_rooms(
         and window openings (each piece's ``start.y`` is its base height); doors
         list the ``rooms`` they join and rooms list the ids they ``connects_to``.
     """
-    rooms_m, rects, layout_source = _rooms_and_rects(rooms_ft, layout)
+    rooms_m, rects, open_rects, layout_source = _rooms_and_rects(rooms_ft, layout)
     shared = find_shared_walls(rects)
     connections = plan_connections(rooms_m, shared)
 
@@ -596,7 +846,8 @@ def build_geometry_from_rooms(
             center = (lo + hi) / 2
             add_door(side[0], side[1], center, [1], "exterior")
             door = doors[-1]["position"]
-            spawn = {"x": door["x"] + dx * 3.0, "y": 1.6, "z": door["z"] + dz * 3.0}
+            step = _spawn_distance(door["x"], door["z"], dx, dz, rects[1:])
+            spawn = {"x": door["x"] + dx * step, "y": 1.6, "z": door["z"] + dz * step}
             break
 
     for a, b in connections:
@@ -605,10 +856,33 @@ def build_geometry_from_rooms(
         connected_ids[a].append(b + 1)
         connected_ids[b].append(a + 1)
 
+    # Bay windows, where the plan asks for them. They replace the room's ordinary window.
+    bays: dict[int, dict] = {}
+    for idx, (room, rect) in enumerate(zip(rooms_m, rects)):
+        spec = bay_spec(room)
+        if spec is None:
+            continue
+        obstacles = [r for j, r in enumerate(rects) if j != idx] + [b["bounds"] for b in bays.values()]
+        bay = build_bay(
+            rect, spec, room["dimensions"]["height"], openings, shared, obstacles,
+            room.get("floor_material", "carpet"), room.get("wall_material", "drywall"),
+        )
+        if bay is None:
+            logger.info(f"  ↪ '{room.get('name')}': no room for a {spec['side']} bay window — skipped")
+            continue
+        openings.append(bay["opening"])
+        for w in bay["windows"]:
+            windows.append({
+                "id": 200 + len(windows) + 1, **w,
+                "glass_type": "double_pane", "room": idx + 1, "bay": True,
+            })
+        bays[idx] = bay
+        logger.info(f"  🪟 '{room.get('name')}': {bay['info']['style']} bay window on the {spec['side']}")
+
     # One window per room, on the longest stretch of exterior wall left over.
     for idx, (room, rect) in enumerate(zip(rooms_m, rects)):
         name = _normalize(room.get("name", ""))
-        if any(k in name for k in _NO_WINDOW_KEYWORDS):
+        if idx in bays or any(k in name for k in _NO_WINDOW_KEYWORDS):
             continue
         win_w = SMALL_WINDOW_W if any(k in name for k in _SMALL_WINDOW_KEYWORDS) else WINDOW_W
         best = None
@@ -661,6 +935,7 @@ def build_geometry_from_rooms(
             f"{geom_dims['length']:.2f}x{geom_dims['width']:.2f}x{geom_dims['height']}m "
             f"@ ({x_offset:.2f}, 0, {z_offset:.2f}) → doors to {connected_ids[idx]}"
         )
+        bay = bays.get(idx)
         rooms_out.append({
             "id": room_id,
             "name": room_name,
@@ -669,7 +944,10 @@ def build_geometry_from_rooms(
             "dimensions": {k: round(v, 3) for k, v in geom_dims.items()},
             "bounds": {k: round(v, 4) for k, v in rects[idx].items()},
             "connects_to": connected_ids[idx],
-            "walls": generate_walls(rects[idx], geom_dims["height"], openings),
+            "walls": generate_walls(rects[idx], geom_dims["height"], openings)
+            + (bay["walls"] if bay else []),
+            # Bump-out outline plus its own floor and ceiling slabs, or null.
+            "bay_window": bay["info"] if bay else None,
             "floor": generate_floor(
                 geom_dims, x_offset, z_offset, room.get("floor_material", "carpet")
             ),
@@ -711,6 +989,8 @@ def build_geometry_from_rooms(
         "doors": doors,
         "windows": windows,
         "materials": material_map,
+        # Outdoor parts of the footprint (an L/U/T-shaped house), for drawing the plan.
+        "open_areas": [{"bounds": {k: round(v, 4) for k, v in r.items()}} for r in open_rects],
         # Outside the front door (or in front of the entry if it had no room for one).
         "spawn_position": spawn or {
             "x": rooms_out[0]["position"]["x"] if rooms_out else 0.0,

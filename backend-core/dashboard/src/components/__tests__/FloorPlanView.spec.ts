@@ -158,4 +158,82 @@ describe('FloorPlanView', () => {
     expect(post).toHaveBeenCalledWith('/projects/7/floor-plan/refine', { instruction: 'make the living room bigger' })
     expect(wrapper.text()).toContain('v3')
   })
+
+  it('draws open areas as outside and fits them in the drawing', async () => {
+    const lShape = {
+      ...geometry,
+      open_areas: [{ bounds: { x0: 7.315, x1: 10, z0: 0, z1: 3.658 } }]
+    }
+    get.mockResolvedValue({ data: { success: true, geometry: lShape } })
+    const wrapper = mountPlan()
+    await flushPromises()
+
+    expect(wrapper.findAll('svg rect')).toHaveLength(3)
+    expect(wrapper.text()).toContain('Outside')
+    expect(wrapper.text()).toContain('2 rooms')
+    const [x, , w] = wrapper.find('svg').attributes('viewBox')!.split(' ').map(Number)
+    expect(x + w).toBeCloseTo(10 + 1.2)
+  })
+
+  it('turns a room into an open area and back', async () => {
+    savedProject()
+    const wrapper = mountPlan()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.startEditing()
+
+    vm.makeOpen(vm.draft.layout.parts[0])
+    expect(vm.draft.layout.parts[0]).toEqual({ size: 8, open: true })
+    expect(vm.draft.rooms.map((r: any) => r.name)).toEqual(['Living Room'])
+    expect(vm.draft.rooms[0].connects_to).toEqual([])
+    expect(vm.draft.layout.entry).toBe('Living Room')
+
+    vm.makeRoom(vm.draft.layout.parts[0])
+    expect(vm.draft.layout.parts[0]).toEqual({ size: 8, room: 'Room 2' })
+    expect(vm.draft.rooms.map((r: any) => r.name)).toEqual(['Living Room', 'Room 2'])
+  })
+
+  it('draws a bay window bump-out and its angled glass', async () => {
+    const withBay = JSON.parse(JSON.stringify(geometry))
+    withBay.rooms[1].bay_window = {
+      outline: [{ x: 3.5, z: 0 }, { x: 4.26, z: -0.76 }, { x: 5.48, z: -0.76 }, { x: 6.24, z: 0 }]
+    }
+    withBay.windows.push({ id: 202, position: { x: 3.88, y: 1.3, z: -0.38 }, width: 0.84, rotation: -45, bay: true })
+    get.mockResolvedValue({ data: { success: true, geometry: withBay } })
+    const wrapper = mountPlan()
+    await flushPromises()
+
+    expect(wrapper.find('svg polygon').attributes('points')).toBe('3.5,3.658 4.26,4.418 5.48,4.418 6.24,3.658')
+    const glass = wrapper.findAll('svg line').filter(l => l.attributes('stroke') === '#4FC3F7')
+    const angled = glass[glass.length - 1]
+    // -45°: runs down-right to up-left in plan, i.e. both coordinates change.
+    expect(Number(angled.attributes('x1'))).not.toBeCloseTo(Number(angled.attributes('x2')))
+    expect(Number(angled.attributes('y1'))).not.toBeCloseTo(Number(angled.attributes('y2')))
+    // The drawing grows to fit the bump-out in front of the house.
+    const [, y, , h] = wrapper.find('svg').attributes('viewBox')!.split(' ').map(Number)
+    expect(y + h).toBeGreaterThan(3.658 + 0.76)
+  })
+
+  it('adds, edits and removes a bay window in the editor', async () => {
+    savedProject()
+    put.mockResolvedValue({ data: { floor_plan: { ...floorPlan, version: 3 }, geometry: savedGeometry } })
+    const wrapper = mountPlan()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.startEditing()
+
+    const living = vm.draft.rooms[1]
+    vm.setBaySide(living, 'front')
+    expect(living.bay_window).toEqual({ side: 'front', style: 'angled', width: 8, depth: 2.5 })
+    living.bay_window.width = 10
+    vm.setBaySide(living, 'back')
+    expect(living.bay_window).toEqual({ side: 'back', style: 'angled', width: 10, depth: 2.5 })
+
+    await vm.saveDraft()
+    expect(put.mock.calls[put.mock.calls.length - 1][1].rooms[1].bay_window.side).toBe('back')
+
+    vm.startEditing()
+    vm.setBaySide(vm.draft.rooms[1], 'none')
+    expect(vm.draft.rooms[1].bay_window).toBeUndefined()
+  })
 })

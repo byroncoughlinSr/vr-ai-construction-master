@@ -406,12 +406,14 @@ FLOOR PLAN DESIGN (all sizes in feet):
 - "layout" is the floor plan, drawn by repeatedly dividing the house's rectangular footprint:
   - "length" is the footprint's left-to-right size and "width" its front-to-back depth. The front (street side, where the front door is) is at the start of the depth.
   - A split node has "split": "x" (parts placed left to right) or "z" (parts placed front to back, first part at the street), and a list of "parts".
-  - Each part has a "size" in feet along that split, and is either a room ({"size": n, "room": "Name"}) or another split.
+  - Each part has a "size" in feet along that split, and is either a room ({"size": n, "room": "Name"}), an open outdoor area ({"size": n, "open": true}), or another split.
+  - The house is a plain rectangle unless the description asks for another shape. For an L, U or T shape, a courtyard or an inset porch, mark the parts outside the house as open; walls, windows and doors go around them.
   - A part spans the full extent of its parent in the other direction, so nest splits to get rooms of different depths. For example, a full-length hallway between a front zone and a back zone is a "z" split of [front zone, hallway, back zone], with each zone split by "x" into rooms.
   - The sizes of a node's parts should add up to its parent's extent. Every room appears in the layout exactly once.
-  - "entry" is the name of the room the front door opens into; it must touch the front or a side of the footprint.
+  - "entry" is the name of the room the front door opens into; it must have an outside wall (the edge of the footprint or of an open area), preferably facing the street.
 - "rooms" lists every room in the layout with the same names, its height, materials, and "connects_to".
 - DOORWAYS: "connects_to" lists the exact names of the rooms this room opens into through a doorway. Only connect rooms whose rectangles share a wall. Design the circulation: guests walk from the entry into the living area, bedrooms open off a hallway or the living area (never through another bedroom), and a bathroom opens off a hallway or the bedroom it serves. Every room must be reachable from the entry. Each connection only needs listing once.
+- BAY WINDOWS: only when the description asks for one, give that room "bay_window": {"side": "front"|"back"|"left"|"right", "width": 8, "depth": 2.5, "style": "angled"|"box"} (feet; "angled" is the classic three-sided bay). The side must be one where the room has an outside wall: the edge of the footprint or of an open area. Leave the key out of every other room.
 - Use descriptive room names (e.g. "Entry Foyer", "Primary Bedroom", "Hall Bathroom")."""
 
         return prompt
@@ -433,9 +435,10 @@ REQUESTED CHANGE: {instruction}
 Apply the requested change and nothing else: keep every room, name, size, material and doorway the change does not affect. Keep the plan livable — every room reachable from the entry, bedrooms never only reachable through another bedroom.
 
 The format is the one used above:
-- "layout" is the footprint ("length" left to right, "width" front to back, street side first) recursively divided by "split": "x" (left to right) or "z" (front to back) into "parts". Each part has a "size" in feet along that split and is either a room ({{"size": n, "room": "Name"}}) or another split. Part sizes should add up to the parent's extent. Every room appears in the layout exactly once. "entry" names the room the front door opens into.
+- "layout" is the footprint ("length" left to right, "width" front to back, street side first) recursively divided by "split": "x" (left to right) or "z" (front to back) into "parts". Each part has a "size" in feet along that split and is either a room ({{"size": n, "room": "Name"}}), an open outdoor area ({{"size": n, "open": true}}; this is how the house gets an L, U or T shape, a courtyard or an inset porch) or another split. Part sizes should add up to the parent's extent. Every room appears in the layout exactly once. "entry" names the room the front door opens into.
 - To make a room bigger or smaller, change its part's "size" and the neighbouring parts (or the footprint) so the sizes still add up.
 - "rooms" lists every room in the layout with the same names, its "dimensions" (height 8-10), "floor_material", "wall_material" and "connects_to" (names of rooms it opens into through a doorway; only rooms that share a wall).
+- A room may have a bay window: "bay_window": {{"side": "front"|"back"|"left"|"right", "width": 8, "depth": 2.5, "style": "angled"|"box"}} (feet; front is the street side, left/right along the layout's length). It must be on a side where the room has an outside wall (the edge of the footprint or of an open area). Keep existing bay windows unless the change is about them; to remove one, leave the key out.
 
 Reply with ONLY a JSON object (no markdown, no explanation): {{"project_structure": {{"layout": {{...}}, "rooms": [...]}}}}"""
 
