@@ -27,6 +27,7 @@ import com.meta.spatial.core.SpatialFeature
 import com.meta.spatial.core.SystemBase
 import com.meta.spatial.core.Vector3
 import com.meta.spatial.okhttp3.OkHttpAssetFetcher
+import com.meta.spatial.runtime.ButtonBits
 import com.meta.spatial.runtime.NetworkedAssetLoader
 import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.AvatarAttachment
@@ -151,7 +152,9 @@ class ImmersiveActivity : AppSystemActivity() {
     private var xrayEnabled = false
     private var roomLabelsVisible = false
     private val roomLabelEntities = mutableListOf<Entity>()
-    private val pendingRoomLabels = java.util.concurrent.ConcurrentLinkedQueue<RoomInfo>()
+    // Room for each label panel, read when the SDK creates that panel.
+    private val roomLabelInfo = java.util.concurrent.ConcurrentHashMap<Entity, RoomInfo>()
+    private var roomLabelPanelConfigured = false
     private var currentMaterial = "Wood"
     private var isRecording = false
     // Set from button release until the transcription comes back (or fails); input is
@@ -202,12 +205,16 @@ class ImmersiveActivity : AppSystemActivity() {
             }
         }
 
-        const val BUTTON_A = 0x00000001L
-        const val BUTTON_B = 0x00000002L
-        const val BUTTON_X = 0x00000100L
-        const val BUTTON_Y = 0x00000200L
-        const val TRIGGER_MASK = 0x20000000L
-        const val GRIP_MASK = 0x04000000L
+        // Controller.buttonState bits, from the SDK's ButtonBits. Trigger and grip have a
+        // separate bit per hand; read only the bits of the hand being processed.
+        val BUTTON_A = ButtonBits.ButtonA.toLong()
+        val BUTTON_B = ButtonBits.ButtonB.toLong()
+        val BUTTON_X = ButtonBits.ButtonX.toLong()
+        val BUTTON_Y = ButtonBits.ButtonY.toLong()
+        val TRIGGER_L = ButtonBits.ButtonTriggerL.toLong()
+        val TRIGGER_R = ButtonBits.ButtonTriggerR.toLong()
+        val GRIP_L = ButtonBits.ButtonSqueezeL.toLong()
+        val GRIP_R = ButtonBits.ButtonSqueezeR.toLong()
 
         const val HAND_LEFT = 0
         const val HAND_RIGHT = 1
@@ -742,6 +749,7 @@ class ImmersiveActivity : AppSystemActivity() {
         val details = buildList {
             currentFloorPlanVersion?.let { add("Floor plan v$it") }
             if (currentProjectId != null) add("Hold grip to change the floor plan")
+            add("Left trigger returns here")
         }.joinToString(" • ")
         val html = """
             <!DOCTYPE html><html>
@@ -1135,6 +1143,15 @@ class ImmersiveActivity : AppSystemActivity() {
         Log.i(TAG, "🌀 Teleported to (${"%.1f".format(tx)}, ${"%.1f".format(tz)})")
     }
 
+    /**
+     * Put the player back at the spawn point outside the front door, facing the prompt
+     * panel, house sign and review panel (all placed relative to [panelAnchor]).
+     */
+    private fun returnToPanels() {
+        scene.setViewOrigin(panelAnchor.x, 0f, panelAnchor.z, 0f)
+        Log.i(TAG, "🚪 Returned to the front door (${"%.1f".format(panelAnchor.x)}, ${"%.1f".format(panelAnchor.z)})")
+    }
+
     private fun toggleXRay() {
         xrayEnabled = !xrayEnabled
         houseGenerator?.setXRayEnabled(xrayEnabled)
@@ -1150,15 +1167,12 @@ class ImmersiveActivity : AppSystemActivity() {
                 roomLabelsVisible = false
                 return
             }
-            // Queue room info for the panel callbacks
-            pendingRoomLabels.clear()
-            pendingRoomLabels.addAll(rooms)
-
             rooms.forEach { room ->
                 // Label floats at eye level in the middle of the room. (room.depth used to
                 // arrive as 0, which put it here; keep it off the walls now that they have doorways.)
                 val labelZ = room.centerZ
                 val entity = Entity.create()
+                roomLabelInfo[entity] = room
                 entity.setComponent(Panel(R.layout.room_label))
                 entity.setComponent(Transform(Pose(
                     t = Vector3(room.centerX, 1.6f, labelZ),
@@ -1171,6 +1185,7 @@ class ImmersiveActivity : AppSystemActivity() {
         } else {
             roomLabelEntities.forEach { it.destroy() }
             roomLabelEntities.clear()
+            roomLabelInfo.clear()
             Log.i(TAG, "🏷️ Room labels hidden")
         }
     }
@@ -1289,6 +1304,7 @@ class ImmersiveActivity : AppSystemActivity() {
         houseGenerator?.clearAllEntities()
         roomLabelEntities.forEach { it.destroy() }
         roomLabelEntities.clear()
+        roomLabelInfo.clear()
         roomLabelsVisible = false
         destroyReviewImagePanel()
         destroyWalkingImagePanel()
@@ -1464,6 +1480,7 @@ class ImmersiveActivity : AppSystemActivity() {
         nativeEntities.values.forEach { it.destroy() }
         roomLabelEntities.forEach { it.destroy() }
         roomLabelEntities.clear()
+        roomLabelInfo.clear()
         houseGenerator?.clearAllEntities()
         activityJob.cancel()
         super.onDestroy()
@@ -1624,6 +1641,8 @@ class ImmersiveActivity : AppSystemActivity() {
         private var teleportDebounceTimer = 0L
         private var roomLabelDebounceTimer = 0L
         private var prevButtonB = false
+        private var prevLeftTrigger = false
+        private val prevButtons = LongArray(2)
         private var gripDebounceTimer = 0L
 
         override fun execute() {
@@ -1639,38 +1658,52 @@ class ImmersiveActivity : AppSystemActivity() {
                 val attachment = entity.tryGetComponent<AvatarAttachment>() ?: continue
                 val transform = entity.tryGetComponent<Transform>() ?: continue
                 val controller = entity.tryGetComponent<Controller>() ?: continue
-                val hand = if (attachment.type == "hand_left") HAND_LEFT else HAND_RIGHT
+                // Types are "left_controller" / "right_controller" / "left_hand" / "right_hand".
+                // Only the active pair (controllers or tracked hands) reports buttons; the
+                // inactive pair reports 0 and would overwrite the active one's state each frame.
+                if (!controller.isActive) continue
+                val hand = if (attachment.type.startsWith("left")) HAND_LEFT else HAND_RIGHT
 
                 val buttons = controller.buttonState.toLong()
+                if (buttons != prevButtons[hand]) {
+                    prevButtons[hand] = buttons
+                    Log.d(TAG, "🎮 ${attachment.type} buttons: 0x${java.lang.Long.toHexString(buttons)}")
+                }
 
                 val p = transform.transform.t
                 val q = transform.transform.q
                 nativeSetControllerState(hand, buttons, p.x, p.y, p.z, q.x, q.y, q.z, q.w)
 
                 if (hand == HAND_LEFT) {
-                    updateControllerState(leftState, transform.transform, buttons)
+                    updateControllerState(leftState, HAND_LEFT, transform.transform, buttons)
                     processLeftController(leftState)
                 } else {
-                    updateControllerState(rightState, transform.transform, buttons)
+                    updateControllerState(rightState, HAND_RIGHT, transform.transform, buttons)
                     processRightController(rightState, entity)
                 }
             }
         }
 
-        private fun updateControllerState(state: ControllerState, pose: Pose, buttons: Long) {
+        private fun updateControllerState(state: ControllerState, hand: Int, pose: Pose, buttons: Long) {
+            val left = hand == HAND_LEFT
             state.buttonA = (buttons and BUTTON_A) != 0L
             state.buttonB = (buttons and BUTTON_B) != 0L
             state.buttonX = (buttons and BUTTON_X) != 0L
             state.buttonY = (buttons and BUTTON_Y) != 0L
-            state.trigger = (buttons and TRIGGER_MASK) != 0L
-            state.grip = (buttons and GRIP_MASK) != 0L
+            state.trigger = (buttons and (if (left) TRIGGER_L else TRIGGER_R)) != 0L
+            state.grip = (buttons and (if (left) GRIP_L else GRIP_R)) != 0L
             state.pose = pose
         }
 
         private fun processLeftController(state: ControllerState) {
             if (locomotionEnabled) {
-                // Explore mode: X = toggle x-ray, Y = toggle room label beacons
+                // Explore mode: X = toggle x-ray, Y = toggle room label beacons,
+                // trigger = back to the front door, where the prompt panels are
                 val now = System.currentTimeMillis()
+                if (state.trigger && !prevLeftTrigger) {
+                    returnToPanels()
+                }
+                prevLeftTrigger = state.trigger
                 if (state.buttonX && (now - xrayDebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
                     xrayDebounceTimer = now
                     toggleXRay()
@@ -2295,6 +2328,10 @@ class ImmersiveActivity : AppSystemActivity() {
                 }
             },
             PanelRegistration(R.layout.room_label) {
+                // The SDK runs this block again for every label panel it creates, and config/panel
+                // append to lists it never clears — so add them once, or panel N runs N callbacks.
+                if (roomLabelPanelConfigured) return@PanelRegistration
+                roomLabelPanelConfigured = true
                 config {
                     width = 0.8f
                     height = 0.4f
@@ -2304,7 +2341,7 @@ class ImmersiveActivity : AppSystemActivity() {
                     val wv = rootView?.findViewById<WebView>(R.id.label_web_view) ?: return@panel
                     wv.settings.javaScriptEnabled = false
                     wv.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    val info = pendingRoomLabels.poll() ?: return@panel
+                    val info = roomLabelInfo[entity] ?: return@panel
                     val sizeText = if (info.width > 0 && info.depth > 0) {
                         // RoomInfo is in scaled world metres; show the real size in feet.
                         val toFt = 1f / (HouseGenerator.SCALE * 0.3048f)
