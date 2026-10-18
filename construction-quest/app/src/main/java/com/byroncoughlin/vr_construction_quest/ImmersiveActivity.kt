@@ -70,6 +70,11 @@ data class ControllerState(
     var buttonY: Boolean = false,
     var trigger: Boolean = false,
     var grip: Boolean = false,
+    // Thumbstick pushed forward / back / left / right (digital, from ButtonBits).
+    var stickUp: Boolean = false,
+    var stickDown: Boolean = false,
+    var stickLeft: Boolean = false,
+    var stickRight: Boolean = false,
     var pose: Pose = Pose()
 )
 
@@ -176,6 +181,16 @@ class ImmersiveActivity : AppSystemActivity() {
         // How far in front of the player (along -z) the panels sit. 1.7 m was close
         // enough that the panels were hard to grab and move.
         private const val PANEL_DISTANCE = 2.6f
+        // Web dashboard panel: left of the prompt panel (which spans x -0.3 .. 0.9).
+        private const val WEB_PANEL_X = -1.9f
+        // Left-stick walking speed (m/s). The house is built at 2x scale, so this is brisk
+        // enough to get round a large house to the back yard.
+        private const val WALK_SPEED = 3.0f
+        // Right-trigger teleport: furthest point on the ground that can be aimed at (m).
+        private const val TELEPORT_RANGE = 40f
+        // How far a controller ray looks for a panel before treating a trigger/grip
+        // press as "grab the panel" rather than teleport / return / record.
+        private const val PANEL_REACH = 15f
         // Prompt panel: 1.2 x 1.2 centred at x=0.3 (so it spans x -0.3 .. 0.9).
         private const val PROMPT_PANEL_SIZE = 1.2f
         // Review image panel: twice the prompt panel in each dimension, parked to its
@@ -215,6 +230,14 @@ class ImmersiveActivity : AppSystemActivity() {
         val TRIGGER_R = ButtonBits.ButtonTriggerR.toLong()
         val GRIP_L = ButtonBits.ButtonSqueezeL.toLong()
         val GRIP_R = ButtonBits.ButtonSqueezeR.toLong()
+        val THUMB_LU = ButtonBits.ButtonThumbLU.toLong()
+        val THUMB_LD = ButtonBits.ButtonThumbLD.toLong()
+        val THUMB_LL = ButtonBits.ButtonThumbLL.toLong()
+        val THUMB_LR = ButtonBits.ButtonThumbLR.toLong()
+        val THUMB_RU = ButtonBits.ButtonThumbRU.toLong()
+        val THUMB_RD = ButtonBits.ButtonThumbRD.toLong()
+        val THUMB_RL = ButtonBits.ButtonThumbRL.toLong()
+        val THUMB_RR = ButtonBits.ButtonThumbRR.toLong()
 
         const val HAND_LEFT = 0
         const val HAND_RIGHT = 1
@@ -748,7 +771,7 @@ class ImmersiveActivity : AppSystemActivity() {
             .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         val details = buildList {
             currentFloorPlanVersion?.let { add("Floor plan v$it") }
-            if (currentProjectId != null) add("Hold grip to change the floor plan")
+            if (currentProjectId != null) add("Hold grip to change the house or yard")
             add("Left trigger returns here")
         }.joinToString(" • ")
         val html = """
@@ -891,7 +914,13 @@ class ImmersiveActivity : AppSystemActivity() {
                 progressBar?.setStateColor(VRProgressBar.ProgressState.COMPLETE)
                 dismissProgressBar(1500)
                 returnFromRefine()
-                dashboardWebView?.let { loadRefineHintHtml(it, null) }
+                // Parts of the change that could not be built ("Hallway has no back
+                // outside wall for a sliding glass door"), so they don't vanish silently.
+                val notes = geometry.optJSONArray("notes")
+                    ?.let { arr -> (0 until arr.length()).map { arr.optString(it) } }
+                    .orEmpty().filter { it.isNotBlank() }
+                if (notes.isNotEmpty()) showPanel()
+                dashboardWebView?.let { loadRefineHintHtml(it, null, notes) }
             }
         }
     }
@@ -911,13 +940,34 @@ class ImmersiveActivity : AppSystemActivity() {
         }
     }
 
-    /** Prompt-2 panel, with [error] (if any) from the last floor-plan change on top. */
-    private fun loadRefineHintHtml(wv: WebView, error: String?) {
-        if (error == null) {
+    /**
+     * Prompt-2 panel, with [error] (if any) from the last floor-plan change on top,
+     * or the [notes] on what the change left out.
+     */
+    private fun loadRefineHintHtml(wv: WebView, error: String?, notes: List<String> = emptyList()) {
+        fun esc(text: String) = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        if (error == null && notes.isEmpty()) {
             loadPrompt2Html(wv)
             return
         }
-        val safe = error.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        if (error == null) {
+            val items = notes.joinToString("") { "<li>${esc(it)}</li>" }
+            wv.loadDataWithBaseURL(null, """
+                <!DOCTYPE html><html>
+                <body style="margin:0;padding:32px;background:#1A1A2E;color:white;
+                             font-family:sans-serif;display:flex;flex-direction:column;
+                             align-items:center;justify-content:center;height:100vh;box-sizing:border-box;">
+                  <p style="font-size:24px;color:#FFB74D;margin-bottom:12px;">⚠️ Changed, but some of it didn't fit</p>
+                  <ul style="font-size:18px;color:#DDDDDD;margin:0 0 16px;">$items</ul>
+                  <p style="font-size:18px;color:#AAAAAA;text-align:center;">
+                    Hold the <strong style="color:white;">grip</strong> to try it another way, or
+                    <strong style="color:white;">A</strong> to describe the look.
+                  </p>
+                </body></html>
+            """.trimIndent(), "text/html", "UTF-8", null)
+            return
+        }
+        val safe = esc(error)
         val html = """
             <!DOCTYPE html><html>
             <body style="margin:0;padding:32px;background:#1A1A2E;color:white;
@@ -1117,7 +1167,16 @@ class ImmersiveActivity : AppSystemActivity() {
         wv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
     }
 
-    private fun loadRenderingHtml(wv: WebView) {
+    /** [gripNote]: the grip was pressed, so say why changes have to wait. */
+    private fun loadRenderingHtml(wv: WebView, gripNote: Boolean = false) {
+        val note = if (gripNote) {
+            "<p style=\"font-size:20px;color:#FFB74D;text-align:center;margin-top:24px;\">" +
+                "✋ Changes to the house or yard can be made once the picture is ready.<br>" +
+                "Accept it (A) or press B, then hold the right grip.</p>"
+        } else {
+            "<p style=\"font-size:16px;color:#888888;text-align:center;margin-top:24px;\">" +
+                "Want to change the house or yard? Hold the right grip after the picture is ready.</p>"
+        }
         val html = """
             <!DOCTYPE html><html>
             <body style="margin:0;padding:32px;background:#1A1A2E;color:white;
@@ -1127,6 +1186,7 @@ class ImmersiveActivity : AppSystemActivity() {
               <p style="font-size:18px;color:#AAAAAA;text-align:center;">
                 Look around while the image is generated — it will appear for review.
               </p>
+              $note
             </body></html>
         """.trimIndent()
         wv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
@@ -1136,10 +1196,11 @@ class ImmersiveActivity : AppSystemActivity() {
         val forward = pose.q * Vector3(0f, 0f, -1f)
         if (forward.y >= 0f) return  // must aim downward toward floor
         val t = -pose.t.y / forward.y  // parametric distance to y=0 plane
-        if (t < 0.3f || t > 20.0f) return  // too close or too far
+        if (t < 0.3f || t > TELEPORT_RANGE) return  // too close or too far
         val tx = pose.t.x + forward.x * t
         val tz = pose.t.z + forward.z * t
-        scene.setViewOrigin(tx, 0f, tz, 0f)
+        // Keep the way the player faces (snap turns), not reset it to 0.
+        scene.setViewOrigin(tx, 0f, tz, scene.getViewSceneRotation())
         Log.i(TAG, "🌀 Teleported to (${"%.1f".format(tx)}, ${"%.1f".format(tz)})")
     }
 
@@ -1147,6 +1208,41 @@ class ImmersiveActivity : AppSystemActivity() {
      * Put the player back at the spawn point outside the front door, facing the prompt
      * panel, house sign and review panel (all placed relative to [panelAnchor]).
      */
+    /**
+     * True when the controller at [pose] points at a grabbable panel within [PANEL_REACH]: its
+     * trigger/grip is then grabbing that panel, not teleporting or recording.
+     */
+    private fun pointingAtPanel(pose: Pose): Boolean {
+        val forward = pose.q * Vector3(0f, 0f, -1f)
+        val hit = scene.lineSegmentIntersect(pose.t, pose.t + forward * PANEL_REACH) ?: return false
+        return hit.entity?.hasComponent<Grabbable>() == true
+    }
+
+    /**
+     * Left stick: walk toward where the head faces (up/down) or sideways (left/right),
+     * anywhere — through doorways, out into the yard and round the house. Walls do not
+     * block it, so a stray push can step through one; Left trigger still goes back.
+     */
+    private fun walk(state: ControllerState, dt: Float) {
+        val ahead = (if (state.stickUp) 1f else 0f) - (if (state.stickDown) 1f else 0f)
+        val side = (if (state.stickRight) 1f else 0f) - (if (state.stickLeft) 1f else 0f)
+        if (ahead == 0f && side == 0f) return
+        val look = scene.getViewerPose().q * Vector3(0f, 0f, -1f)
+        val len = Math.sqrt((look.x * look.x + look.z * look.z).toDouble()).toFloat()
+        if (len < 1e-3f) return  // looking straight up or down
+        val fx = look.x / len
+        val fz = look.z / len
+        // Right of the facing direction (fx, fz) is (-fz, fx).
+        val step = WALK_SPEED * dt
+        val origin = scene.getViewOrigin()
+        scene.setViewOrigin(
+            origin.x + (fx * ahead - fz * side) * step,
+            0f,
+            origin.z + (fz * ahead + fx * side) * step,
+            scene.getViewSceneRotation(),
+        )
+    }
+
     private fun returnToPanels() {
         scene.setViewOrigin(panelAnchor.x, 0f, panelAnchor.z, 0f)
         Log.i(TAG, "🚪 Returned to the front door (${"%.1f".format(panelAnchor.x)}, ${"%.1f".format(panelAnchor.z)})")
@@ -1320,14 +1416,17 @@ class ImmersiveActivity : AppSystemActivity() {
         destroyHouseSign()
         panelAnchor = Vector3(0f, 0f, 0f)
         placePromptPanel()
-        webPanelEntity?.setComponent(Transform(Pose(t = Vector3(-1.9f, 1.1f, -PANEL_DISTANCE))))
         showPanel()
         dashboardWebView?.let { loadIdleHtml(it) }
     }
 
+    /** The prompt panel and the web dashboard panel, in front of [panelAnchor]. */
     private fun placePromptPanel() {
         dashboardPanelEntity?.setComponent(Transform(Pose(
             t = Vector3(panelAnchor.x + 0.3f, 1.1f, panelAnchor.z - PANEL_DISTANCE)
+        )))
+        webPanelEntity?.setComponent(Transform(Pose(
+            t = Vector3(panelAnchor.x + WEB_PANEL_X, 1.1f, panelAnchor.z - PANEL_DISTANCE)
         )))
     }
 
@@ -1336,8 +1435,9 @@ class ImmersiveActivity : AppSystemActivity() {
     private fun loadPrompt2Html(wv: WebView) {
         val refineHint = if (currentProjectId != null) """
               <p style="font-size:15px;color:#888;text-align:center;margin-top:14px;">
-                Want a different layout? Hold the <strong style="color:white;">grip</strong> and say
-                what to change — "make the kitchen bigger".
+                Want changes? Hold the <strong style="color:white;">grip</strong> and say
+                what to change — "make the kitchen bigger", "tile roof and beige stucco",
+                "palm trees by the front door".
               </p>""" else ""
         val html = """
             <!DOCTYPE html><html>
@@ -1453,7 +1553,7 @@ class ImmersiveActivity : AppSystemActivity() {
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
             
-            houseGenerator = HouseGenerator(SERVER_URL)
+            houseGenerator = HouseGenerator(SERVER_URL, this)
             
             // Connect to real-time collaboration room
             connectToRoom("tiny_house_room", "quest_user_${System.currentTimeMillis() % 1000}")
@@ -1625,7 +1725,7 @@ class ImmersiveActivity : AppSystemActivity() {
         Log.i(TAG, "🌐 Creating web panel entity programmatically")
         val webPanelEntityLocal = Entity.create()
         webPanelEntityLocal.setComponent(Panel(R.layout.web_panel))
-        webPanelEntityLocal.setComponent(Transform(Pose(t = Vector3(-1.9f, 1.1f, -PANEL_DISTANCE))))
+        webPanelEntityLocal.setComponent(Transform(Pose(t = Vector3(WEB_PANEL_X, 1.1f, -PANEL_DISTANCE))))
         webPanelEntityLocal.setComponent(Grabbable())
         webPanelEntityLocal.setComponent(Visible(true))
         webPanelEntity = webPanelEntityLocal
@@ -1642,11 +1742,20 @@ class ImmersiveActivity : AppSystemActivity() {
         private var roomLabelDebounceTimer = 0L
         private var prevButtonB = false
         private var prevLeftTrigger = false
+        private var lastFrameNanos = 0L
+        private var frameSeconds = 0f
         private val prevButtons = LongArray(2)
         private var gripDebounceTimer = 0L
+        /** The "changes wait for the picture" note is up for this rendering. */
+        private var gripBusyNoticeShown = false
 
         override fun execute() {
             if (!isLibraryLoaded) return
+            val frameNanos = System.nanoTime()
+            // Capped so a hitch does not fling the player across the yard.
+            frameSeconds = if (lastFrameNanos == 0L) 0f
+                else ((frameNanos - lastFrameNanos) / 1e9f).coerceAtMost(0.1f)
+            lastFrameNanos = frameNanos
 
             val query = Query.where {
                 has(AvatarAttachment.id, Transform.id, Controller.id)
@@ -1692,6 +1801,10 @@ class ImmersiveActivity : AppSystemActivity() {
             state.buttonY = (buttons and BUTTON_Y) != 0L
             state.trigger = (buttons and (if (left) TRIGGER_L else TRIGGER_R)) != 0L
             state.grip = (buttons and (if (left) GRIP_L else GRIP_R)) != 0L
+            state.stickUp = (buttons and (if (left) THUMB_LU else THUMB_RU)) != 0L
+            state.stickDown = (buttons and (if (left) THUMB_LD else THUMB_RD)) != 0L
+            state.stickLeft = (buttons and (if (left) THUMB_LL else THUMB_RL)) != 0L
+            state.stickRight = (buttons and (if (left) THUMB_LR else THUMB_RR)) != 0L
             state.pose = pose
         }
 
@@ -1700,9 +1813,11 @@ class ImmersiveActivity : AppSystemActivity() {
                 // Explore mode: X = toggle x-ray, Y = toggle room label beacons,
                 // trigger = back to the front door, where the prompt panels are
                 val now = System.currentTimeMillis()
-                if (state.trigger && !prevLeftTrigger) {
+                // Not while pointing at a panel: that trigger press is grabbing it.
+                if (state.trigger && !prevLeftTrigger && !pointingAtPanel(state.pose)) {
                     returnToPanels()
                 }
+                walk(state, frameSeconds)
                 prevLeftTrigger = state.trigger
                 if (state.buttonX && (now - xrayDebounceTimer > DEBOUNCE_TIMEOUT_MS)) {
                     xrayDebounceTimer = now
@@ -1729,7 +1844,8 @@ class ImmersiveActivity : AppSystemActivity() {
             if (locomotionEnabled) {
                 // Explore mode: trigger = teleport, B = clear house
                 val now = System.currentTimeMillis()
-                if (state.trigger && (now - teleportDebounceTimer > 300L)) {
+                if (state.trigger && (now - teleportDebounceTimer > 300L) &&
+                    !pointingAtPanel(state.pose)) {
                     teleportDebounceTimer = now
                     handleTeleportation(state.pose)
                 }
@@ -1795,6 +1911,16 @@ class ImmersiveActivity : AppSystemActivity() {
                     onRetryTranscription()
                 }
                 return
+            }
+
+            // The grip can't record a change while the picture renders: say so instead
+            // of ignoring it.
+            if (voiceState != VoiceState.GENERATING_IMAGE) gripBusyNoticeShown = false
+            if (voiceState == VoiceState.GENERATING_IMAGE && state.grip && !gripBusyNoticeShown &&
+                currentProjectId != null) {
+                gripBusyNoticeShown = true
+                Log.i(TAG, "✋ Grip pressed while the picture renders — changes wait until it's ready")
+                dashboardWebView?.let { loadRenderingHtml(it, gripNote = true) }
             }
 
             // Block input while generating image or geometry
@@ -1873,6 +1999,8 @@ class ImmersiveActivity : AppSystemActivity() {
             val canRefine = currentProjectId != null && !isRecording && !transcribing &&
                 (voiceState == VoiceState.READY_FOR_PROMPT2 || voiceState == VoiceState.WALKING)
             if (!canRefine || !state.grip || state.buttonA) return false
+            // Gripping a panel to move it, not asking for a change.
+            if (pointingAtPanel(state.pose)) return false
             gripDebounceTimer = now
             isRecording = true
             refineReturnState = voiceState

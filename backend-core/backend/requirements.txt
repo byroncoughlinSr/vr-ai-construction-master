@@ -20,6 +20,7 @@ aiofiles==23.2.1
 # Image Processing
 pillow==10.2.0
 numpy==1.26.3
+trimesh==4.4.9  # normalises the 3D plant models (plant_model_service.py)
 compel==2.0.2
 
 # AI/ML Core (CUDA enabled)

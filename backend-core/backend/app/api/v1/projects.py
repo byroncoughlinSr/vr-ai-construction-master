@@ -13,7 +13,7 @@ from ...schemas.project import (
     ProjectListResponse, ProjectStats
 )
 from ...services import get_image_service
-from ...services import floor_plan_service
+from ...services import floor_plan_service, plant_model_service
 from ...services.floor_plan_service import FloorPlanError
 from .image_jobs import start_image_generation
 
@@ -379,32 +379,56 @@ def update_floor_plan(project_id: int, update: FloorPlanUpdate, db: Session = De
 
 @router.post("/{project_id}/floor-plan/refine")
 async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db: Session = Depends(get_db)):
-    """Change the floor plan in words; the AI's revision is saved as a new version.
+    """Change the house in words; used by the headset's voice refinement and the dashboard.
 
-    Used by the headset's in-house voice refinement and the dashboard.
+    A change to the rooms is saved as a new floor-plan version. A change to only
+    the outside (roof, walls, yard) updates the current version in place;
+    ``updated_in_place`` says which happened.
     """
     from .ai_planning import planning_service  # one shared planner (and its Ollama probe state)
 
     current = _current_plan(db, project_id)
     logger.info(f"✏️  Refining project {project_id} v{current.version}: {refine.instruction[:160]}")
     try:
-        result = await planning_service.refine_floor_plan(current.structure, refine.instruction)
+        result = await planning_service.refine_floor_plan(
+            current.structure, refine.instruction,
+            site=floor_plan_service.site_summary(
+                current, plant_models=[m["name"] for m in plant_model_service.ready_models(db)],
+            ),
+        )
     except Exception as e:
         logger.error(f"❌ Floor plan refinement failed: {e}")
         raise HTTPException(status_code=502, detail=f"Refinement failed: {e}")
 
-    structure = (result.get("plan") or {}).get("project_structure") or {}
+    revised = result.get("plan") or {}
+    structure = revised.get("project_structure") or {}
+    exterior = revised.get("exterior", structure.get("exterior"))
+    scope = str(revised.get("scope") or "").strip().lower()
+    if scope not in ("exterior", "floor_plan", "both"):
+        scope = "floor_plan" if structure.get("rooms") else "exterior" if exterior is not None else "floor_plan"
+    logger.info(f"✏️  Change scope: {scope}")
+
     try:
-        plan = floor_plan_service.add_floor_plan_version(
-            db, project_id, current.name, structure,
-            change_type="refined", change_note=refine.instruction, source=result.get("source"),
-        )
+        if scope == "exterior":
+            if exterior is None:
+                raise FloorPlanError("the AI returned no exterior")
+            plan = floor_plan_service.update_exterior(db, current, exterior, source=result.get("source"))
+        else:
+            # A rename the AI may have applied in only some places.
+            structure = floor_plan_service.rename_rooms(structure, revised.get("renames"))
+            if exterior is not None:
+                structure = {**structure, "exterior": exterior}
+            plan = floor_plan_service.add_floor_plan_version(
+                db, project_id, current.name, structure,
+                change_type="refined", change_note=refine.instruction, source=result.get("source"),
+            )
     except FloorPlanError as e:
         db.rollback()
+        logger.warning(f"⚠️  Revised floor plan rejected: {e}")
         raise HTTPException(status_code=422, detail=f"The revised plan is not buildable: {e}")
     db.commit()
     db.refresh(plan)
-    return _new_version_response(db, plan)
+    return {**_new_version_response(db, plan), "updated_in_place": scope == "exterior"}
 
 
 @router.put("/{project_id}/floor-plan/image")

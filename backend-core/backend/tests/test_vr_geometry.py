@@ -77,6 +77,120 @@ def test_unmatched_connects_to_prefers_circulation_room():
     assert bedroom_doors in ({(4, 5)}, {(1, 4)})
 
 
+def test_no_door_to_removes_an_automatically_added_door():
+    rooms = house()
+    rooms[1]["connects_to"] = ["Hallway"]  # Kitchen is no longer requested from anywhere
+    assert (2, 3) in interior_pairs(geo.build_geometry_from_rooms(rooms))  # added for reachability
+    rooms[1]["no_door_to"] = ["Kitchen"]
+    g = geo.build_geometry_from_rooms(rooms)
+    pairs = interior_pairs(g)
+    assert (2, 3) not in pairs
+    assert (3, 6) in pairs  # reached through the bathroom instead
+    assert g["notes"] == []
+
+
+def test_no_door_to_beats_connects_to():
+    rooms = house()
+    rooms[2]["no_door_to"] = "Living Room"  # a lone name; Living Room still lists Kitchen
+    assert (2, 3) not in interior_pairs(geo.build_geometry_from_rooms(rooms))
+
+
+def test_no_door_to_keeps_the_only_way_in_and_says_so():
+    rooms = house()
+    rooms[1]["connects_to"] = ["Hallway"]
+    rooms[2]["no_door_to"] = ["Living Room", "Bathroom"]  # both of the kitchen's neighbours
+    g = geo.build_geometry_from_rooms(rooms)
+    assert any(3 in p for p in interior_pairs(g))
+    assert any("Kitchen" in n and "only way" in n for n in g["notes"])
+
+
+def _side_x_or_z(room_out, opening):
+    """Which side of a built room an opening (door/window) sits on."""
+    b, p = room_out["bounds"], opening["position"]
+    if opening["rotation"] == 0:
+        return "front" if abs(p["z"] - b["z0"]) < 1e-3 else "back" if abs(p["z"] - b["z1"]) < 1e-3 else None
+    return "left" if abs(p["x"] - b["x0"]) < 1e-3 else "right" if abs(p["x"] - b["x1"]) < 1e-3 else None
+
+
+def test_solid_wall_moves_the_doorway_off_it():
+    rooms = house()
+    rooms[2]["solid_walls"] = ["left"]  # Kitchen's wall to the Living Room
+    g = geo.build_geometry_from_rooms(rooms)
+    pairs = interior_pairs(g)
+    assert (2, 3) not in pairs
+    assert (3, 6) in pairs  # through the bathroom instead
+    assert g["rooms"][2]["solid_walls"] == ["left"]
+    assert g["notes"] == []
+
+
+def test_solid_walls_get_no_windows_or_outside_doors():
+    rooms = house()
+    rooms[2]["solid_walls"] = ["front", "right wall"]  # both of the kitchen's outside walls
+    rooms[2]["outside_doors"] = [{"side": "right", "style": "sliding_glass"}]
+    g = geo.build_geometry_from_rooms(rooms)
+    assert not [w for w in g["windows"] if w["room"] == 3]
+    assert not [d for d in g["doors"] if d["door_type"] == "patio"]
+    assert any("kept solid" in n for n in g["notes"])
+
+
+def test_front_door_avoids_a_solid_wall():
+    rooms = house()
+    rooms[0]["solid_walls"] = "front"
+    g = geo.build_geometry_from_rooms(rooms)
+    front = next(d for d in g["doors"] if d["door_type"] == "exterior")
+    assert _side_x_or_z(g["rooms"][0], front) == "left"
+    assert g["notes"] == []
+
+
+def test_window_can_be_removed_or_put_on_a_side():
+    rooms = house()
+    rooms[1]["window"] = False  # Living Room
+    rooms[2]["window"] = {"side": "right"}  # Kitchen
+    g = geo.build_geometry_from_rooms(rooms)
+    assert not [w for w in g["windows"] if w["room"] == 2]
+    kitchen_windows = [w for w in g["windows"] if w["room"] == 3]
+    assert [_side_x_or_z(g["rooms"][2], w) for w in kitchen_windows] == ["right"]
+
+
+def test_kitchen_keeps_its_last_clean_wall_for_counters():
+    rooms = house()
+    # Doorways on the left (Living Room) and back (Bathroom), a sliding door on the
+    # right: only the front wall is left clean, so it gets no window.
+    rooms[2]["connects_to"] = ["Bathroom"]
+    rooms[2]["outside_doors"] = [{"side": "right", "style": "sliding_glass"}]
+    g = geo.build_geometry_from_rooms(rooms)
+    assert not [w for w in g["windows"] if w["room"] == 3]
+    rooms[2]["name"] = "Den"  # any other room does get one
+    rooms[1]["connects_to"] = ["Den", "Hallway"]
+    g = geo.build_geometry_from_rooms(rooms)
+    assert [_side_x_or_z(g["rooms"][2], w) for w in g["windows"] if w["room"] == 3] == ["front"]
+
+
+def test_open_to_removes_the_wall_between_rooms():
+    rooms = house()
+    rooms[1]["connects_to"] = ["Hallway"]
+    rooms[1]["open_to"] = ["Kitchen"]
+    g = geo.build_geometry_from_rooms(rooms)
+    assert not [p for p in interior_pairs(g) if 3 in p]  # joined without a door
+    assert [o["rooms"] for o in g["open_walls"]] == [[2, 3]]
+    assert g["rooms"][1]["open_to"] == [3] and g["rooms"][2]["open_to"] == [2]
+    x = g["rooms"][2]["bounds"]["x0"]  # the shared wall
+    z0, z1 = g["rooms"][2]["bounds"]["z0"], g["rooms"][2]["bounds"]["z1"]
+    for room_out in (g["rooms"][1], g["rooms"][2]):
+        for w in room_out["walls"]:
+            on_line = abs(w["start"]["x"] - x) < 1e-3 and abs(w["end"]["x"] - x) < 1e-3
+            lo, hi = sorted((w["start"]["z"], w["end"]["z"]))
+            assert not (on_line and w["start"]["y"] == 0 and hi > z0 + 0.2 and lo < z1 - 0.2)
+
+
+def test_open_to_a_room_that_does_not_touch_is_reported():
+    rooms = house()
+    rooms[0]["open_to"] = ["Bathroom"]
+    g = geo.build_geometry_from_rooms(rooms)
+    assert g["open_walls"] == []
+    assert any("don't share a wall" in n for n in g["notes"])
+
+
 def test_walls_have_a_hole_at_each_door_on_both_sides():
     g = geo.build_geometry_from_rooms(house())
     door = next(d for d in g["doors"] if sorted(d["rooms"]) == [1, 2])
@@ -421,3 +535,102 @@ def test_deep_angled_bay_steepens_its_sides_instead_of_turning_into_a_box():
     living = by_name(g)["Living Room"]["id"]
     rotations = sorted(abs(w["rotation"]) for w in g["windows"] if w["room"] == living)
     assert rotations[0] == 0 and 45 < rotations[1] < 90
+
+
+# Doors to the yard ("outside_doors")
+
+def door_house(kitchen_doors, kitchen_extra=None):
+    # Living Room (entry) | Kitchen, both 20 x 14 ft, street side in front.
+    layout = {"length": 40, "width": 14, "entry": "Living Room", "split": "x", "parts": [
+        {"size": 20, "room": "Living Room"}, {"size": 20, "room": "Kitchen"}]}
+    rooms = [
+        {"name": "Living Room", "dimensions": {"height": 9}, "connects_to": ["Kitchen"]},
+        {"name": "Kitchen", "dimensions": {"height": 9}, "outside_doors": kitchen_doors, **(kitchen_extra or {})},
+    ]
+    return geo.build_geometry_from_rooms(rooms, layout=layout)
+
+
+def test_sliding_glass_door_to_the_back_yard():
+    g = door_house([{"side": "back", "style": "sliding glass", "width": 6}])
+    kitchen = by_name(g)["Kitchen"]
+    patio = [d for d in g["doors"] if d["door_type"] == "patio"]
+    assert len(patio) == 1
+    door = patio[0]
+    assert door["style"] == "sliding_glass" and door["side"] == "back"
+    assert door["rooms"] == [kitchen["id"]]
+    assert door["width"] == pytest.approx(6 * geo.FT_TO_M, abs=1e-3)
+    assert door["position"]["z"] == pytest.approx(kitchen["bounds"]["z1"])
+    assert door["rotation"] == 0
+    # The front door is still the only "exterior" door, and nothing was skipped.
+    assert [d["door_type"] for d in g["doors"]].count("exterior") == 1
+    assert g["notes"] == []
+
+
+def test_outside_door_cuts_a_hole_in_the_wall():
+    g = door_house([{"side": "back", "style": "sliding_glass", "width": 6}])
+    kitchen = by_name(g)["Kitchen"]
+    door = next(d for d in g["doors"] if d["door_type"] == "patio")
+    lo = door["position"]["x"] - door["width"] / 2
+    hi = door["position"]["x"] + door["width"] / 2
+    back = kitchen["bounds"]["z1"]
+    for w in kitchen["walls"]:
+        if w["start"]["z"] == pytest.approx(back) and w["end"]["z"] == pytest.approx(back):
+            a, b = sorted((w["start"]["x"], w["end"]["x"]))
+            crosses = a < hi - 1e-3 and b > lo + 1e-3
+            assert not crosses or w["start"]["y"] >= geo.DOOR_H - 1e-3, "wall left standing in the doorway"
+
+
+def test_window_keeps_clear_of_an_outside_door():
+    g = door_house([{"side": "back", "style": "french"}])
+    door = next(d for d in g["doors"] if d["door_type"] == "patio")
+    kitchen = by_name(g)["Kitchen"]
+    for w in g["windows"]:
+        if w["room"] == kitchen["id"] and w["position"]["z"] == pytest.approx(door["position"]["z"]):
+            gap = abs(w["position"]["x"] - door["position"]["x"])
+            assert gap >= (w["width"] + door["width"]) / 2
+
+
+def test_bay_window_keeps_clear_of_an_outside_door():
+    g = door_house(
+        [{"side": "back", "style": "sliding_glass", "width": 8}],
+        {"bay_window": {"side": "back", "width": 6, "style": "box"}},
+    )
+    door = next(d for d in g["doors"] if d["door_type"] == "patio")
+    bay = by_name(g)["Kitchen"]["bay_window"]
+    if bay is not None:
+        lo, hi = bay["outline"][0]["x"], bay["outline"][-1]["x"]
+        d_lo = door["position"]["x"] - door["width"] / 2
+        d_hi = door["position"]["x"] + door["width"] / 2
+        assert d_hi <= min(lo, hi) or d_lo >= max(lo, hi)
+
+
+def test_outside_door_on_an_inside_wall_is_skipped_with_a_note():
+    g = door_house([{"side": "left", "style": "sliding_glass"}])  # the Kitchen's left is the Living Room
+    assert not [d for d in g["doors"] if d["door_type"] == "patio"]
+    assert g["notes"] == ["Kitchen has no left outside wall for a sliding glass door"]
+
+
+def test_outside_door_shrinks_to_fit_its_wall():
+    g = door_house([{"side": "right", "style": "sliding_glass", "width": 40}])  # 14 ft wall
+    door = next(d for d in g["doors"] if d["door_type"] == "patio")
+    assert door["width"] <= 14 * geo.FT_TO_M - 2 * geo.EDGE_MARGIN + 1e-3
+    assert door["rotation"] == 90
+
+
+def test_skipped_bay_window_is_noted():
+    g = bay_house({"side": "right"})
+    assert g["notes"] == ["Living Room has no room for a right bay window"]
+
+
+@pytest.mark.parametrize("raw, expected", [
+    ({"side": "rear", "style": "Sliding Glass Door"}, [("back", "sliding_glass", 6.0)]),
+    ([{"side": "backyard", "style": "double french doors", "width": 6}], [("back", "french", 6.0)]),
+    ("left", [("left", "hinged", 3.0)]),
+    ([{"side": "up"}], []),
+    (None, []),
+    ([{"side": "back", "width": 1}], [("back", "hinged", 3.0)]),  # never narrower than a door
+])
+def test_outside_door_spec_parsing(raw, expected):
+    specs = geo.outside_door_specs({"outside_doors": raw})
+    got = [(s["side"], s["style"], round(s["width"] / geo.FT_TO_M, 1)) for s in specs]
+    assert got == expected

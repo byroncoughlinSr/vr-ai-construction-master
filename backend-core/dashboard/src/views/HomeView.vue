@@ -272,7 +272,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { useProjectsStore } from 'stores/projects'
 import { useMaterialsStore } from 'stores/materials'
-import { apiClient } from 'src/services/api'
 import BudgetPieChart from 'components/BudgetPieChart.vue'
 import CostTrendChart from 'components/CostTrendChart.vue'
 import TimelineGantt from 'components/TimelineGantt.vue'
@@ -437,78 +436,37 @@ const loadProjectToVR = (): void => {
     return
   }
   
-  // Show immediate feedback
-  $q.notify({
-    type: 'info',
-    message: `Loading "${projectName}" into VR`,
-    caption: 'Request sent to backend...',
-    timeout: 2000
-  })
-  
-  // Fire-and-forget: Send request without waiting for response
-  apiClient.post<{
-    success: boolean
-    project_id: number
-    project_name: string
-    generation_id: string
-    status: string
-    message: string
-    websocket_url: string
-    vr_geometry_url: string
-  }>(`/projects/${projectId}/load-to-vr`, {})
-    .then((response) => {
-      // Handle success in background
-      console.log(`✅ Project ${projectId} load initiated, generation_id: ${response.generation_id}`)
-      $q.notify({
-        type: 'positive',
-        message: 'VR load started successfully',
-        caption: 'Image generation in progress...',
-        timeout: 2000
-      })
-      
-      // Trigger VR Quest app to load the project
-      try {
-        // In the headset's WebView, ImmersiveActivity exposes `Android`. Pass the
-        // generation id so the headset shows the image this request started.
-        const android = (window as any).Android
-        if (android && typeof android.loadProjectWithImage === 'function' && response.generation_id) {
-          console.log(`📲 Calling Android.loadProjectWithImage(${projectId}, ${response.generation_id})`)
-          android.loadProjectWithImage(projectId, response.generation_id)
-          $q.notify({
-            type: 'positive',
-            message: 'VR loading...',
-            caption: 'Check your Quest headset!',
-            timeout: 3000
-          })
-        } else if (android && typeof android.loadProject === 'function') {
-          console.log(`📲 Calling Android.loadProject(${projectId})`)
-          android.loadProject(projectId)
-          $q.notify({
-            type: 'positive',
-            message: 'VR loading...',
-            caption: 'Check your Quest headset!',
-            timeout: 3000
-          })
-        } else {
-          console.log('ℹ️ Not in VR WebView - Android interface not available')
-        }
-      } catch (err) {
-        console.error('Failed to call Android.loadProject:', err)
-      }
+  // Only the house is loaded: no picture is started, so the headset is free to
+  // walk and take changes (grip) at once. In the headset's WebView,
+  // ImmersiveActivity exposes `Android`.
+  const android = (window as any).Android
+  if (!android || typeof android.loadProject !== 'function') {
+    $q.notify({
+      type: 'info',
+      message: 'Open the dashboard in the headset to load a house',
+      caption: 'Load to VR works from the Quest',
+      timeout: 3000
     })
-    .catch((err) => {
-      // Handle errors in background
-      console.error('Load to VR failed:', err)
-      $q.notify({
-        type: 'negative',
-        message: 'Failed to load project to VR',
-        caption: (err as Error).message,
-        timeout: 3000
-      })
+    return
+  }
+  try {
+    console.log(`📲 Calling Android.loadProject(${projectId})`)
+    android.loadProject(projectId)
+    $q.notify({
+      type: 'positive',
+      message: `Loading "${projectName}" into VR`,
+      caption: 'Check your Quest headset!',
+      timeout: 3000
     })
-  
-  // Don't wait - return immediately
-  console.log(`🚀 Load to VR request sent for project ${projectId}`)
+  } catch (err) {
+    console.error('Failed to call Android.loadProject:', err)
+    $q.notify({
+      type: 'negative',
+      message: 'Failed to load project to VR',
+      caption: (err as Error).message,
+      timeout: 3000
+    })
+  }
 }
 
 const formatCurrency = (value: number): string => {

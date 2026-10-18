@@ -6,6 +6,7 @@ import com.meta.spatial.core.Color4
 import com.meta.spatial.core.Entity
 import com.meta.spatial.core.Pose
 import com.meta.spatial.core.Vector3
+import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.Grabbable
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
@@ -34,7 +35,7 @@ data class RoomInfo(
  * HouseGenerator loads project data from the backend API and generates
  * walkable VR geometry for Meta Quest devices.
  */
-class HouseGenerator(private val serverUrl: String) {
+class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity) {
     companion object {
         private const val TAG = "HouseGenerator"
         const val SCALE = 2.0f
@@ -63,6 +64,7 @@ class HouseGenerator(private val serverUrl: String) {
     private val windowEntities = mutableListOf<Entity>()
     private val wallCeilingEntities = mutableListOf<Entity>()
     private val roomInfoList = mutableListOf<RoomInfo>()
+    private val exterior = ExteriorBuilder(activity)
     private var spawnPosition = Vector3(0f, 1.6f, -3.0f)
 
     /**
@@ -197,6 +199,9 @@ class HouseGenerator(private val serverUrl: String) {
             spawnPosition = Vector3(spawnRoom.centerX, 1.6f, spawnRoom.centerZ)
             Log.i(TAG, "📍 No spawn_position in JSON — using ${spawnRoom.name} center: (${spawnRoom.centerX}, 1.6, ${spawnRoom.centerZ})")
         }
+
+        // Roof, wall finish and yard, when the plan describes the outside.
+        geometry.optJSONObject("exterior")?.let { exterior.build(it) }
 
         val doors = geometry.optJSONArray("doors")
         val doorCount = doors?.length() ?: 0
@@ -404,8 +409,13 @@ class HouseGenerator(private val serverUrl: String) {
         val dirX = Math.cos(rad).toFloat()
         val dirZ = Math.sin(rad).toFloat()
         val quat = yawAlong(rotationDeg)
-        val isExterior = doorJson.optString("door_type") == "exterior"
-        val color = if (isExterior) Color4(0.25f, 0.18f, 0.12f, 1.0f) else Color4(0.4f, 0.3f, 0.2f, 1.0f)
+        val doorType = doorJson.optString("door_type")
+        val isExterior = doorType == "exterior" || doorType == "patio"
+        val color = if (isExterior) {
+            exterior.trimColor ?: Color4(0.25f, 0.18f, 0.12f, 1.0f)
+        } else {
+            Color4(0.4f, 0.3f, 0.2f, 1.0f)
+        }
 
         // Deeper than the wall so the frame shows on both faces.
         val trim = 0.08f
@@ -423,6 +433,105 @@ class HouseGenerator(private val serverUrl: String) {
             entity.setComponent(Material().apply {
                 baseColor = color
                 roughness = 0.6f
+                unlit = false
+            })
+            entity.setComponent(Transform(Pose(t = center, q = quat)))
+            entity.setComponent(Visible(true))
+            doorEntities.add(entity)
+        }
+        if (doorType == "patio") {
+            generateDoorLeaves(doorJson, x, z, width, height - trim, dirX, dirZ, rotationDeg, color)
+        }
+    }
+
+    /**
+     * The doors themselves for a door to the yard, left open so it can be walked
+     * through: a sliding glass door's moving panel is slid across the fixed one;
+     * French doors and a plain door stand swung out into the yard.
+     */
+    private fun generateDoorLeaves(
+        doorJson: JSONObject, x: Float, z: Float, width: Float, height: Float,
+        dirX: Float, dirZ: Float, rotationDeg: Float, frameColor: Color4,
+    ) {
+        val inner = width - 2 * 0.08f  // between the jambs
+        // Which way is outside: the wall side the backend put the door on.
+        val (outX, outZ) = when (doorJson.optString("side")) {
+            "front" -> 0f to -1f
+            "back" -> 0f to 1f
+            "left" -> -1f to 0f
+            "right" -> 1f to 0f
+            else -> 0f to 0f
+        }
+        val glass = Color4(0.7f, 0.9f, 1.0f, 0.3f)
+        when (doorJson.optString("style")) {
+            "sliding_glass" -> {
+                // Two panels on two tracks; the moving one is slid over the fixed one,
+                // leaving the other half open.
+                val panelW = inner / 2 + 0.04f
+                val track = WALL_THICKNESS / 4
+                val fixedAt = -inner / 4
+                for ((along, depthOffset) in listOf(fixedAt to -track, fixedAt + 0.12f to track)) {
+                    addLeaf(
+                        x + dirX * along + outX * depthOffset, z + dirZ * along + outZ * depthOffset,
+                        panelW, height, rotationDeg, glass, frameColor,
+                    )
+                }
+            }
+            "french" -> {
+                // Two glass leaves, hinged at the jambs, swung out square to the wall.
+                val leafW = inner / 2
+                for (hinge in listOf(-1f, 1f)) {
+                    val hx = x + dirX * hinge * inner / 2
+                    val hz = z + dirZ * hinge * inner / 2
+                    addLeaf(
+                        hx + outX * (leafW / 2 + WALL_THICKNESS / 2), hz + outZ * (leafW / 2 + WALL_THICKNESS / 2),
+                        leafW, height, rotationDeg + 90f, glass, frameColor,
+                    )
+                }
+            }
+            else -> {
+                // A plain door, open square to the wall at one jamb.
+                val hx = x - dirX * inner / 2
+                val hz = z - dirZ * inner / 2
+                addLeaf(
+                    hx + outX * (inner / 2 + WALL_THICKNESS / 2), hz + outZ * (inner / 2 + WALL_THICKNESS / 2),
+                    inner, height, rotationDeg + 90f, null, frameColor,
+                )
+            }
+        }
+    }
+
+    /**
+     * One door leaf [w] wide standing on the floor, centred on ([x], [z]) and running
+     * along [rotationDeg]: a glass pane in a frame, or a solid leaf when [glass] is null.
+     */
+    private fun addLeaf(
+        x: Float, z: Float, w: Float, h: Float, rotationDeg: Float, glass: Color4?, frameColor: Color4,
+    ) {
+        val rad = Math.toRadians(rotationDeg.toDouble())
+        val ax = Math.cos(rad).toFloat()
+        val az = Math.sin(rad).toFloat()
+        val quat = yawAlong(rotationDeg)
+        val stile = 0.06f
+        val thick = 0.05f
+        val boxes = if (glass == null) {
+            listOf(Triple(Vector3(x, h / 2, z), Vector3(w, h, thick), frameColor))
+        } else {
+            listOf(
+                Triple(Vector3(x, h / 2, z), Vector3(w - 2 * stile, h - 2 * stile, thick / 2), glass),
+                Triple(Vector3(x - ax * (w - stile) / 2, h / 2, z - az * (w - stile) / 2), Vector3(stile, h, thick), frameColor),
+                Triple(Vector3(x + ax * (w - stile) / 2, h / 2, z + az * (w - stile) / 2), Vector3(stile, h, thick), frameColor),
+                Triple(Vector3(x, stile / 2, z), Vector3(w, stile, thick), frameColor),
+                Triple(Vector3(x, h - stile / 2, z), Vector3(w, stile, thick), frameColor),
+            )
+        }
+        for ((center, size, color) in boxes) {
+            val entity = Entity.create()
+            entity.setComponent(Mesh(mesh = "mesh://box".toUri()))
+            entity.setComponent(centeredBox(size))
+            entity.setComponent(Material().apply {
+                baseColor = color
+                roughness = if (color === glass) 0.1f else 0.6f
                 unlit = false
             })
             entity.setComponent(Transform(Pose(t = center, q = quat)))
@@ -497,6 +606,7 @@ class HouseGenerator(private val serverUrl: String) {
         windowEntities.clear()
         wallCeilingEntities.clear()  // entities already destroyed above
         roomInfoList.clear()
+        exterior.clear()
     }
 
     /**
@@ -504,6 +614,7 @@ class HouseGenerator(private val serverUrl: String) {
      */
     fun setXRayEnabled(enabled: Boolean) {
         wallCeilingEntities.forEach { it.setComponent(Visible(!enabled)) }
+        exterior.setShellVisible(!enabled)
         Log.i(TAG, "${if (enabled) "🔍 X-ray ON" else "🔒 X-ray OFF"} | ${wallCeilingEntities.size} entities")
     }
 
