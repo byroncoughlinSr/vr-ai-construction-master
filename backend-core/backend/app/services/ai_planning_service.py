@@ -6,11 +6,28 @@ import time
 from typing import Optional, Dict, Any, List
 import ollama
 import google.generativeai as genai
-from groq import Groq
+from groq import APIStatusError, BadRequestError, Groq
 
 from ..config import settings
 
 logger = logging.getLogger(__name__)
+
+
+# The outside of the house, as both planning prompts describe it to the AI. The
+# backend cleans the result with vr_exterior.exterior_spec — keep them in step.
+EXTERIOR_FORMAT = """{"roof": {"style": "gable"|"hip"|"flat"|"shed", "material": "clay_tile"|"concrete_tile"|"asphalt_shingle"|"metal"|"slate"|"wood_shake", "color": "#rrggbb", "pitch": 5, "overhang": 1.5},
+ "walls": {"material": "stucco"|"siding"|"brick"|"stone"|"wood"|"paint", "color": "#rrggbb"},
+ "trim": {"color": "#rrggbb"},
+ "ground": {"material": "grass"|"gravel"|"dirt"|"sand"},
+ "landscape": [items]}
+- Colors are hex (beige stucco is about #e3d4b6, terracotta tile #b5562f). Leave out a part nobody asked for.
+- "pitch" is the roof's rise per 12 of run (Spanish/Mediterranean tile roofs are low, 3-5; most roofs 4-8). "overhang" is in feet.
+- Positions are in feet in the floor plan's coordinates: x runs left to right from the footprint's left edge (0) to its "length"; z runs from the street side (0) to the back ("width"). The front yard is negative z (up to about -30), the back yard is beyond "width", the side yards are x < 0 and x > "length". Open parts of the footprint are yard too. Never put an item inside the house's rooms.
+- Items:
+  - plants and rocks at a point: {"type": "tree"|"pine"|"palm"|"shrub"|"rock", "plant": "what it is, in the person's words: 'coral rose', 'Japanese maple', 'hydrangea', 'boxwood', 'lavender', 'agave', ...", "x": n, "z": n, "height": ft, "width": ft, "flower_color": "#rrggbb"} (all but type, x, z optional; "color" is the leaves'). Name the plant whenever the request does; SITE "plant_models" are plants with a 3D model: use that exact name.
+  - areas: {"type": "lawn"|"path"|"driveway"|"patio"|"deck"|"flower_bed"|"pool", "x": center x, "z": center z, "width": size along x, "depth": size along z, "material": "concrete"|"pavers"|"brick"|"stone"|"tile"|"gravel"|"asphalt"|"wood"} (material optional; a flower bed may name its "plant" ("tulips") and "color" is its flowers' color). A path or driveway may instead run in a line: {"type": "path", "from": {"x": n, "z": n}, "to": {"x": n, "z": n}, "width": ft}.
+  - lines: {"type": "hedge"|"fence"|"garden_wall", "from": {"x": n, "z": n}, "to": {"x": n, "z": n}, "height": ft, "style": "picket"|"privacy"}.
+  - Keep plants and rocks outside every room's rectangle (when the SITE lists them): "by" or "on each side of the front door" means the SITE's front_door "beside_it" spots (4 ft out from the door's wall, 5 ft to either side). A walkway to the front door runs from the street (z about -25) to the door. Space plants sensibly (trees 10+ ft apart, shrubs 3-4 ft apart); for "a row of" or "both sides of", list each plant."""
 
 
 class AIPlanningService:
@@ -94,15 +111,30 @@ class AIPlanningService:
         )
         return await self._run_provider_chain(prompt, "Plan")
 
-    async def refine_floor_plan(self, structure: Dict[str, Any], instruction: str) -> Dict[str, Any]:
-        """Apply a spoken/typed change ("make the kitchen bigger") to a floor plan.
+    async def refine_floor_plan(
+        self, structure: Dict[str, Any], instruction: str, site: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Apply a spoken/typed change ("make the kitchen bigger", "tile roof") to a house.
 
-        ``structure`` is a ``project_structure`` (``layout`` + ``rooms``, feet).
-        Returns the provider result; on success ``plan["project_structure"]`` is
-        the whole revised floor plan.
+        ``structure`` is a ``project_structure`` (``layout`` + ``rooms`` + ``exterior``,
+        feet); ``site`` is ``floor_plan_service.site_summary``. Returns the provider
+        result; on success ``plan["scope"]`` says what changed: ``"exterior"`` (only
+        ``plan["exterior"]``), else ``plan["project_structure"]`` is the whole revised plan.
         """
-        prompt = self._build_refine_prompt(structure, instruction)
-        return await self._run_provider_chain(prompt, "Floor plan refinement")
+        prompt = self._build_refine_prompt(structure, instruction, site)
+        result = await self._run_provider_chain(prompt, "Floor plan refinement")
+        # Groq sometimes answers a floor-plan change with only the "layout" (the
+        # room list lost to its miscounted braces): unusable, so ask once more.
+        plan = result.get("plan") or {}
+        revised = plan.get("project_structure")
+        if (
+            str(plan.get("scope") or "").strip().lower() != "exterior"
+            and isinstance(revised, dict) and revised.get("layout") is not None
+            and not isinstance(revised.get("rooms"), list)
+        ):
+            logger.warning("Refined floor plan came back without its room list — asking again")
+            result = await self._run_provider_chain(prompt, "Floor plan refinement")
+        return result
 
     async def _run_provider_chain(self, prompt: str, what: str) -> Dict[str, Any]:
         """Send ``prompt`` to Groq, then Ollama, then Gemini until one returns
@@ -149,21 +181,49 @@ class AIPlanningService:
 
             loop = asyncio.get_running_loop()
 
+            max_tokens = 4096
+
             def _groq_generate():
                 return self.groq_client.chat.completions.create(
                     model=settings.groq_model,
                     messages=[{'role': 'user', 'content': prompt}],
                     temperature=0.7,
                     top_p=0.9,
-                    max_tokens=4096,
+                    max_tokens=max_tokens,
                     response_format={'type': 'json_object'},
                 )
 
-            # Groq is fast; a short timeout is plenty
-            response = await asyncio.wait_for(
-                loop.run_in_executor(None, _groq_generate),
-                timeout=120.0
-            )
+            # Groq is fast; a short timeout is plenty. JSON mode rejects a whole
+            # answer over one bad character but sends the rejected text back with the
+            # error: repair that like any other, and if it is beyond repair ask once more.
+            for attempt in (1, 2):
+                try:
+                    response = await asyncio.wait_for(
+                        loop.run_in_executor(None, _groq_generate),
+                        timeout=120.0
+                    )
+                    break
+                except BadRequestError as e:
+                    failed = ((getattr(e, "body", None) or {}).get("error") or {}).get("failed_generation")
+                    if not failed:
+                        raise
+                    logger.warning("Groq's JSON check failed — repairing its output instead")
+                    result = self._parse_structured_plan(self._salvage_groq_json(failed), "groq")
+                    if result.get("success") or attempt == 2:
+                        return result
+                    logger.warning("Groq's output was beyond repair — asking Groq again")
+                except APIStatusError as e:
+                    # The per-minute token limit counts max_tokens as well as the
+                    # prompt, so a long house can be refused outright (413): ask
+                    # again with room for a shorter answer if one would still fit.
+                    # Groq's count is an estimate (a retry cut by exactly the
+                    # overrun was still ~90 over), hence the margin.
+                    over = self._groq_tokens_over(e)
+                    if attempt == 2 or over is None or max_tokens - over - 256 < 2048:
+                        raise
+                    max_tokens -= over + 256
+                    logger.warning(f"Groq token limit exceeded by {over} — retrying with max_tokens={max_tokens}")
+                    continue
 
             content = response.choices[0].message.content
             logger.info("Groq response received successfully")
@@ -177,6 +237,42 @@ class AIPlanningService:
         except Exception as e:
             logger.error(f"Groq generation failed: {e}")
             raise
+
+    @staticmethod
+    def _groq_tokens_over(error: Exception) -> Optional[int]:
+        """By how many tokens a request went over Groq's per-minute limit, from the
+        413 "Limit 8000, Requested 8258" message; None for any other error."""
+        if getattr(error, "status_code", None) != 413:
+            return None
+        match = re.search(r"Limit (\d+), Requested (\d+)", str(error))
+        return int(match.group(2)) - int(match.group(1)) if match else None
+
+    @staticmethod
+    def _salvage_groq_json(text: str) -> str:
+        """Repair the JSON Groq's JSON mode rejected. Seen on long floor plans: the
+        model miscounts its braces around "rooms" — leaving "layout" open so "rooms"
+        lands inside it, or closing "project_structure" early so "rooms" lands at the
+        top — then ends with a stray quote ('...]"}}}' or '...]"}}'). Drop the quote,
+        close what is still open, and put "rooms" back beside "layout". Anything
+        else goes to the usual repair pipeline unchanged."""
+        fixed = re.sub(r'([\]}])"(\s*\}+\s*)$', r'\1\2', text.strip())
+        obj = None
+        for closing in ("", "}", "}}", "}}}"):
+            try:
+                obj, _ = json.JSONDecoder().raw_decode(fixed + closing)
+                break
+            except ValueError:
+                continue
+        if not isinstance(obj, dict):
+            return text
+        structure = obj.get("project_structure")
+        if isinstance(structure, dict) and "rooms" not in structure:
+            layout = structure.get("layout")
+            if isinstance(layout, dict) and isinstance(layout.get("rooms"), list):
+                structure["rooms"] = layout.pop("rooms")
+            elif isinstance(obj.get("rooms"), list):
+                structure["rooms"] = obj.pop("rooms")
+        return json.dumps(obj)
 
     async def _generate_with_ollama(self, prompt: str) -> Dict[str, Any]:
         """Generate construction plan using Ollama with reduced memory footprint."""
@@ -413,40 +509,72 @@ FLOOR PLAN DESIGN (all sizes in feet):
   - "entry" is the name of the room the front door opens into; it must have an outside wall (the edge of the footprint or of an open area), preferably facing the street.
 - "rooms" lists every room in the layout with the same names, its height, materials, and "connects_to".
 - DOORWAYS: "connects_to" lists the exact names of the rooms this room opens into through a doorway. Only connect rooms whose rectangles share a wall. Design the circulation: guests walk from the entry into the living area, bedrooms open off a hallway or the living area (never through another bedroom), and a bathroom opens off a hallway or the bedroom it serves. Every room must be reachable from the entry. Each connection only needs listing once.
+- OPEN PLAN: when the description asks for rooms open to each other (an open kitchen, living and dining), list them in "open_to" instead of "connects_to": the wall between them is left out. They must share a wall.
+- WALLS FOR COUNTERS AND FURNITURE: windows and doors are placed automatically. A room may list "solid_walls": ["back", ...] (sides "front"|"back"|"left"|"right") that must stay free of any window, door or doorway; a kitchen keeps one long wall for counters, stove and cabinets, so give the kitchen one solid wall that doesn't face its entry or the dining area.
 - BAY WINDOWS: only when the description asks for one, give that room "bay_window": {"side": "front"|"back"|"left"|"right", "width": 8, "depth": 2.5, "style": "angled"|"box"} (feet; "angled" is the classic three-sided bay). The side must be one where the room has an outside wall: the edge of the footprint or of an open area. Leave the key out of every other room.
-- Use descriptive room names (e.g. "Entry Foyer", "Primary Bedroom", "Hall Bathroom")."""
+- OUTSIDE DOORS: the front door is automatic (on the "entry" room). Only when the description asks for another door to the outside (a back door, a sliding glass door or French doors to the yard, patio or deck), give that room "outside_doors": [{"side": "front"|"back"|"left"|"right", "style": "sliding_glass"|"french"|"hinged", "width": 6}] (feet; a double sliding door is about 6-8 ft, French doors 5-6 ft, a single door 3 ft). The side must be one where the room has an outside wall. Leave the key out of every other room.
+- Use descriptive room names (e.g. "Entry Foyer", "Primary Bedroom", "Hall Bathroom").
+- OUTSIDE OF THE HOUSE: only when the description mentions the roof, the outside walls, colors, or the yard (trees, plants, paths, driveway, patio, fence, pool), add "exterior" inside "project_structure":
+""" + EXTERIOR_FORMAT
 
         return prompt
 
-    def _build_refine_prompt(self, structure: Dict[str, Any], instruction: str) -> str:
-        """Prompt for changing an existing floor plan. Uses the same layout format
-        as ``_build_planning_prompt`` — change both together."""
+    def _build_refine_prompt(
+        self, structure: Dict[str, Any], instruction: str, site: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Prompt for changing an existing house. Uses the same layout and exterior
+        formats as ``_build_planning_prompt`` — change both together."""
         current = json.dumps(
             {"layout": structure.get("layout"), "rooms": structure.get("rooms", [])},
             separators=(",", ":"),
         )
-        return f"""You are a residential architectural designer revising an existing floor plan.
+        exterior = json.dumps(structure.get("exterior"), separators=(",", ":"))
+        site_json = json.dumps(site or {}, separators=(",", ":"))
+        return f"""You are a residential architect and landscape designer revising an existing house.
 
 CURRENT FLOOR PLAN (JSON, all sizes in feet):
 {current}
 
+CURRENT EXTERIOR (JSON, feet; null means none yet):
+{exterior}
+
+SITE (feet: the footprint, the front door and which way it faces, every room's rectangle and its four "walls" (front/back/left/right, each "<what is on the other side: outside or room names>: <what is in it: doorways, windows, doors, open walls>", "(solid)" when kept clear), the other doors to the yard (put a deck or patio "outside the sliding door" against the wall there), the open outdoor parts of the footprint, and "doorways": every doorway between two rooms the house has now, including ones added automatically so every room is reachable):
+{site_json}
+
 REQUESTED CHANGE: {instruction}
 
-Apply the requested change and nothing else: keep every room, name, size, material and doorway the change does not affect. Keep the plan livable — every room reachable from the entry, bedrooms never only reachable through another bedroom.
+First decide what the change is about:
+- "exterior": only the outside — roof, outside wall finish or colors, trim, the ground, or the yard (trees, palms, shrubs, flowers, lawn, paths, driveway, patio, deck, fence, hedge, pool, rocks).
+- "floor_plan": the rooms — sizes, adding or removing rooms, doorways, the house's shape, bay windows, and doors to the outside (back door, sliding glass door, French doors), even when they lead to the yard, a patio or a deck.
+- "both": it asks for both.
 
-The format is the one used above:
+Apply the requested change and nothing else: keep everything the change does not affect.
+
+FLOOR PLAN format (for "floor_plan" or "both"):
 - "layout" is the footprint ("length" left to right, "width" front to back, street side first) recursively divided by "split": "x" (left to right) or "z" (front to back) into "parts". Each part has a "size" in feet along that split and is either a room ({{"size": n, "room": "Name"}}), an open outdoor area ({{"size": n, "open": true}}; this is how the house gets an L, U or T shape, a courtyard or an inset porch) or another split. Part sizes should add up to the parent's extent. Every room appears in the layout exactly once. "entry" names the room the front door opens into.
 - To make a room bigger or smaller, change its part's "size" and the neighbouring parts (or the footprint) so the sizes still add up.
-- "rooms" lists every room in the layout with the same names, its "dimensions" (height 8-10), "floor_material", "wall_material" and "connects_to" (names of rooms it opens into through a doorway; only rooms that share a wall).
-- A room may have a bay window: "bay_window": {{"side": "front"|"back"|"left"|"right", "width": 8, "depth": 2.5, "style": "angled"|"box"}} (feet; front is the street side, left/right along the layout's length). It must be on a side where the room has an outside wall (the edge of the footprint or of an open area). Keep existing bay windows unless the change is about them; to remove one, leave the key out.
+- "rooms" lists every room in the layout with the same names, its "dimensions" (height 8-10), "floor_material", "wall_material" and "connects_to" (names of rooms it opens into through a doorway; only rooms that share a wall). Keep the plan livable — every room reachable from the entry, bedrooms never only reachable through another bedroom.
+- To remove a doorway (or make a wall solid), drop each room from the other's "connects_to" AND add it to the room's "no_door_to" list (e.g. "no_door_to": ["Hallway"]); a doorway in SITE "doorways" that no "connects_to" lists was added automatically and only "no_door_to" removes it. If that leaves rooms unreachable, connect them another way through "connects_to" (e.g. the hallway to a room beside it). Keep existing "no_door_to" entries unless the change asks for that doorway back; to add a doorway, remove the pair from "no_door_to".
+- WALLS: to make a wall clean (no window, door or doorway in it, e.g. for kitchen counters or a bed), add its side to the room's "solid_walls" list (["back", "left"]; "front" is the street side, left/right along the layout's length; SITE rooms' "walls" show which side has what). A solid wall overrides doors, doorways and windows on it; if a doorway in it is the only way into a room, connect that room another way through "connects_to". To allow openings in it again, remove the side from "solid_walls".
+- WINDOWS are placed automatically, one per room (none in hallways and closets): "window": false removes the room's window, "window": {{"side": "left"}} puts it on that side. To remove a room's windows, ALWAYS set "window": false — also when its window is a bay window (then leave "bay_window" out too); without it the ordinary window comes back. To move or remove only one particular opening, "solid_walls" on its side is usually what is meant.
+- To REMOVE A WALL between two rooms (open them to each other), list the other room in "open_to" (e.g. the kitchen's "open_to": ["Dining Room"]); the rooms must share a wall. They are then joined without a doorway, so drop them from each other's "connects_to". To put the wall back, remove the name from "open_to".
+- To RENAME a room, also return "renames": {{"Old Name": "New Name"}} beside "project_structure", and use the new name everywhere (layout, rooms, "connects_to", "no_door_to", "open_to", "entry").
+- A room may have a bay window: "bay_window": {{"side": "front"|"back"|"left"|"right", "width": 8, "depth": 2.5, "style": "angled"|"box"}} (feet; front is the street side, left/right along the layout's length). It must be on a side where the room has an outside wall (the edge of the footprint or of an open area). A bay window takes the place of the room's ordinary window. Keep existing bay windows unless the change is about them; to remove one, leave the key out.
+- A room may have doors to the outside besides the front door: "outside_doors": [{{"side": "front"|"back"|"left"|"right", "style": "sliding_glass"|"french"|"hinged", "width": 6}}] (feet; a double sliding glass door is about 6-8 ft, French doors 5-6 ft, a back door 3 ft). Use a side where the room has an outside wall (the SITE's rooms show which edges are on the footprint or an open area); "to the backyard" means "back". Keep existing outside doors unless the change is about them; to remove one, drop it from the list.
 
-Reply with ONLY a JSON object (no markdown, no explanation): {{"project_structure": {{"layout": {{...}}, "rooms": [...]}}}}"""
+EXTERIOR format (for "exterior" or "both"; return the WHOLE exterior: the current one with the change applied, keeping every item the change does not affect):
+{EXTERIOR_FORMAT}
+
+Reply with ONLY a JSON object (no markdown, no explanation):
+- for "exterior": {{"scope": "exterior", "exterior": {{...}}}}
+- for "floor_plan": {{"scope": "floor_plan", "project_structure": {{"layout": {{...}}, "rooms": [...]}}}} (plus "renames" when a room is renamed)
+- for "both": {{"scope": "both", "project_structure": {{"layout": {{...}}, "rooms": [...]}}, "exterior": {{...}}}}"""
 
     def _clean_json_string(self, json_str: str) -> str:
         """Fix common LLM JSON formatting issues before parsing."""
         # Strip markdown code fences
         json_str = re.sub(r'```(?:json)?\s*', '', json_str).strip()
-        
+
         # Remove trailing commas before } or ]
         json_str = re.sub(r',\s*([}\]])', r'\1', json_str)
         

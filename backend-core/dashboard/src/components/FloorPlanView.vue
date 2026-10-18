@@ -71,6 +71,45 @@
                 >Outside</text>
               </g>
 
+              <!-- Yard: plants, paths, patios and fences, seen from above -->
+              <g v-for="(part, i) in landscape" :key="`l${i}`" :transform="partTransform(part)">
+                <ellipse
+                  v-if="part.shape === 'sphere'"
+                  :rx="part.size.x / 2" :ry="part.size.z / 2" :fill="rgb(part.color)"
+                />
+                <rect
+                  v-else
+                  :x="-part.size.x / 2" :y="-part.size.z / 2"
+                  :width="part.size.x" :height="part.size.z" :fill="rgb(part.color)"
+                />
+              </g>
+
+              <!-- Plants (vr_plants.py): hedges as their line, the rest by their spread -->
+              <template v-for="(plant, i) in plantsToDraw">
+                <line
+                  v-if="plant.line"
+                  :key="`h${i}`"
+                  class="hedge"
+                  :x1="plant.line.from.x" :y1="svgY(plant.line.from.z)"
+                  :x2="plant.line.to.x" :y2="svgY(plant.line.to.z)"
+                  :stroke="rgb(plant.color)" :stroke-width="plant.line.width" stroke-linecap="round"
+                />
+                <circle
+                  v-else
+                  :key="`p${i}`"
+                  class="plant"
+                  :cx="plant.position.x" :cy="svgY(plant.position.z)" :r="plant.scale.x / 2"
+                  :fill="rgb(plant.color)" stroke="rgba(0,0,0,0.25)" stroke-width="0.04"
+                ><title>{{ plant.name ?? '' }}</title></circle>
+              </template>
+              <!-- Plants drawn with a 3D model made from a photo -->
+              <circle
+                v-for="(model, i) in plantModels" :key="`m${i}`"
+                class="plant-model"
+                :cx="model.position.x" :cy="svgY(model.position.z)" :r="model.width / 2"
+                fill="#C8E6C9" stroke="#2E7D32" stroke-width="0.06" stroke-dasharray="0.15 0.1"
+              ><title>{{ model.name }} (from a photo)</title></circle>
+
               <!-- Bay window bump-outs -->
               <polygon
                 v-for="room in baysToDraw" :key="`bay${room.id}`"
@@ -106,16 +145,30 @@
                 >{{ feet(room.dimensions.length) }} × {{ feet(room.dimensions.width) }} ft</text>
               </g>
 
+              <!-- Walls taken out between open rooms: a dashed line where the wall was -->
+              <g v-for="(o, i) in openWalls" :key="`ow${i}`">
+                <line v-bind="wallLine(o)" stroke="#FAFAFA" :stroke-width="WALL * 1.1" />
+                <line v-bind="wallLine(o)" stroke="#90A4AE" stroke-width="0.05" stroke-dasharray="0.25 0.2" />
+              </g>
+
               <!-- Windows: glazing line over the wall -->
               <g v-for="w in windows" :key="`w${w.id}`">
                 <line v-bind="span(w)" stroke="#FFFFFF" :stroke-width="WALL * 1.4" />
                 <line v-bind="span(w)" stroke="#4FC3F7" :stroke-width="WALL * 0.6" />
               </g>
 
-              <!-- Doors: a gap in the wall with jamb ticks -->
-              <g v-for="d in doors" :key="`d${d.id}`">
+              <!-- Doors: a gap in the wall with jamb ticks; doors to the yard in green,
+                   with the glass drawn in for a sliding glass or French door -->
+              <g v-for="d in doors" :key="`d${d.id}`" :class="{ 'patio-door': d.door_type === 'patio' }">
                 <line v-bind="span(d)" stroke="#FFFFFF" :stroke-width="WALL * 1.6" />
-                <line v-for="(tick, i) in jambs(d)" :key="i" v-bind="tick" stroke="#6D4C41" :stroke-width="0.06" />
+                <line
+                  v-if="d.door_type === 'patio' && d.style !== 'hinged'"
+                  v-bind="span(d)" stroke="#4FC3F7" :stroke-width="WALL * 0.4"
+                />
+                <line
+                  v-for="(tick, i) in jambs(d)" :key="i" v-bind="tick"
+                  :stroke="d.door_type === 'patio' ? '#2E7D32' : '#6D4C41'" :stroke-width="0.06"
+                />
               </g>
 
               <!-- Entry marker -->
@@ -132,9 +185,29 @@
             <div class="row q-gutter-md text-caption text-grey-7 q-mt-sm">
               <span>{{ rooms.length }} rooms</span>
               <span>{{ interiorDoorCount }} doorways</span>
+              <span v-if="patioDoors.length">{{ patioDoors.length }} to the yard</span>
               <span>{{ windows.length }} windows</span>
               <span><span class="swatch" style="background:#4FC3F7" /> window</span>
               <span><span class="swatch" style="background:#6D4C41" /> doorway</span>
+              <span v-if="patioDoors.length"><span class="swatch" style="background:#2E7D32" /> door to the yard</span>
+              <span v-if="openWalls.length"><span class="swatch" style="background:#90A4AE" /> open (no wall)</span>
+            </div>
+            <!-- Requested doors / bay windows that did not fit -->
+            <div v-for="(note, i) in notes" :key="`n${i}`" class="text-caption text-orange-9 plan-note">
+              ⚠ {{ note }}
+            </div>
+
+            <!-- The outside, as the AI last described it -->
+            <div v-if="exterior" class="row q-gutter-md text-caption text-grey-8 q-mt-xs exterior-summary">
+              <span v-if="exterior.roof">
+                <span class="swatch" :style="{ background: exterior.roof.color }" />
+                {{ words(exterior.roof.style) }} roof, {{ words(exterior.roof.material) }}
+              </span>
+              <span v-if="exterior.walls">
+                <span class="swatch" :style="{ background: exterior.walls.color }" />
+                {{ words(exterior.walls.material) }} walls
+              </span>
+              <span v-if="exterior.landscape?.length">{{ landscapeSummary }}</span>
             </div>
 
             <div v-if="floorPlan?.image_url" class="q-mt-md">
@@ -148,7 +221,7 @@
                 v-model="instruction"
                 class="col"
                 dense outlined
-                label="Describe a change (e.g. make the kitchen bigger)"
+                label="Describe a change (e.g. make the kitchen bigger, tile roof, palm trees out front)"
                 :disable="saving"
                 @keyup.enter="refine"
               />
@@ -299,12 +372,45 @@ interface PlanRoom {
   connects_to?: number[]
   bay_window?: { outline: { x: number; z: number }[] } | null
 }
+// The outside of the house (vr_exterior.py): parts in metres, the spec in feet.
+interface ExteriorPart {
+  shape: 'box' | 'sphere'
+  center: Point
+  size: Point
+  yaw: number
+  color: { r: number; g: number; b: number }
+  kind: string
+}
+// A plant: a shared mesh at a position and size, or one baked mesh (beds, hedges).
+interface ExteriorPlant {
+  mesh: string
+  position: Point
+  scale: Point
+  color: { r: number; g: number; b: number }
+  name?: string
+  baked?: boolean
+  line?: { from: { x: number; z: number }; to: { x: number; z: number }; width: number }
+}
+// A plant drawn with a 3D model made from a photo (plant_model_service.py).
+interface ExteriorModel {
+  model_id: number
+  name: string
+  position: Point
+  width: number
+}
+interface ExteriorSpec {
+  roof?: { style: string; material: string; color: string }
+  walls?: { material: string; color: string }
+  landscape?: { type: string; plant?: string }[]
+}
 interface Opening {
   id: number
   position: Point
   width: number
   rotation: number
   door_type?: string
+  // Doors to the yard ("patio"): sliding_glass | french | hinged.
+  style?: string
 }
 // The saved plan (sizes in feet), as GET /projects/{id}/floor-plan returns it.
 interface LayoutNode {
@@ -324,9 +430,13 @@ interface BayWindowSpec {
   width?: number
   depth?: number
 }
+// A wall taken out between two open rooms ("open_to").
+interface OpenWall { rooms: number[]; start: Point; end: Point }
 interface PlanRoomSpec {
   name: string
   connects_to?: string[]
+  no_door_to?: string[]
+  open_to?: string[]
   bay_window?: BayWindowSpec
   [key: string]: unknown
 }
@@ -361,7 +471,15 @@ const saveError = ref<string | null>(null)
 const rooms = ref<PlanRoom[]>([])
 const doors = ref<Opening[]>([])
 const windows = ref<Opening[]>([])
+const openWalls = ref<OpenWall[]>([])
+const notes = ref<string[]>([])
 const openAreas = ref<{ bounds: Bounds }[]>([])
+const landscape = ref<ExteriorPart[]>([])
+const plants = ref<ExteriorPlant[]>([])
+const plantModels = ref<ExteriorModel[]>([])
+// A flower bed's flowers are shown by the bed itself.
+const plantsToDraw = computed(() => plants.value.filter(p => !p.baked || p.line))
+const exterior = ref<ExteriorSpec | null>(null)
 const floorPlan = ref<FloorPlan | null>(null)
 const history = ref<FloorPlan[]>([])
 const showHistory = ref(false)
@@ -370,12 +488,30 @@ const draft = ref<Draft | null>(null)
 const instruction = ref('')
 
 const frontDoor = computed(() => doors.value.find(d => d.door_type === 'exterior'))
-const interiorDoorCount = computed(() => doors.value.filter(d => d.door_type !== 'exterior').length)
+const patioDoors = computed(() => doors.value.filter(d => d.door_type === 'patio'))
+const interiorDoorCount = computed(() => doors.value.filter(d => d.door_type !== 'exterior' && d.door_type !== 'patio').length)
 
 const extent = computed(() => {
   const b = [...rooms.value, ...openAreas.value].map(r => r.bounds)
   for (const room of rooms.value) {
     for (const p of room.bay_window?.outline ?? []) b.push({ x0: p.x, x1: p.x, z0: p.z, z1: p.z })
+  }
+  for (const p of landscape.value) {
+    const r = Math.max(p.size.x, p.size.z) / 2
+    b.push({ x0: p.center.x - r, x1: p.center.x + r, z0: p.center.z - r, z1: p.center.z + r })
+  }
+  for (const p of plantsToDraw.value) {
+    if (p.line) {
+      const { from, to } = p.line
+      b.push({ x0: Math.min(from.x, to.x), x1: Math.max(from.x, to.x), z0: Math.min(from.z, to.z), z1: Math.max(from.z, to.z) })
+    } else {
+      const r = p.scale.x / 2
+      b.push({ x0: p.position.x - r, x1: p.position.x + r, z0: p.position.z - r, z1: p.position.z + r })
+    }
+  }
+  for (const m of plantModels.value) {
+    const r = m.width / 2
+    b.push({ x0: m.position.x - r, x1: m.position.x + r, z0: m.position.z - r, z1: m.position.z + r })
   }
   return {
     x0: Math.min(...b.map(r => r.x0)),
@@ -399,6 +535,8 @@ const along = (o: Opening) => {
   const rad = (o.rotation * Math.PI) / 180
   return { dx: Math.cos(rad), dz: Math.sin(rad) }
 }
+
+const wallLine = (o: OpenWall) => ({ x1: o.start.x, y1: svgY(o.start.z), x2: o.end.x, y2: svgY(o.end.z) })
 
 const baysToDraw = computed(() => rooms.value.filter(r => r.bay_window?.outline?.length))
 const bayPoints = (room: PlanRoom) =>
@@ -426,6 +564,26 @@ const jambs = (o: Opening) => {
 }
 
 const feet = (metres: number) => Math.round(metres / 0.3048)
+
+const rgb = (c: ExteriorPart['color']) =>
+  `rgb(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)})`
+
+// yaw turns the part's x axis toward +z; the plan is drawn with z flipped.
+const partTransform = (p: ExteriorPart) =>
+  `translate(${p.center.x} ${svgY(p.center.z)}) rotate(${-p.yaw})`
+
+const words = (key: string) => key.replace(/_/g, ' ')
+
+const landscapeSummary = computed(() => {
+  const counts = new Map<string, number>()
+  for (const item of exterior.value?.landscape ?? []) {
+    const name = (item.plant || words(item.type)).toLowerCase()
+    counts.set(name, (counts.get(name) ?? 0) + 1)
+  }
+  const fromPhotos = plantModels.value.length
+  return [...counts].map(([name, n]) => `${n} ${name}${n > 1 && !name.endsWith('s') ? 's' : ''}`).join(', ') +
+    (fromPhotos ? ` (${fromPhotos} from photos)` : '')
+})
 
 const ROOM_COLORS: [string[], string][] = [
   [['bed'], '#E3F2FD'],
@@ -456,8 +614,17 @@ const errorMessage = (err: unknown, fallback: string) => {
 const showGeometry = (geometry: any) => {
   rooms.value = (geometry?.rooms ?? []).filter((r: PlanRoom) => r.bounds)
   doors.value = geometry?.doors ?? []
+  notes.value = geometry?.notes ?? []
   windows.value = geometry?.windows ?? []
+  openWalls.value = geometry?.open_walls ?? []
   openAreas.value = (geometry?.open_areas ?? []).filter((a: { bounds?: Bounds }) => a.bounds)
+  // Lowest first, so canopies cover their trunks and tiles their bed.
+  landscape.value = ((geometry?.exterior?.parts ?? []) as ExteriorPart[])
+    .filter(p => p.kind === 'landscape')
+    .sort((a, b) => a.center.y + a.size.y / 2 - (b.center.y + b.size.y / 2))
+  plants.value = geometry?.exterior?.plants ?? []
+  plantModels.value = geometry?.exterior?.models ?? []
+  exterior.value = geometry?.exterior?.spec ?? null
 }
 
 const load = async () => {
@@ -529,6 +696,9 @@ const partRows = computed(() => {
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
 
+// Room fields that hold other rooms' names (doorways, blocked doorways, open walls).
+const ROOM_REFS = ['connects_to', 'no_door_to', 'open_to'] as const
+
 /** Rename a room everywhere it is referenced: layout leaf, room list, doorways, entry. */
 const renameRoom = (part: LayoutNode, name: string) => {
   const d = draft.value
@@ -537,7 +707,9 @@ const renameRoom = (part: LayoutNode, name: string) => {
   part.room = name
   for (const room of d.rooms) {
     if (same(room.name, old)) room.name = name
-    room.connects_to = (room.connects_to ?? []).map(n => (same(n, old) ? name : n))
+    for (const key of ROOM_REFS) {
+      if (room[key]) room[key] = room[key]!.map(n => (same(n, old) ? name : n))
+    }
   }
   if (d.layout.entry && same(d.layout.entry, old)) d.layout.entry = name
 }
@@ -577,6 +749,9 @@ const makeOpen = (part: LayoutNode) => {
   d.rooms = d.rooms.filter(r => !same(r.name, name))
   for (const room of d.rooms) {
     room.connects_to = (room.connects_to ?? []).filter(n => !same(n, name))
+    for (const key of ['no_door_to', 'open_to'] as const) {
+      if (room[key]) room[key] = room[key]!.filter(n => !same(n, name))
+    }
   }
   if (d.layout.entry && same(d.layout.entry, name)) d.layout.entry = d.rooms[0]?.name
 }

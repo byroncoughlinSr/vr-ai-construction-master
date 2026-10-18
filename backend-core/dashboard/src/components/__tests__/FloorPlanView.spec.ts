@@ -236,4 +236,113 @@ describe('FloorPlanView', () => {
     vm.setBaySide(vm.draft.rooms[1], 'none')
     expect(vm.draft.rooms[1].bay_window).toBeUndefined()
   })
+  it('draws the yard and sums up the outside of the house', async () => {
+    const green = { r: 0.3, g: 0.5, b: 0.2 }
+    get.mockResolvedValue({
+      data: {
+        success: true,
+        geometry: {
+          ...geometry,
+          exterior: {
+            roof: [],
+            parts: [
+              // The ground and wall finish are not drawn in the plan.
+              { shape: 'box', center: { x: 3, y: -0.1, z: 1 }, size: { x: 30, y: 0.05, z: 30 }, yaw: 0, color: green, kind: 'ground' },
+              { shape: 'box', center: { x: 3, y: 1.4, z: -0.11 }, size: { x: 2, y: 2.7, z: 0.02 }, yaw: 0, color: green, kind: 'wall' },
+              // A tree out front: trunk and canopy.
+              { shape: 'sphere', center: { x: 1, y: 3, z: -6 }, size: { x: 3, y: 3, z: 3 }, yaw: 0, color: green, kind: 'landscape' },
+              { shape: 'box', center: { x: 1, y: 1, z: -6 }, size: { x: 0.2, y: 2, z: 0.2 }, yaw: 0, color: green, kind: 'landscape' }
+            ],
+            spec: {
+              roof: { style: 'hip', material: 'clay_tile', color: '#b5562f' },
+              walls: { material: 'stucco', color: '#e3d4b6' },
+              landscape: [{ type: 'tree' }, { type: 'palm' }, { type: 'palm' }]
+            }
+          }
+        }
+      }
+    })
+    const wrapper = mountPlan()
+    await flushPromises()
+
+    expect(wrapper.findAll('svg ellipse')).toHaveLength(1)
+    expect(wrapper.findAll('svg rect')).toHaveLength(3) // two rooms and the trunk
+    // The canopy (higher) is drawn after the trunk.
+    const yard = wrapper.findAll('svg g[transform]')
+    expect(yard[1].find('ellipse').exists()).toBe(true)
+    // The drawing reaches the tree in the front yard: 6 m in front of the house.
+    const [, , , height] = (wrapper.find('svg').attributes('viewBox') ?? '').split(' ').map(Number)
+    expect(height).toBeGreaterThan(3.658 + 6)
+    const summary = wrapper.find('.exterior-summary').text()
+    expect(summary).toContain('hip roof, clay tile')
+    expect(summary).toContain('stucco walls')
+    expect(summary).toContain('1 tree, 2 palms')
+  })
+
+  it('draws plants, hedges and photo models, and names the plants', async () => {
+    const coral = { r: 0.97, g: 0.51, b: 0.47 }
+    get.mockResolvedValue({
+      data: {
+        success: true,
+        geometry: {
+          ...geometry,
+          exterior: {
+            roof: [],
+            parts: [],
+            plant_meshes: {},
+            plants: [
+              { mesh: 'rose-1', position: { x: 1, y: -0.1, z: -2 }, scale: { x: 1, y: 1.2, z: 1 }, yaw: 30, color: coral, name: 'coral rose' },
+              { mesh: 'bed-2', position: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, yaw: 0, color: coral, baked: true },
+              {
+                mesh: 'hedge-3', position: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 }, yaw: 0, color: coral, baked: true,
+                line: { from: { x: -1, z: -8 }, to: { x: 6, z: -8 }, width: 0.6 }
+              }
+            ],
+            models: [{ model_id: 4, name: 'Coral rose', url: '/plant_models/4/m.glb', position: { x: 3, y: -0.1, z: -2 }, scale: 1.2, yaw: 0, width: 0.9 }],
+            spec: {
+              landscape: [
+                { type: 'shrub', plant: 'coral rose' }, { type: 'shrub', plant: 'coral rose' },
+                { type: 'flower_bed', plant: 'tulips' }, { type: 'hedge' }
+              ]
+            }
+          }
+        }
+      }
+    })
+    const wrapper = mountPlan()
+    await flushPromises()
+
+    const plants = wrapper.findAll('circle.plant')
+    expect(plants).toHaveLength(1) // the bed's flowers are not drawn on their own
+    expect(plants[0].attributes('r')).toBe('0.5')
+    expect(plants[0].find('title').text()).toBe('coral rose')
+    expect(wrapper.find('line.hedge').attributes('stroke-width')).toBe('0.6')
+    expect(wrapper.find('circle.plant-model title').text()).toContain('Coral rose')
+    // The drawing reaches the hedge 8 m in front of the house.
+    const [, , , height] = (wrapper.find('svg').attributes('viewBox') ?? '').split(' ').map(Number)
+    expect(height).toBeGreaterThan(3.658 + 8)
+    const summary = wrapper.find('.exterior-summary').text()
+    expect(summary).toContain('2 coral roses, 1 tulips, 1 hedge (1 from photos)')
+  })
+
+  it('draws a sliding glass door to the yard and notes what did not fit', async () => {
+    const withPatio = JSON.parse(JSON.stringify(geometry))
+    withPatio.doors.push({
+      id: 103, position: { x: 4.877, y: 0, z: 3.658 }, width: 1.829, rotation: 0,
+      door_type: 'patio', style: 'sliding_glass', side: 'back', rooms: [2]
+    })
+    withPatio.notes = ['Entry Foyer has no left outside wall for a french door']
+    get.mockResolvedValue({ data: { success: true, geometry: withPatio } })
+    const wrapper = mountPlan()
+    await flushPromises()
+
+    const patio = wrapper.find('g.patio-door')
+    expect(patio.exists()).toBe(true)
+    expect(patio.findAll('line').some(l => l.attributes('stroke') === '#4FC3F7')).toBe(true)
+    expect(patio.findAll('line').filter(l => l.attributes('stroke') === '#2E7D32')).toHaveLength(2)
+    // Still one doorway between rooms; the yard door is counted on its own.
+    expect(wrapper.text()).toContain('1 doorways')
+    expect(wrapper.text()).toContain('1 to the yard')
+    expect(wrapper.text()).toContain('Entry Foyer has no left outside wall for a french door')
+  })
 })

@@ -26,6 +26,7 @@ from .api.v1.designs import router as designs_router
 from .api.v1.materials import router as materials_router
 from .api.v1.voice import router as voice_router
 from .api.v1.websocket import router as websocket_router
+from .api.v1.plants import router as plants_router
 
 # Configure structured logging
 setup_logging(
@@ -112,11 +113,13 @@ async def log_requests(request: Request, call_next):
     return response
 
 # Mount static file directories (StaticFiles refuses a missing directory)
-for _directory in (settings.generated_images_dir, settings.exports_dir, settings.uploads_dir):
+for _directory in (settings.generated_images_dir, settings.exports_dir, settings.uploads_dir, settings.plant_models_dir):
     os.makedirs(_directory, exist_ok=True)
 app.mount("/generated_images", StaticFiles(directory=settings.generated_images_dir), name="generated_images")
 app.mount("/exports", StaticFiles(directory=settings.exports_dir), name="exports")
 app.mount("/uploads", StaticFiles(directory=settings.uploads_dir), name="uploads")
+# 3D plant models made from photos (plant_model_service.py), loaded by the headset.
+app.mount("/plant_models", StaticFiles(directory=settings.plant_models_dir), name="plant_models")
 
 # Include API routers
 app.include_router(
@@ -153,6 +156,12 @@ app.include_router(
     voice_router,
     prefix="/api/v1/voice",
     tags=["Voice Processing"]
+)
+
+app.include_router(
+    plants_router,
+    prefix="/api/v1/plants",
+    tags=["Plant Models"]
 )
 
 app.include_router(

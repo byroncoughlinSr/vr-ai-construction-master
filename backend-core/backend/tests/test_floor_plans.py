@@ -108,7 +108,7 @@ def test_refine_saves_the_ai_revision(example_id, monkeypatch):
     revised["layout"]["parts"][0]["parts"][1]["parts"][1]["size"] = 18  # bigger kitchen
     seen = {}
 
-    async def refine(structure, instruction):
+    async def refine(structure, instruction, site=None):
         seen["rooms"] = [r["name"] for r in structure["rooms"]]
         seen["instruction"] = instruction
         return _plan_result(revised)
@@ -130,7 +130,7 @@ def test_refine_saves_the_ai_revision(example_id, monkeypatch):
 
 
 def test_refine_rejects_an_empty_revision(example_id, monkeypatch):
-    async def refine(structure, instruction):
+    async def refine(structure, instruction, site=None):
         return _plan_result({})
 
     monkeypatch.setattr(ai_planning.planning_service, "refine_floor_plan", refine)
@@ -209,3 +209,176 @@ def test_project_without_floor_plan_uses_its_stored_plan():
     assert geometry["floor_plan"] is None
     assert len(geometry["rooms"]) == 9
     assert client.get(f"/api/v1/projects/{project_id}/floor-plan").status_code == 404
+
+
+TILE_ROOF = {
+    "roof": {"style": "hip", "material": "clay tile", "color": "terracotta"},
+    "walls": {"material": "stucco", "color": "beige"},
+    "landscape": [{"type": "palm", "x": 4, "z": -6}],
+}
+
+
+def _refine(example_id, monkeypatch, plan: dict, instruction: str = "tile roof"):
+    seen = {}
+
+    async def refine(structure, instruction, site=None):
+        seen["structure"], seen["site"] = structure, site
+        return {"success": True, "plan": plan, "source": "groq"}
+
+    monkeypatch.setattr(ai_planning.planning_service, "refine_floor_plan", refine)
+    response = client.post(
+        f"/api/v1/projects/{example_id}/floor-plan/refine", json={"instruction": instruction},
+    )
+    return response, seen
+
+
+def test_exterior_change_updates_the_current_version_in_place(example_id, monkeypatch):
+    response, seen = _refine(example_id, monkeypatch, {"scope": "exterior", "exterior": TILE_ROOF})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["updated_in_place"] is True
+    assert body["floor_plan"]["version"] == 1
+    assert body["floor_plan"]["change_type"] == "example"
+    exterior = body["floor_plan"]["exterior"]
+    assert exterior["roof"]["material"] == "clay_tile"
+    assert exterior["walls"]["color"].startswith("#")
+    assert body["geometry"]["exterior"]["roof"]
+    # The AI is told where the house and its front door are.
+    assert seen["site"]["footprint"] == {"length": 50.0, "width": 36.0}
+    assert seen["site"]["front_door"]["faces"] == "-z (toward the street)"
+    assert len(seen["site"]["front_door"]["beside_it"]) == 2
+    assert len(seen["site"]["rooms"]) == len(EXAMPLE_STRUCTURE["rooms"])
+    versions = client.get(f"/api/v1/projects/{example_id}/floor-plans").json()["floor_plans"]
+    assert len(versions) == 1
+
+
+def test_room_change_keeps_the_exterior(example_id, monkeypatch):
+    _refine(example_id, monkeypatch, {"scope": "exterior", "exterior": TILE_ROOF})
+    revised = copy.deepcopy(EXAMPLE_STRUCTURE)
+    revised["layout"]["parts"][0]["parts"][1]["parts"][1]["size"] = 18
+    response, seen = _refine(
+        example_id, monkeypatch, {"scope": "floor_plan", "project_structure": revised}, "bigger kitchen",
+    )
+    assert seen["structure"]["exterior"]["roof"]["style"] == "hip"
+    body = response.json()
+    assert body["updated_in_place"] is False
+    assert body["floor_plan"]["version"] == 2
+    assert body["floor_plan"]["exterior"]["roof"]["style"] == "hip"
+
+
+def test_change_to_both_saves_a_version_with_the_new_exterior(example_id, monkeypatch):
+    response, _ = _refine(example_id, monkeypatch, {
+        "scope": "both", "project_structure": copy.deepcopy(EXAMPLE_STRUCTURE), "exterior": TILE_ROOF,
+    })
+    body = response.json()
+    assert body["floor_plan"]["version"] == 2
+    assert body["floor_plan"]["exterior"]["landscape"][0]["type"] == "palm"
+
+
+def test_exterior_change_without_an_exterior_is_rejected(example_id, monkeypatch):
+    response, _ = _refine(example_id, monkeypatch, {"scope": "exterior"})
+    assert response.status_code == 422
+    assert client.get(f"/api/v1/projects/{example_id}/floor-plan").json()["exterior"] is None
+
+
+def test_dashboard_edit_keeps_the_exterior(example_id, monkeypatch):
+    _refine(example_id, monkeypatch, {"scope": "exterior", "exterior": TILE_ROOF})
+    response = client.put(f"/api/v1/projects/{example_id}/floor-plan", json={
+        "layout": EXAMPLE_STRUCTURE["layout"], "rooms": EXAMPLE_STRUCTURE["rooms"],
+    })
+    assert response.json()["floor_plan"]["exterior"]["roof"]["style"] == "hip"
+
+
+def test_door_to_the_yard_is_a_room_change_and_is_shown_to_the_ai(example_id, monkeypatch):
+    revised = copy.deepcopy(EXAMPLE_STRUCTURE)
+    kitchen = next(r for r in revised["rooms"] if r["name"] == "Kitchen")
+    kitchen["outside_doors"] = [{"side": "back", "style": "sliding_glass", "width": 6}]
+    response, _ = _refine(
+        example_id, monkeypatch, {"scope": "floor_plan", "project_structure": revised},
+        "double glass sliding door from the kitchen to the backyard",
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["updated_in_place"] is False
+    assert body["floor_plan"]["version"] == 2
+    patio = [d for d in body["geometry"]["doors"] if d["door_type"] == "patio"]
+    assert [(d["style"], d["side"]) for d in patio] == [("sliding_glass", "back")]
+    assert body["geometry"]["notes"] == []
+    # The next change ("a deck outside the sliding door") is told where the door is.
+    _, seen = _refine(example_id, monkeypatch, {"scope": "exterior", "exterior": TILE_ROOF})
+    door = seen["site"]["outside_doors"][0]
+    assert door["room"] == "Kitchen" and door["style"] == "sliding_glass" and door["side"] == "back"
+    assert door["z"] == pytest.approx(36.0)
+
+
+def test_site_summary_lists_doorways_added_for_reachability():
+    from types import SimpleNamespace
+
+    from app.services.floor_plan_service import site_summary
+
+    layout = {"length": 24, "width": 12, "entry": "Den", "split": "x",
+              "parts": [{"size": 12, "room": "Den"}, {"size": 12, "room": "Kitchen"}]}
+    rooms = [{"name": "Den", "dimensions": {"height": 9}}, {"name": "Kitchen", "dimensions": {"height": 9}}]
+    site = site_summary(SimpleNamespace(rooms=rooms, layout=layout))
+    assert site["doorways"] == [["Den", "Kitchen"]]  # in no connects_to, added by the builder
+
+
+def test_rename_rooms_renames_every_reference():
+    from app.services.floor_plan_service import rename_rooms
+
+    structure = {
+        "layout": {"length": 24, "width": 12, "entry": "Den", "split": "x",
+                   "parts": [{"size": 12, "room": "Den"}, {"size": 12, "room": "Kitchen"}]},
+        "rooms": [{"name": "Den", "connects_to": ["kitchen"]},
+                  {"name": "Kitchen", "open_to": "Den", "no_door_to": ["Den"]}],
+    }
+    out = rename_rooms(structure, {"den": "Family Room"})
+    assert out["layout"]["entry"] == "Family Room"
+    assert out["layout"]["parts"][0]["room"] == "Family Room"
+    assert [r["name"] for r in out["rooms"]] == ["Family Room", "Kitchen"]
+    assert out["rooms"][1]["open_to"] == "Family Room" and out["rooms"][1]["no_door_to"] == ["Family Room"]
+    assert structure["rooms"][0]["name"] == "Den"  # a copy
+
+
+def test_rename_in_only_the_layout_keeps_the_room_settings():
+    from app.services.floor_plan_service import validate_structure
+
+    structure = {
+        "layout": {"length": 24, "width": 12, "split": "x",
+                   "parts": [{"size": 12, "room": "Den"}, {"size": 12, "room": "Cook Space"}]},
+        "rooms": [{"name": "Den"}, {"name": "Kitchen", "floor_material": "tile", "solid_walls": ["back"]}],
+    }
+    clean = validate_structure(structure)
+    assert [r["name"] for r in clean["rooms"]] == ["Den", "Cook Space"]
+    assert clean["rooms"][1]["floor_material"] == "tile"
+
+
+def test_refine_applies_renames_the_ai_reports(example_id, monkeypatch):
+    revised = copy.deepcopy(EXAMPLE_STRUCTURE)  # renamed nowhere: the backend does it
+
+    async def refine(structure, instruction, site=None):
+        return {"success": True, "source": "groq", "plan": {
+            "scope": "floor_plan", "project_structure": revised, "renames": {"Kitchen": "Chef's Kitchen"}}}
+
+    monkeypatch.setattr(ai_planning.planning_service, "refine_floor_plan", refine)
+    response = client.post(
+        f"/api/v1/projects/{example_id}/floor-plan/refine", json={"instruction": "call the kitchen chef's kitchen"}
+    )
+    assert response.status_code == 200
+    names = [r["name"] for r in response.json()["geometry"]["rooms"]]
+    assert "Chef's Kitchen" in names and "Kitchen" not in names
+
+
+def test_site_summary_describes_each_wall():
+    from types import SimpleNamespace
+
+    from app.services.floor_plan_service import site_summary
+
+    layout = {"length": 24, "width": 12, "entry": "Den", "split": "x",
+              "parts": [{"size": 12, "room": "Den"}, {"size": 12, "room": "Kitchen"}]}
+    rooms = [{"name": "Den"}, {"name": "Kitchen", "solid_walls": ["back"], "window": {"side": "right"}}]
+    site = site_summary(SimpleNamespace(rooms=rooms, layout=layout))
+    kitchen = next(r for r in site["rooms"] if r["name"] == "Kitchen")["walls"]
+    assert kitchen["left"] == "Den: doorway to Den"
+    assert kitchen["right"] == "outside: window"
+    assert kitchen["back"] == "outside: none (solid)"

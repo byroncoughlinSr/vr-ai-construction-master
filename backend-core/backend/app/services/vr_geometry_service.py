@@ -215,6 +215,9 @@ _NO_WINDOW_KEYWORDS = ("hall", "corridor", "closet", "pantry", "stair")
 _SMALL_WINDOW_KEYWORDS = ("bath", "laundry", "powder", "wc", "toilet")
 # When a room has no requested door, connect it through one of these first.
 _CIRCULATION_KEYWORDS = ("hall", "corridor", "foyer", "entry", "living", "family", "great")
+# Rooms that always keep one wall free of openings, for counters and cabinets.
+_CLEAN_WALL_KEYWORDS = ("kitchen",)
+CLEAN_WALL_MIN = round(6.0 * FT_TO_M, 3)  # shorter walls don't count as room for counters
 
 
 def _room_rect(x_center: float, z_center: float, length: float, width: float) -> dict:
@@ -268,27 +271,85 @@ def _resolve_room(name: str, names: list[str]) -> int | None:
     return partial[0] if len(partial) == 1 else None
 
 
-def plan_connections(rooms: list[dict], shared: dict) -> list[tuple[int, int]]:
+def _name_list(value: Any) -> list:
+    return [value] if isinstance(value, str) else list(value or []) if isinstance(value, list) else []
+
+
+def plan_open_walls(
+    rooms: list[dict], rects: list[dict], shared: dict, notes: list[str],
+) -> list[tuple[int, int]]:
+    """Pairs of rooms whose shared wall is taken out altogether: a room's
+    ``open_to`` names rooms it is open to (an open kitchen and dining room).
+    Rooms that don't touch, or a wall either room keeps solid, are reported in ``notes``."""
+    names = [_normalize(r.get("name", "")) for r in rooms]
+    pairs: list[tuple[int, int]] = []
+    for i, room in enumerate(rooms):
+        for target in _name_list(room.get("open_to")):
+            j = _resolve_room(target, names)
+            if j is None or j == i:
+                logger.info(f"  ↪ '{room.get('name')}' open_to '{target}': no such room")
+                continue
+            pair = (min(i, j), max(i, j))
+            if pair in pairs:
+                continue
+            a, b = rooms[pair[0]].get("name"), rooms[pair[1]].get("name")
+            wall = shared.get(pair)
+            if wall is None:
+                notes.append(f"{a} and {b} don't share a wall, so it could not be opened up")
+                continue
+            if any(_side_name(rects[k], wall[0], wall[1]) in _side_set(rooms[k].get("solid_walls")) for k in pair):
+                notes.append(f"The wall between {a} and {b} is kept solid, so it was not opened up")
+                continue
+            pairs.append(pair)
+    return pairs
+
+
+def plan_connections(
+    rooms: list[dict], shared: dict, notes: list[str] | None = None,
+    rects: list[dict] | None = None, open_pairs: list[tuple[int, int]] = (),
+) -> list[tuple[int, int]]:
     """Decide which pairs of rooms get a doorway.
 
     Honours each room's ``connects_to`` where the two rooms actually share
     enough wall for a door, then adds doors until every room is reachable from
     the entry (room 0), preferring to connect through circulation spaces.
+    A room's ``no_door_to`` names rooms it must not get a doorway to: a pair
+    listed there is never requested and only added for reachability as a last
+    resort, so "remove the door between X and Y" sticks even when that door
+    was one added here. Such a last-resort door is reported in ``notes``. A wall
+    either room keeps solid (``solid_walls``, needs ``rects``) blocks the pair the
+    same way. ``open_pairs`` (``plan_open_walls``) are already joined: they get
+    no door and count towards reachability.
     """
     names = [_normalize(r.get("name", "")) for r in rooms]
     pairs: list[tuple[int, int]] = []
+    open_pairs = list(open_pairs)
+
+    blocked: set[tuple[int, int]] = set()
+    for i, room in enumerate(rooms):
+        for target in _name_list(room.get("no_door_to")):
+            j = _resolve_room(target, names)
+            if j is not None and j != i:
+                blocked.add((min(i, j), max(i, j)))
+    if rects is not None:
+        for pair, (axis, line, _, _) in shared.items():
+            if any(_side_name(rects[k], axis, line) in _side_set(rooms[k].get("solid_walls")) for k in pair):
+                blocked.add(pair)
 
     for i, room in enumerate(rooms):
-        targets = room.get("connects_to") or []
-        if isinstance(targets, str):  # a lone name instead of a list
-            targets = [targets]
-        for target in targets:
+        for target in _name_list(room.get("connects_to")):
             j = _resolve_room(target, names)
             if j is None or j == i:
                 logger.info(f"  ↪ '{room.get('name')}' connects_to '{target}': no such room")
                 continue
             pair = (min(i, j), max(i, j))
-            if pair in pairs:
+            if pair in pairs or pair in open_pairs:
+                continue
+            if pair in blocked:
+                logger.info(
+                    f"  ↪ '{rooms[pair[0]].get('name')}' ↔ '{rooms[pair[1]].get('name')}' "
+                    f"requested but marked no_door_to or solid — skipped"
+                )
                 continue
             wall = shared.get(pair)
             if wall is None or not _fits(wall[2], wall[3], DOOR_W):
@@ -306,7 +367,7 @@ def plan_connections(rooms: list[dict], shared: dict) -> list[tuple[int, int]]:
         seen, stack = {0}, [0]
         while stack:
             cur = stack.pop()
-            for a, b in pairs:
+            for a, b in pairs + open_pairs:
                 nxt = b if a == cur else a if b == cur else None
                 if nxt is not None and nxt not in seen:
                     seen.add(nxt)
@@ -321,12 +382,22 @@ def plan_connections(rooms: list[dict], shared: dict) -> list[tuple[int, int]]:
                 continue
             inside = a if a in seen else b
             is_circulation = any(k in names[inside] for k in _CIRCULATION_KEYWORDS)
-            candidates.append((is_circulation, hi - lo, (a, b)))
+            candidates.append(((a, b) not in blocked, is_circulation, hi - lo, (a, b)))
         if not candidates:
             stranded = [rooms[i].get("name") for i in range(len(rooms)) if i not in seen]
             logger.warning(f"⚠️  No wall wide enough to reach: {stranded}")
             break
-        pair = max(candidates)[2]
+        allowed, _, _, pair = max(candidates)
+        if not allowed:
+            logger.warning(
+                f"⚠️  '{rooms[pair[0]].get('name')}' ↔ '{rooms[pair[1]].get('name')}' is marked "
+                f"no_door_to but is the only way in — keeping the door"
+            )
+            if notes is not None:
+                notes.append(
+                    f"The doorway between {rooms[pair[0]].get('name')} and {rooms[pair[1]].get('name')} "
+                    f"stays: it is the only way into part of the house"
+                )
         logger.info(
             f"  ➕ Added door '{rooms[pair[0]].get('name')}' ↔ '{rooms[pair[1]].get('name')}' "
             f"so every room is reachable"
@@ -358,6 +429,39 @@ def _room_sides(rect: dict) -> list[tuple[str, float, float, float]]:
         ("x", rect["z1"], rect["x0"], rect["x1"]),
         ("z", rect["x0"], rect["z0"], rect["z1"]),
     ]
+
+
+_SIDE_NAMES = ("front", "right", "back", "left")  # the order of _room_sides
+
+
+def _side_name(rect: dict, axis: str, line: float) -> str | None:
+    """Which side of the room (front/right/back/left) lies on ``axis``/``line``."""
+    for name, (ax, ln, _, _) in zip(_SIDE_NAMES, _room_sides(rect)):
+        if ax == axis and abs(ln - line) < _EPS:
+            return name
+    return None
+
+
+def _side_set(raw: Any) -> set[str]:
+    """The sides a room field names (``"solid_walls": ["back", "left"]``), with
+    the usual aliases; ``"all"`` (or ``true``) means every side."""
+    if raw is True:
+        return set(_SIDE_NAMES)
+    sides = set()
+    for item in _name_list(raw):
+        side = str(item or "").strip().lower().removesuffix("wall").strip()
+        if side in ("all", "every", "all sides"):
+            return set(_SIDE_NAMES)
+        side = _SIDE_ALIASES.get(side, side)
+        if side in _SIDE_NAMES:
+            sides.add(side)
+    return sides
+
+
+def _openings_within(side: tuple, openings: list[dict]) -> list[dict]:
+    """Openings on this stretch of wall itself, not just on its line."""
+    _, _, lo, hi = side
+    return [o for o in _opening_on(side, openings) if o["hi"] > lo + _EPS and o["lo"] < hi - _EPS]
 
 
 def exterior_intervals(side: tuple, shared: dict) -> list[tuple[float, float]]:
@@ -610,6 +714,82 @@ def build_bay(
     }
 
 
+# Outside doors other than the front door: sliding glass, French or hinged doors
+# from a room to the yard. Widths in feet when the plan gives none.
+OUTSIDE_DOOR_STYLES = {"sliding_glass": 6.0, "french": 5.0, "hinged": 3.0}
+OUTSIDE_DOOR_MIN_W = DOOR_W
+OUTSIDE_DOOR_MAX_W = round(16.0 * FT_TO_M, 3)
+_SIDE_ALIASES = {"street": "front", "rear": "back", "backyard": "back", "east": "right", "west": "left"}
+
+
+def _door_style(raw: Any) -> str:
+    text = str(raw or "").strip().lower().replace("-", " ").replace("_", " ")
+    if any(k in text for k in ("slid", "slider", "glass", "patio")):
+        return "sliding_glass"
+    if "french" in text or "double" in text:
+        return "french"
+    return "hinged"
+
+
+def outside_door_specs(room: dict) -> list[dict]:
+    """The room's requested doors to the outside, cleaned up (sizes in metres).
+
+    The floor plan stores ``"outside_doors": [{"side": "front"|"back"|"left"|"right",
+    "style": "sliding_glass"|"french"|"hinged", "width": ft}]``; style defaults to
+    hinged, width to the style's usual size. Entries with no usable side are dropped.
+    """
+    raw = room.get("outside_doors")
+    if raw is None:
+        raw = room.get("outside_door")
+    if isinstance(raw, (dict, str)):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return []
+    specs = []
+    for item in raw:
+        if isinstance(item, str):
+            item = {"side": item}
+        if not isinstance(item, dict):
+            continue
+        side = str(item.get("side") or "").strip().lower()
+        side = _SIDE_ALIASES.get(side, side)
+        if side not in _BAY_SIDES:
+            continue
+        style = _door_style(item.get("style"))
+        width = _feet(item.get("width"), OUTSIDE_DOOR_STYLES[style]) * FT_TO_M
+        specs.append({
+            "side": side,
+            "style": style,
+            "width": min(OUTSIDE_DOOR_MAX_W, max(OUTSIDE_DOOR_MIN_W, width)),
+        })
+    return specs
+
+
+def place_outside_door(rect: dict, spec: dict, openings: list[dict], shared: dict) -> tuple | None:
+    """Where an outside door goes on its side of the room: ``(axis, line, center, width)``,
+    or None when that side has no stretch of outside wall wide enough for a door.
+
+    It takes the longest stretch of outside wall clear of other openings, centred,
+    narrowed to fit (never below a plain door's width).
+    """
+    index, _ = _BAY_SIDES[spec["side"]]
+    side = _room_sides(rect)[index]
+    axis, line, _, _ = side
+    near = [(o["lo"] - EDGE_MARGIN, o["hi"] + EDGE_MARGIN) for o in _opening_on(side, openings)]
+    spans = [
+        piece
+        for ext_lo, ext_hi in exterior_intervals(side, shared)
+        for piece in _free_intervals(ext_lo + EDGE_MARGIN, ext_hi - EDGE_MARGIN, near)
+    ]
+    if not spans:
+        return None
+    s_lo, s_hi = max(spans, key=lambda iv: iv[1] - iv[0])
+    width = min(spec["width"], s_hi - s_lo)
+    if width < OUTSIDE_DOOR_MIN_W - _EPS:
+        return None
+    return axis, line, (s_lo + s_hi) / 2, width
+
+
 def generate_floor(dimensions: dict, x_offset: float, z_offset: float, material: str = "carpet") -> dict:
     """Generate floor geometry for a room.
 
@@ -781,6 +961,8 @@ def build_geometry_from_rooms(
     target_platform: str = "quest2",
     optimize_for_vr: bool = True,
     layout: dict | None = None,
+    exterior: dict | None = None,
+    plant_models: list[dict] | None = None,
 ) -> dict:
     """Build a VR geometry payload from a list of rooms.
 
@@ -789,7 +971,8 @@ def build_geometry_from_rooms(
             ``name``, ``dimensions`` (``length``/``width``/``height`` in ft),
             ``floor_material`` (default ``"carpet"``),
             ``wall_material`` (default ``"drywall"``),
-            ``connects_to`` (names of rooms reached through a doorway).
+            ``connects_to`` (names of rooms reached through a doorway),
+            ``no_door_to`` (names of rooms it must not get a doorway to).
             Without a ``layout`` they are packed 3 per row in list order and
             room 0 is the entry.
         materials: Optional list of material dicts with ``material_type`` and
@@ -801,6 +984,12 @@ def build_geometry_from_rooms(
         layout: The AI's nested-split floor plan (see ``layout_rects_from_tree``).
             Positions and sizes come from it when valid; ``rooms_ft`` then only
             supplies heights, materials and ``connects_to``.
+        exterior: The plan's outside description (roof, wall finish, landscaping;
+            see ``vr_exterior.exterior_spec``). Without one the house is built
+            as before: no roof, white walls, no yard.
+        plant_models: Finished 3D models made from photos
+            (``plant_model_service.ready_models``); a plant naming one is drawn
+            with it instead of its procedural mesh.
 
     Returns:
         The ``geometry`` dict sent to the Quest. Walls are pre-split around door
@@ -809,27 +998,53 @@ def build_geometry_from_rooms(
     """
     rooms_m, rects, open_rects, layout_source = _rooms_and_rects(rooms_ft, layout)
     shared = find_shared_walls(rects)
-    connections = plan_connections(rooms_m, shared)
+    # Requested features that could not be built, in words for the headset/dashboard.
+    notes: list[str] = []
+    open_pairs = plan_open_walls(rooms_m, rects, shared, notes)
+    connections = plan_connections(rooms_m, shared, notes, rects=rects, open_pairs=open_pairs)
+    solid = [_side_set(r.get("solid_walls")) for r in rooms_m]
 
     openings: list[dict] = []
     doors: list[dict] = []
     windows: list[dict] = []
     connected_ids: dict[int, list[int]] = {i: [] for i in range(len(rooms_m))}
+    open_ids: dict[int, list[int]] = {i: [] for i in range(len(rooms_m))}
 
-    def add_door(axis: str, line: float, center: float, room_ids: list[int], door_type: str):
+    # Walls taken out between open rooms: a full-width hole up to the lower ceiling
+    # (the taller room keeps a strip of wall above it).
+    open_walls: list[dict] = []
+    for a, b in open_pairs:
+        axis, line, lo, hi = shared[(a, b)]
+        top = min(rooms_m[a]["dimensions"]["height"], rooms_m[b]["dimensions"]["height"])
+        openings.append({"axis": axis, "line": line, "lo": lo, "hi": hi, "bottom": 0.0, "top": top})
+        open_walls.append({
+            "rooms": [a + 1, b + 1],
+            "start": _point(axis, line, lo),
+            "end": _point(axis, line, hi),
+            "height": round(top, 4),
+        })
+        open_ids[a].append(b + 1)
+        open_ids[b].append(a + 1)
+        logger.info(f"  ⬜ '{rooms_m[a].get('name')}' open to '{rooms_m[b].get('name')}' (wall removed)")
+
+    def add_door(
+        axis: str, line: float, center: float, room_ids: list[int], door_type: str,
+        width: float = DOOR_W, **extra: Any,
+    ):
         openings.append({
             "axis": axis, "line": line,
-            "lo": center - DOOR_W / 2, "hi": center + DOOR_W / 2,
+            "lo": center - width / 2, "hi": center + width / 2,
             "bottom": 0.0, "top": DOOR_H,
         })
         doors.append({
             "id": 100 + len(doors) + 1,
             "position": _point(axis, line, center),
-            "width": DOOR_W,
+            "width": round(width, 4),
             "height": DOOR_H,
             "rotation": 0 if axis == "x" else 90,
             "door_type": door_type,
             "rooms": room_ids,
+            **extra,
         })
 
     # Front door: on the entry's (room 0's) outside wall, street side first.
@@ -837,18 +1052,27 @@ def build_geometry_from_rooms(
     spawn = None
     if rects:
         front, east, back, west = _room_sides(rects[0])
-        # Each side with the direction pointing out of the house, street side first.
-        for side, (dx, dz) in ((front, (0, -1)), (east, (1, 0)), (west, (-1, 0)), (back, (0, 1))):
-            spans = [iv for iv in exterior_intervals(side, shared) if _fits(*iv, DOOR_W)]
-            if not spans:
-                continue
-            lo, hi = max(spans, key=lambda iv: iv[1] - iv[0])
-            center = (lo + hi) / 2
-            add_door(side[0], side[1], center, [1], "exterior")
-            door = doors[-1]["position"]
-            step = _spawn_distance(door["x"], door["z"], dx, dz, rects[1:])
-            spawn = {"x": door["x"] + dx * step, "y": 1.6, "z": door["z"] + dz * step}
-            break
+        # Each side with the direction pointing out of the house, street side first;
+        # walls kept solid only when there is no other way in.
+        sides = (("front", front, (0, -1)), ("right", east, (1, 0)), ("left", west, (-1, 0)), ("back", back, (0, 1)))
+        for keep_solid in (True, False):
+            for name, side, (dx, dz) in sides:
+                if keep_solid and name in solid[0]:
+                    continue
+                spans = [iv for iv in exterior_intervals(side, shared) if _fits(*iv, DOOR_W)]
+                if not spans:
+                    continue
+                lo, hi = max(spans, key=lambda iv: iv[1] - iv[0])
+                center = (lo + hi) / 2
+                add_door(side[0], side[1], center, [1], "exterior")
+                door = doors[-1]["position"]
+                step = _spawn_distance(door["x"], door["z"], dx, dz, rects[1:])
+                spawn = {"x": door["x"] + dx * step, "y": 1.6, "z": door["z"] + dz * step}
+                if not keep_solid:
+                    notes.append(f"The front door had to go in {rooms_m[0].get('name')}'s solid {name} wall")
+                break
+            if spawn:
+                break
 
     for a, b in connections:
         axis, line, lo, hi = shared[(a, b)]
@@ -856,11 +1080,31 @@ def build_geometry_from_rooms(
         connected_ids[a].append(b + 1)
         connected_ids[b].append(a + 1)
 
+    # Doors to the yard (door_type "patio"; the front door stays the only "exterior"
+    # one). Placed before bay windows and ordinary windows, which then keep clear of them.
+    for idx, (room, rect) in enumerate(zip(rooms_m, rects)):
+        for spec in outside_door_specs(room):
+            label = spec["style"].replace("_", " ")
+            if spec["side"] in solid[idx]:
+                notes.append(f"{room.get('name')}'s {spec['side']} wall is kept solid, so the {label} door was left out")
+                continue
+            spot = place_outside_door(rect, spec, openings, shared)
+            if spot is None:
+                logger.info(f"  ↪ '{room.get('name')}': no {spec['side']} outside wall for a {label} door — skipped")
+                notes.append(f"{room.get('name')} has no {spec['side']} outside wall for a {label} door")
+                continue
+            axis, line, center, width = spot
+            add_door(axis, line, center, [idx + 1], "patio", width, style=spec["style"], side=spec["side"])
+            logger.info(f"  🚪 '{room.get('name')}': {width / FT_TO_M:.0f} ft {label} door on the {spec['side']}")
+
     # Bay windows, where the plan asks for them. They replace the room's ordinary window.
     bays: dict[int, dict] = {}
     for idx, (room, rect) in enumerate(zip(rooms_m, rects)):
         spec = bay_spec(room)
         if spec is None:
+            continue
+        if spec["side"] in solid[idx]:
+            notes.append(f"{room.get('name')}'s {spec['side']} wall is kept solid, so the bay window was left out")
             continue
         obstacles = [r for j, r in enumerate(rects) if j != idx] + [b["bounds"] for b in bays.values()]
         bay = build_bay(
@@ -869,6 +1113,7 @@ def build_geometry_from_rooms(
         )
         if bay is None:
             logger.info(f"  ↪ '{room.get('name')}': no room for a {spec['side']} bay window — skipped")
+            notes.append(f"{room.get('name')} has no room for a {spec['side']} bay window")
             continue
         openings.append(bay["opening"])
         for w in bay["windows"]:
@@ -880,13 +1125,28 @@ def build_geometry_from_rooms(
         logger.info(f"  🪟 '{room.get('name')}': {bay['info']['style']} bay window on the {spec['side']}")
 
     # One window per room, on the longest stretch of exterior wall left over.
+    # "window": false leaves it out, {"side": ...} puts it on that side; never in a
+    # solid wall, and a kitchen keeps its last clean wall for counters.
     for idx, (room, rect) in enumerate(zip(rooms_m, rects)):
         name = _normalize(room.get("name", ""))
-        if idx in bays or any(k in name for k in _NO_WINDOW_KEYWORDS):
+        win = room.get("window", True)
+        if win is False or str(win).strip().lower() in ("none", "no", "false", "0"):
+            continue
+        wanted = _side_set([win.get("side")]) if isinstance(win, dict) else set()
+        if idx in bays or (not isinstance(win, dict) and any(k in name for k in _NO_WINDOW_KEYWORDS)):
             continue
         win_w = SMALL_WINDOW_W if any(k in name for k in _SMALL_WINDOW_KEYWORDS) else WINDOW_W
+        clean = [
+            side_name for side_name, side in zip(_SIDE_NAMES, _room_sides(rect))
+            if side[3] - side[2] >= CLEAN_WALL_MIN and not _openings_within(side, openings)
+        ]
+        keep_clean = any(k in name for k in _CLEAN_WALL_KEYWORDS) and not solid[idx] and len(clean) == 1
         best = None
-        for side in _room_sides(rect):
+        for side_name, side in zip(_SIDE_NAMES, _room_sides(rect)):
+            if side_name in solid[idx] or (wanted and side_name not in wanted):
+                continue
+            if keep_clean and side_name == clean[0]:
+                continue
             axis, line, _, _ = side
             near_openings = [
                 (o["lo"] - EDGE_MARGIN, o["hi"] + EDGE_MARGIN) for o in _opening_on(side, openings)
@@ -900,6 +1160,10 @@ def build_geometry_from_rooms(
                 if _fits(f_lo, f_hi, win_w) and (best is None or f_hi - f_lo > best[3] - best[2]):
                     best = (axis, line, f_lo, f_hi)
         if best is None:
+            if wanted:
+                notes.append(f"{room.get('name')} has no room for a window on the {'/'.join(sorted(wanted))}")
+            elif keep_clean:
+                logger.info(f"  ↪ '{room.get('name')}': no window, to keep its {clean[0]} wall clear for counters")
             continue
         axis, line, f_lo, f_hi = best
         center = (f_lo + f_hi) / 2
@@ -944,6 +1208,9 @@ def build_geometry_from_rooms(
             "dimensions": {k: round(v, 3) for k, v in geom_dims.items()},
             "bounds": {k: round(v, 4) for k, v in rects[idx].items()},
             "connects_to": connected_ids[idx],
+            # Rooms it is open to (no wall between) and the sides it keeps clear of openings.
+            "open_to": open_ids[idx],
+            "solid_walls": [s for s in _SIDE_NAMES if s in solid[idx]],
             "walls": generate_walls(rects[idx], geom_dims["height"], openings)
             + (bay["walls"] if bay else []),
             # Bump-out outline plus its own floor and ceiling slabs, or null.
@@ -982,21 +1249,35 @@ def build_geometry_from_rooms(
         }
     logger.info(f"🎨 Material map: {list(material_map.keys())}")
 
+    from .vr_exterior import build_exterior, exterior_spec  # imports this module
+
+    exterior_out = build_exterior(
+        exterior_spec(exterior), rects, [r["dimensions"]["height"] for r in rooms_m],
+        open_rects, openings, shared, bays, plant_models,
+    )
+
     return {
         "project_id": project_id,
         "project_name": project_name,
         "rooms": rooms_out,
         "doors": doors,
         "windows": windows,
+        # Walls taken out between open rooms (open_to), as the stretch removed.
+        "open_walls": open_walls,
         "materials": material_map,
         # Outdoor parts of the footprint (an L/U/T-shaped house), for drawing the plan.
         "open_areas": [{"bounds": {k: round(v, 4) for k, v in r.items()}} for r in open_rects],
+        # Roof meshes, wall finish, ground and landscaping, or null (see vr_exterior.py).
+        "exterior": exterior_out,
         # Outside the front door (or in front of the entry if it had no room for one).
         "spawn_position": spawn or {
             "x": rooms_out[0]["position"]["x"] if rooms_out else 0.0,
             "y": 1.6,
             "z": -3.0,
         },
+        # Requested doors and bay windows that did not fit, e.g.
+        # "Hallway has no back outside wall for a sliding glass door".
+        "notes": notes,
         "metadata": {
             "total_rooms": len(rooms_out),
             "total_doors": len(doors),
