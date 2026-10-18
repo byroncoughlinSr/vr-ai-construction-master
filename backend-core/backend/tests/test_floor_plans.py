@@ -12,6 +12,7 @@ from app.api.v1 import ai_planning
 from app.database import Base, get_db
 from app.main import app
 from app.models import AIGeneration, FloorPlan, Project
+from app.services import floor_plan_service
 from app.services.example_floor_plans import EXAMPLE_NAME, EXAMPLE_STRUCTURE, seed_example
 
 engine = create_engine(
@@ -382,3 +383,71 @@ def test_site_summary_describes_each_wall():
     assert kitchen["left"] == "Den: doorway to Den"
     assert kitchen["right"] == "outside: window"
     assert kitchen["back"] == "outside: none (solid)"
+
+
+DINING = {"rooms": {"Dining Room": [{"type": "dining table", "seats": 6, "name": "oak farmhouse table"}]}}
+
+
+def test_furniture_change_updates_the_current_version_in_place(example_id, monkeypatch):
+    response, seen = _refine(
+        example_id, monkeypatch, {"scope": "furniture", "furniture": DINING},
+        "a dining table with 6 chairs in the middle of the dining room",
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["updated_in_place"] is True
+    assert body["floor_plan"]["version"] == 1
+    assert body["floor_plan"]["furniture"]["rooms"]["Dining Room"][0]["seats"] == 6
+    types = [p["type"] for p in body["geometry"]["furniture"]["pieces"]]
+    assert types.count("dining chair") == 6 and "dining table" in types
+    assert seen["structure"]["furniture"] is None
+
+    # A second change to another room keeps the dining room's.
+    response, seen = _refine(example_id, monkeypatch, {
+        "scope": "furniture", "furniture": {"rooms": {"Living Room": [{"type": "sofa"}]}},
+    }, "a sofa in the living room")
+    rooms = response.json()["floor_plan"]["furniture"]["rooms"]
+    assert set(rooms) == {"Dining Room", "Living Room"}
+    assert seen["structure"]["furniture"]["rooms"]["Dining Room"]
+
+
+def test_furniture_change_without_furniture_is_rejected(example_id, monkeypatch):
+    response, _ = _refine(example_id, monkeypatch, {"scope": "furniture"})
+    assert response.status_code == 422
+
+
+def test_room_change_keeps_the_furniture_and_follows_renames(example_id, monkeypatch):
+    _refine(example_id, monkeypatch, {"scope": "furniture", "furniture": DINING})
+    revised = floor_plan_service.rename_rooms(copy.deepcopy(EXAMPLE_STRUCTURE), {"Dining Room": "Formal Dining"})
+    response, _ = _refine(example_id, monkeypatch, {
+        "scope": "floor_plan", "project_structure": revised, "renames": {"Dining Room": "Formal Dining"},
+        "furniture": {"rooms": {"Kitchen": [{"type": "kitchen island", "seats": 3}]}},
+    }, "rename the dining room and add an island")
+    body = response.json()
+    assert body["updated_in_place"] is False
+    assert body["floor_plan"]["version"] == 2
+    assert set(body["floor_plan"]["furniture"]["rooms"]) == {"Formal Dining", "Kitchen"}
+
+
+def test_dashboard_edit_keeps_the_furniture_of_rooms_it_keeps(example_id, monkeypatch):
+    _refine(example_id, monkeypatch, {"scope": "furniture", "furniture": {"auto": True, **DINING}})
+    rooms = [r for r in EXAMPLE_STRUCTURE["rooms"]]
+    response = client.put(f"/api/v1/projects/{example_id}/floor-plan", json={
+        "layout": EXAMPLE_STRUCTURE["layout"], "rooms": rooms,
+    })
+    furniture = response.json()["floor_plan"]["furniture"]
+    assert furniture["auto"] is True and "Dining Room" in furniture["rooms"]
+
+
+def test_a_furnished_house_from_the_planner_is_saved_with_its_furniture(monkeypatch):
+    structure = {**copy.deepcopy(EXAMPLE_STRUCTURE), "furniture": {"auto": True}}
+
+    async def generate_complete_project(project_description, **kwargs):
+        return {"success": True, "plan": {"project_structure": structure, "phases": [], "material_list": []},
+                "source": "groq", "project_name": "Furnished House"}
+
+    monkeypatch.setattr(ai_planning.planning_service, "generate_complete_project", generate_complete_project)
+    body = client.post("/api/v1/planning/generate-vr-from-prompt", json={"prompt": "a furnished cottage"}).json()
+    assert body["geometry"]["furniture"]["pieces"]
+    plan = client.get(f"/api/v1/projects/{body['project_id']}/floor-plan").json()
+    assert plan["furniture"] == {"auto": True}

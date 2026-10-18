@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from ..models import AIGeneration, ConstructionPhase, FloorPlan, Material, Project
 from . import plant_model_service
 from .vr_exterior import exterior_spec
+from .vr_furniture import furniture_spec, merge_furniture, prune_furniture, rename_furniture_rooms
 from .vr_geometry_service import (
     FT_TO_M,
     LayoutError,
@@ -43,7 +44,8 @@ _ROOM_REFS = ("connects_to", "no_door_to", "open_to")
 def rename_rooms(structure: dict, renames: Any) -> dict:
     """A copy of ``structure`` with rooms renamed (``{"Old name": "New name"}``,
     case-insensitive) everywhere a name appears: layout leaves, ``entry``, the
-    room list and the names in ``connects_to`` / ``no_door_to`` / ``open_to``."""
+    room list, the names in ``connects_to`` / ``no_door_to`` / ``open_to`` and the
+    rooms ``furniture`` is listed under."""
     if not isinstance(renames, dict):
         return structure
     mapping = {
@@ -80,12 +82,14 @@ def rename_rooms(structure: dict, renames: Any) -> dict:
                 room[key] = [renamed(v) for v in value]
             elif isinstance(value, str):
                 room[key] = renamed(value)
+    if isinstance(out.get("furniture"), dict):
+        out["furniture"] = rename_furniture_rooms(out["furniture"], mapping)
     return out
 
 
 def validate_structure(structure: Any) -> dict:
     """Check a ``project_structure`` and return a clean copy (``layout``, ``rooms``
-    and, when it has one, the cleaned ``exterior``).
+    and, when it has them, the cleaned ``exterior`` and ``furniture``).
 
     Rooms must be objects with names; a ``layout``, when given, must be a valid
     nested-split tree. Raises FloorPlanError otherwise.
@@ -122,6 +126,8 @@ def validate_structure(structure: Any) -> dict:
     clean = {"layout": layout, "rooms": rooms}
     if "exterior" in structure:
         clean["exterior"] = exterior_spec(structure.get("exterior"))
+    if "furniture" in structure:
+        clean["furniture"] = furniture_spec(structure.get("furniture"))
     return clean
 
 
@@ -145,13 +151,16 @@ def add_floor_plan_version(
 ) -> FloorPlan:
     """Validate ``structure`` and store it as the project's next version (not committed).
 
-    The outside of the house comes from ``structure["exterior"]`` when given, else
-    it is carried over from the current version.
+    The outside of the house and the furniture come from ``structure["exterior"]`` /
+    ``["furniture"]`` when given, else they are carried over from the current
+    version (furniture only for rooms the plan still has).
     """
     clean = validate_structure(structure)
-    if "exterior" not in clean:
+    if "exterior" not in clean or "furniture" not in clean:
         current = current_floor_plan(db, project_id)
-        clean["exterior"] = current.exterior if current else None
+        clean.setdefault("exterior", current.exterior if current else None)
+        clean.setdefault("furniture", current.furniture if current else None)
+    clean["furniture"] = prune_furniture(clean["furniture"], [str(r["name"]) for r in clean["rooms"]])
     latest = db.query(func.max(FloorPlan.version)).filter(FloorPlan.project_id == project_id).scalar()
     plan = FloorPlan(
         project_id=project_id,
@@ -160,6 +169,7 @@ def add_floor_plan_version(
         layout=clean["layout"],
         rooms=clean["rooms"],
         exterior=clean["exterior"],
+        furniture=clean["furniture"],
         change_type=change_type,
         change_note=change_note,
         source=source,
@@ -186,11 +196,31 @@ def update_exterior(db: Session, plan: FloorPlan, exterior: Any, source: str | N
     return plan
 
 
-def site_summary(plan: FloorPlan, plant_models: list[str] | None = None) -> dict:
+def update_furniture(db: Session, plan: FloorPlan, furniture: Any, source: str | None = None) -> FloorPlan:
+    """Change the furniture on ``plan`` itself, without a new version (not committed):
+    the rooms ``furniture`` lists are replaced, the others kept. Raises FloorPlanError
+    when it describes nothing."""
+    change = furniture_spec(furniture)
+    if change is None:
+        raise FloorPlanError("the furniture description has nothing usable in it")
+    names = [str(r.get("name")) for r in plan.rooms or [] if isinstance(r, dict)]
+    plan.furniture = prune_furniture(merge_furniture(plan.furniture, change), names)
+    db.add(plan)
+    db.flush()
+    logger.info(
+        f"🛋️  Furniture of project {plan.project_id} floor plan v{plan.version} updated in place"
+        f" ({', '.join(change.get('rooms') or {}) or 'auto'})" + (f" ({source})" if source else "")
+    )
+    return plan
+
+
+def site_summary(plan: FloorPlan, plant_models: list[str] | None = None,
+                 furniture_models: list[str] | None = None) -> dict:
     """Where things are, in feet, so the AI can place plants and paths around the
     house: the footprint, the front door (and which way it faces), each room's
     rectangle, the other doors to the yard and the open (outdoor) parts of the footprint.
-    ``plant_models`` names the plants that have a 3D model made from a photo."""
+    ``plant_models`` / ``furniture_models`` name the plants and pieces that have a
+    3D model made from a photo."""
     geometry = build_geometry_from_rooms(rooms_ft=list(plan.rooms or []), layout=plan.layout)
 
     def ft(v: float) -> float:
@@ -259,6 +289,8 @@ def site_summary(plan: FloorPlan, plant_models: list[str] | None = None) -> dict
     ]
     if plant_models:
         site["plant_models"] = plant_models[:20]
+    if furniture_models:
+        site["furniture_models"] = furniture_models[:20]
     return site
 
 
@@ -328,6 +360,7 @@ def serialize(plan: FloorPlan) -> dict:
         "layout": plan.layout,
         "rooms": plan.rooms,
         "exterior": plan.exterior,
+        "furniture": plan.furniture,
         "change_type": plan.change_type,
         "change_note": plan.change_note,
         "source": plan.source,
@@ -343,14 +376,18 @@ def geometry_for_plan(
     target_platform: str = "quest2",
     optimize_for_vr: bool = True,
     plant_models: list[dict] | None = None,
+    furniture_models: list[dict] | None = None,
 ) -> dict:
     """VR geometry for one floor-plan version, named after the house.
-    ``plant_models``: the finished photo models (``plant_model_service.ready_models``)."""
+    ``plant_models`` / ``furniture_models``: the finished photo models
+    (``plant_model_service.ready_models``)."""
     geometry = build_geometry_from_rooms(
         rooms_ft=list(plan.rooms or []),
         layout=plan.layout,
         exterior=plan.exterior,
         plant_models=plant_models,
+        furniture=plan.furniture,
+        furniture_models=furniture_models,
         materials=materials,
         project_id=plan.project_id,
         project_name=plan.name,
@@ -424,7 +461,8 @@ def geometry_for_project(
         logger.info(f"🗺️  Using floor plan v{plan.version} '{plan.name}'")
         return geometry_for_plan(
             plan, materials, target_platform, optimize_for_vr,
-            plant_models=plant_model_service.ready_models(db),
+            plant_models=plant_model_service.ready_models(db, "plant"),
+            furniture_models=plant_model_service.ready_models(db, "furniture"),
         )
 
     rooms_ft, layout = _legacy_rooms(db, project.id)

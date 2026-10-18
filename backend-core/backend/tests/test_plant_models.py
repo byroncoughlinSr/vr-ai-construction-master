@@ -138,8 +138,8 @@ def test_a_photo_becomes_a_normalised_model(provider, started):
 def test_a_description_is_drawn_first(provider, started, monkeypatch):
     drawn = []
 
-    async def draw(description, out):
-        drawn.append(description)
+    async def draw(description, out, kind):
+        drawn.append((description, kind))
         out.write_bytes(_photo("JPEG", (512, 512)))
         return out
 
@@ -149,7 +149,7 @@ def test_a_description_is_drawn_first(provider, started, monkeypatch):
     _run(body["id"])
     model = client.get(f"/api/v1/plants/models/{body['id']}").json()
     assert model["status"] == "ready"
-    assert drawn == ["coral Knock Out rose bush in bloom"]
+    assert drawn == [("coral Knock Out rose bush in bloom", "plant")]
     assert model["image_url"] == f"/plant_models/{body['id']}/source.jpg"
 
 
@@ -231,6 +231,54 @@ def test_houses_that_name_the_plant_draw_the_model(provider, started, monkeypatc
 
     monkeypatch.setattr(ai_planning.planning_service, "refine_floor_plan", refine)
     client.post(f"/api/v1/projects/{project_id}/floor-plan/refine", json={"instruction": "more coral roses"})
+    assert seen["plant_models"] == ["Coral rose"]
+
+
+def test_furniture_has_its_own_library(provider, started):
+    response = client.post(
+        "/api/v1/furniture/models", data={"name": "Grandma's armchair", "height_ft": "3.5"},
+        files={"photo": ("chair.png", _photo(), "image/png")},
+    )
+    assert response.status_code == 202
+    chair = response.json()
+    assert chair["kind"] == "furniture"
+    plant = _add("Coral rose").json()
+    assert plant["kind"] == "plant"
+    assert [m["id"] for m in client.get("/api/v1/furniture/models").json()["models"]] == [chair["id"]]
+    assert [m["id"] for m in client.get("/api/v1/plants/models").json()["models"]] == [plant["id"]]
+    # Each library only serves its own.
+    assert client.get(f"/api/v1/plants/models/{chair['id']}").status_code == 404
+    assert client.delete(f"/api/v1/furniture/models/{plant['id']}").status_code == 404
+
+
+def test_houses_that_name_the_piece_draw_the_furniture_model(provider, started, monkeypatch):
+    response = client.post(
+        "/api/v1/furniture/models", data={"name": "Grandma's armchair"},
+        files={"photo": ("chair.png", _photo(), "image/png")},
+    )
+    model_id = response.json()["id"]
+    _run(model_id)
+    _run(_add("Coral rose").json()["id"])
+    with TestingSessionLocal() as db:
+        project_id = seed_example(db).id
+        plan = floor_plan_service.current_floor_plan(db, project_id)
+        floor_plan_service.update_furniture(db, plan, {"rooms": {"Living Room": [
+            {"type": "armchair", "name": "grandmas armchair"}, {"type": "sofa"},
+        ]}})
+        db.commit()
+    furniture = client.get(f"/api/v1/projects/{project_id}/generate-vr").json()["geometry"]["furniture"]
+    assert [m["model_id"] for m in furniture["models"]] == [model_id]
+    assert [p["type"] for p in furniture["pieces"]] == ["sofa"]
+
+    seen = {}
+
+    async def refine(structure, instruction, site=None):
+        seen.update(site)
+        return {"success": True, "plan": {"scope": "furniture", "furniture": {"rooms": {}}}, "source": "groq"}
+
+    monkeypatch.setattr(ai_planning.planning_service, "refine_floor_plan", refine)
+    client.post(f"/api/v1/projects/{project_id}/floor-plan/refine", json={"instruction": "move the armchair"})
+    assert seen["furniture_models"] == ["Grandma's armchair"]
     assert seen["plant_models"] == ["Coral rose"]
 
 

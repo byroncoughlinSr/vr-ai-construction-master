@@ -174,7 +174,8 @@ def _singular(word: str) -> str:
 
 def name_key(text: Any) -> str:
     """Lower-case singular words: "Coral Roses" and "coral rose" give the same key."""
-    words = re.findall(r"[a-z0-9]+", str(text or "").lower())
+    # Apostrophes go first: "Grandma's chair" and "grandmas chairs" match.
+    words = re.findall(r"[a-z0-9]+", re.sub(r"['’]", "", str(text or "").lower()))
     return " ".join(_singular(w) for w in words)
 
 

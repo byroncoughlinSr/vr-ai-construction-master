@@ -178,3 +178,14 @@ def test_groq_request_over_the_token_limit_is_retried_with_a_smaller_answer():
     result = asyncio.run(service._generate_with_groq("prompt"))
     assert calls == [4096, 4096 - 258 - 256]
     assert result["success"] is True
+
+
+def test_both_prompts_describe_furniture():
+    service = _service()
+    planning = service._build_planning_prompt("a furnished cottage", None, None, None)
+    assert '"furniture" inside "project_structure"' in planning
+    furniture = {"rooms": {"Den": [{"type": "sofa"}]}}
+    refine = service._build_refine_prompt({"layout": None, "rooms": [], "furniture": furniture}, "add a piano", {})
+    assert 'CURRENT FURNITURE (JSON by room; null means none yet):\n{"rooms":{"Den":[{"type":"sofa"}]}}' in refine
+    assert '{"scope": "furniture", "furniture":' in refine
+    assert '"kitchen island"' in refine

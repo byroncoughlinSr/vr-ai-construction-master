@@ -787,7 +787,7 @@ def build_exterior(
         ((x0 + x1) / 2, GROUND_TOP - ground_t / 2, (z0 + z1) / 2), (x1 - x0, ground_t, z1 - z0),
         ground["color"], walkable=True, kind="ground",
     ))
-    found_top = -0.013  # just under the floors (0.05 world units thick, centred on 0)
+    found_top = -0.026  # just under the floors (0.05 world units thick, centred on 0; 1 unit = 1 m)
     for rect in rects:
         parts.append(_box(
             ((rect["x0"] + rect["x1"]) / 2, (GROUND_TOP + found_top) / 2, (rect["z0"] + rect["z1"]) / 2),

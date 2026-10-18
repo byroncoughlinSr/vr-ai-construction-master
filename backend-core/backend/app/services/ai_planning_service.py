@@ -30,6 +30,14 @@ EXTERIOR_FORMAT = """{"roof": {"style": "gable"|"hip"|"flat"|"shed", "material":
   - Keep plants and rocks outside every room's rectangle (when the SITE lists them): "by" or "on each side of the front door" means the SITE's front_door "beside_it" spots (4 ft out from the door's wall, 5 ft to either side). A walkway to the front door runs from the street (z about -25) to the door. Space plants sensibly (trees 10+ ft apart, shrubs 3-4 ft apart); for "a row of" or "both sides of", list each plant."""
 
 
+# Furniture, as both planning prompts describe it. The backend cleans the result with
+# vr_furniture.furniture_spec and places the pieces itself — keep them in step.
+FURNITURE_FORMAT = """{"auto": true|false, "rooms": {"<exact room name>": [items]}}
+- "auto": true furnishes every room NOT in "rooms" as that kind of room usually is (bedroom: bed, nightstands, dresser; living: sofa, coffee table, armchair, TV; dining: table and chairs; kitchen: counters, fridge, stove, island; bathroom: toilet, vanity, tub). Use it for "furnish the house". A room in "rooms" gets exactly its items ([] = empty).
+- Item: {"type": "sofa"|"loveseat"|"sectional"|"armchair"|"recliner"|"dining chair"|"office chair"|"bar stool"|"bench"|"dining table"|"round table"|"coffee table"|"side table"|"console table"|"desk"|"bed"|"crib"|"nightstand"|"dresser"|"wardrobe"|"bookshelf"|"tv stand"|"sideboard"|"piano"|"counter"|"kitchen island"|"refrigerator"|"stove"|"toilet"|"vanity"|"bathtub"|"shower"|"washer"|"dryer"|"rug"|"floor lamp"|"potted plant", "name": "the person's words ('navy velvet sofa')", "color": "#rrggbb", "material": "oak"|"walnut"|..., "seats": n, "size": "king"|"queen"|"full"|"twin", "count": n, "place": "front"|"back"|"left"|"right"|"center"|"corner", "x": ft, "z": ft, "facing": side, "width"/"depth"/"height": ft}; only "type" is required. "seats" = chairs round a table or stools at an island (don't list them separately); "size" is a bed's.
+- Pieces are placed automatically (against free walls, clear of doorways and windows; nightstands by the bed, coffee table before the sofa). "place" picks the wall ("front" = street side) or center/corner; give "x"/"z" (feet from the room's front-left corner) only for an exact spot. SITE "furniture_models" have a 3D model from a photo: use that exact "name"."""
+
+
 class AIPlanningService:
     """Service for construction planning using LLM models."""
 
@@ -118,8 +126,9 @@ class AIPlanningService:
 
         ``structure`` is a ``project_structure`` (``layout`` + ``rooms`` + ``exterior``,
         feet); ``site`` is ``floor_plan_service.site_summary``. Returns the provider
-        result; on success ``plan["scope"]`` says what changed: ``"exterior"`` (only
-        ``plan["exterior"]``), else ``plan["project_structure"]`` is the whole revised plan.
+        result; on success ``plan["scope"]`` says what changed: ``"exterior"`` or
+        ``"furniture"`` (only ``plan["exterior"]`` / ``plan["furniture"]``, the rooms
+        that change), else ``plan["project_structure"]`` is the whole revised plan.
         """
         prompt = self._build_refine_prompt(structure, instruction, site)
         result = await self._run_provider_chain(prompt, "Floor plan refinement")
@@ -128,7 +137,7 @@ class AIPlanningService:
         plan = result.get("plan") or {}
         revised = plan.get("project_structure")
         if (
-            str(plan.get("scope") or "").strip().lower() != "exterior"
+            str(plan.get("scope") or "").strip().lower() not in ("exterior", "furniture")
             and isinstance(revised, dict) and revised.get("layout") is not None
             and not isinstance(revised.get("rooms"), list)
         ):
@@ -515,7 +524,9 @@ FLOOR PLAN DESIGN (all sizes in feet):
 - OUTSIDE DOORS: the front door is automatic (on the "entry" room). Only when the description asks for another door to the outside (a back door, a sliding glass door or French doors to the yard, patio or deck), give that room "outside_doors": [{"side": "front"|"back"|"left"|"right", "style": "sliding_glass"|"french"|"hinged", "width": 6}] (feet; a double sliding door is about 6-8 ft, French doors 5-6 ft, a single door 3 ft). The side must be one where the room has an outside wall. Leave the key out of every other room.
 - Use descriptive room names (e.g. "Entry Foyer", "Primary Bedroom", "Hall Bathroom").
 - OUTSIDE OF THE HOUSE: only when the description mentions the roof, the outside walls, colors, or the yard (trees, plants, paths, driveway, patio, fence, pool), add "exterior" inside "project_structure":
-""" + EXTERIOR_FORMAT
+""" + EXTERIOR_FORMAT + """
+- FURNITURE: only when the description mentions furniture or asks for a furnished house, add "furniture" inside "project_structure" (room names exactly as in "rooms"):
+""" + FURNITURE_FORMAT
 
         return prompt
 
@@ -529,6 +540,7 @@ FLOOR PLAN DESIGN (all sizes in feet):
             separators=(",", ":"),
         )
         exterior = json.dumps(structure.get("exterior"), separators=(",", ":"))
+        furniture = json.dumps(structure.get("furniture"), separators=(",", ":"))
         site_json = json.dumps(site or {}, separators=(",", ":"))
         return f"""You are a residential architect and landscape designer revising an existing house.
 
@@ -538,6 +550,9 @@ CURRENT FLOOR PLAN (JSON, all sizes in feet):
 CURRENT EXTERIOR (JSON, feet; null means none yet):
 {exterior}
 
+CURRENT FURNITURE (JSON by room; null means none yet):
+{furniture}
+
 SITE (feet: the footprint, the front door and which way it faces, every room's rectangle and its four "walls" (front/back/left/right, each "<what is on the other side: outside or room names>: <what is in it: doorways, windows, doors, open walls>", "(solid)" when kept clear), the other doors to the yard (put a deck or patio "outside the sliding door" against the wall there), the open outdoor parts of the footprint, and "doorways": every doorway between two rooms the house has now, including ones added automatically so every room is reachable):
 {site_json}
 
@@ -545,8 +560,9 @@ REQUESTED CHANGE: {instruction}
 
 First decide what the change is about:
 - "exterior": only the outside — roof, outside wall finish or colors, trim, the ground, or the yard (trees, palms, shrubs, flowers, lawn, paths, driveway, patio, deck, fence, hedge, pool, rocks).
+- "furniture": only what is in the rooms — sofas, chairs, beds, tables, desks, dressers, shelves, TVs, kitchen counters, islands and appliances, toilets, tubs, showers, vanities, rugs, lamps, indoor plants.
 - "floor_plan": the rooms — sizes, adding or removing rooms, doorways, the house's shape, bay windows, and doors to the outside (back door, sliding glass door, French doors), even when they lead to the yard, a patio or a deck.
-- "both": it asks for both.
+- "both": it asks for the rooms and the outside.
 
 Apply the requested change and nothing else: keep everything the change does not affect.
 
@@ -565,10 +581,15 @@ FLOOR PLAN format (for "floor_plan" or "both"):
 EXTERIOR format (for "exterior" or "both"; return the WHOLE exterior: the current one with the change applied, keeping every item the change does not affect):
 {EXTERIOR_FORMAT}
 
+FURNITURE format (for "furniture", or beside any other scope when the change also moves furniture): return only the rooms whose furniture changes, each with its whole new list (its current items with the change applied); rooms left out keep theirs. Give "auto" only when the change asks to furnish (true) or clear (false) the whole house. When a room is renamed or removed, its furniture follows automatically.
+{FURNITURE_FORMAT}
+
 Reply with ONLY a JSON object (no markdown, no explanation):
 - for "exterior": {{"scope": "exterior", "exterior": {{...}}}}
+- for "furniture": {{"scope": "furniture", "furniture": {{"rooms": {{"Room Name": [...]}}}}}}
 - for "floor_plan": {{"scope": "floor_plan", "project_structure": {{"layout": {{...}}, "rooms": [...]}}}} (plus "renames" when a room is renamed)
-- for "both": {{"scope": "both", "project_structure": {{"layout": {{...}}, "rooms": [...]}}, "exterior": {{...}}}}"""
+- for "both": {{"scope": "both", "project_structure": {{"layout": {{...}}, "rooms": [...]}}, "exterior": {{...}}}}
+Add "furniture": {{...}} beside "exterior" or "project_structure" when the change is about furniture too."""
 
     def _clean_json_string(self, json_str: str) -> str:
         """Fix common LLM JSON formatting issues before parsing."""

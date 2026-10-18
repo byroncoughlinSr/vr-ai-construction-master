@@ -26,6 +26,9 @@ class FloorPlan(Base):
     # Roof, wall finish and landscaping (vr_exterior.exterior_spec). A change to only
     # the outside updates the current version in place; new versions carry it over.
     exterior = Column(JSON)
+    # Furniture by room name (vr_furniture.furniture_spec); handled like the exterior:
+    # a furniture-only change updates the current version in place, new versions carry it over.
+    furniture = Column(JSON)
 
     # How this version came about
     change_type = Column(String(50), nullable=False)  # generated, edited, refined, example
@@ -43,7 +46,7 @@ class FloorPlan(Base):
     @property
     def structure(self) -> dict:
         """The plan as the planner's ``project_structure``."""
-        return {"layout": self.layout, "rooms": self.rooms or [], "exterior": self.exterior}
+        return {"layout": self.layout, "rooms": self.rooms or [], "exterior": self.exterior, "furniture": self.furniture}
 
     def __repr__(self):
         return f"<FloorPlan(project_id={self.project_id}, version={self.version}, name='{self.name}')>"

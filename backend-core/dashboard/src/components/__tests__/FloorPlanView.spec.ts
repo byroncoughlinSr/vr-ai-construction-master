@@ -325,6 +325,45 @@ describe('FloorPlanView', () => {
     expect(summary).toContain('2 coral roses, 1 tulips, 1 hedge (1 from photos)')
   })
 
+  it('draws the furniture under the room names, rugs first, and sums it up', async () => {
+    const wood = { r: 0.55, g: 0.4, b: 0.3 }
+    const square = (x: number, z: number, h: number): [number, number][] =>
+      [[x - h, z - h], [x + h, z - h], [x + h, z + h], [x - h, z + h]]
+    get.mockResolvedValue({
+      data: {
+        success: true,
+        geometry: {
+          ...geometry,
+          furniture: {
+            meshes: {},
+            pieces: [
+              { type: 'sofa', room: 2, outline: square(4, 1, 0.5), color: wood, name: 'navy sofa' },
+              { type: 'dining chair', room: 2, outline: square(5, 2, 0.2), color: wood },
+              { type: 'dining chair', room: 2, outline: square(6, 2, 0.2), color: wood },
+              { type: 'rug', room: 2, outline: square(4.5, 1.5, 1), color: wood }
+            ],
+            models: [
+              { type: 'armchair', room: 1, outline: square(1, 1, 0.4), color: wood, model_id: 9, name: "Grandma's armchair" }
+            ]
+          }
+        }
+      }
+    })
+    const wrapper = mountPlan()
+    await flushPromises()
+
+    const pieces = wrapper.findAll('polygon.furniture')
+    expect(pieces).toHaveLength(5)
+    expect(pieces[0].classes()).toContain('rug')
+    expect(pieces[1].find('title').text()).toBe('navy sofa')
+    expect(wrapper.find('polygon.furniture-model title').text()).toBe("Grandma's armchair (from a photo)")
+    // Room names are drawn after the furniture, so they stay on top.
+    const svg = wrapper.find('svg').html()
+    expect(svg.lastIndexOf('class="furniture')).toBeLessThan(svg.indexOf('Living Room'))
+    expect(wrapper.find('.furniture-summary').text())
+      .toBe('🛋 4 pieces of furniture (2 dining chairs, 1 sofa, 1 armchair), 1 from photos')
+  })
+
   it('draws a sliding glass door to the yard and notes what did not fit', async () => {
     const withPatio = JSON.parse(JSON.stringify(geometry))
     withPatio.doors.push({

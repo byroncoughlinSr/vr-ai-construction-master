@@ -14,6 +14,7 @@ from ...schemas.project import (
 )
 from ...services import get_image_service
 from ...services import floor_plan_service, plant_model_service
+from ...services.vr_furniture import furniture_spec, merge_furniture
 from ...services.floor_plan_service import FloorPlanError
 from .image_jobs import start_image_generation
 
@@ -382,8 +383,8 @@ async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db:
     """Change the house in words; used by the headset's voice refinement and the dashboard.
 
     A change to the rooms is saved as a new floor-plan version. A change to only
-    the outside (roof, walls, yard) updates the current version in place;
-    ``updated_in_place`` says which happened.
+    the outside (roof, walls, yard) or the furniture updates the current version
+    in place; ``updated_in_place`` says which happened.
     """
     from .ai_planning import planning_service  # one shared planner (and its Ollama probe state)
 
@@ -393,7 +394,9 @@ async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db:
         result = await planning_service.refine_floor_plan(
             current.structure, refine.instruction,
             site=floor_plan_service.site_summary(
-                current, plant_models=[m["name"] for m in plant_model_service.ready_models(db)],
+                current,
+                plant_models=[m["name"] for m in plant_model_service.ready_models(db, "plant")],
+                furniture_models=[m["name"] for m in plant_model_service.ready_models(db, "furniture")],
             ),
         )
     except Exception as e:
@@ -403,19 +406,35 @@ async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db:
     revised = result.get("plan") or {}
     structure = revised.get("project_structure") or {}
     exterior = revised.get("exterior", structure.get("exterior"))
+    furniture = revised.get("furniture", structure.get("furniture"))
     scope = str(revised.get("scope") or "").strip().lower()
-    if scope not in ("exterior", "floor_plan", "both"):
-        scope = "floor_plan" if structure.get("rooms") else "exterior" if exterior is not None else "floor_plan"
+    if scope not in ("exterior", "furniture", "floor_plan", "both"):
+        scope = (
+            "floor_plan" if structure.get("rooms")
+            else "exterior" if exterior is not None
+            else "furniture" if furniture is not None
+            else "floor_plan"
+        )
+    in_place = scope in ("exterior", "furniture")
     logger.info(f"✏️  Change scope: {scope}")
 
     try:
-        if scope == "exterior":
-            if exterior is None:
-                raise FloorPlanError("the AI returned no exterior")
-            plan = floor_plan_service.update_exterior(db, current, exterior, source=result.get("source"))
+        if in_place:
+            if exterior is None and furniture is None:
+                raise FloorPlanError(f"the AI returned no {scope}")
+            plan = current
+            if exterior is not None:
+                plan = floor_plan_service.update_exterior(db, plan, exterior, source=result.get("source"))
+            if furniture is not None:
+                plan = floor_plan_service.update_furniture(db, plan, furniture, source=result.get("source"))
         else:
+            # The furniture the AI returns is only the rooms that change: start from
+            # the current furniture (renamed with its rooms) and apply that.
+            structure = {**structure, "furniture": current.furniture}
             # A rename the AI may have applied in only some places.
             structure = floor_plan_service.rename_rooms(structure, revised.get("renames"))
+            if furniture is not None:
+                structure["furniture"] = merge_furniture(structure["furniture"], furniture_spec(furniture))
             if exterior is not None:
                 structure = {**structure, "exterior": exterior}
             plan = floor_plan_service.add_floor_plan_version(
@@ -428,7 +447,7 @@ async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db:
         raise HTTPException(status_code=422, detail=f"The revised plan is not buildable: {e}")
     db.commit()
     db.refresh(plan)
-    return {**_new_version_response(db, plan), "updated_in_place": scope == "exterior"}
+    return {**_new_version_response(db, plan), "updated_in_place": in_place}
 
 
 @router.put("/{project_id}/floor-plan/image")

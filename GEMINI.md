@@ -139,9 +139,10 @@ constants **must** stay in sync across the language boundary or the house develo
   corners, and passing one vector puts the box beside its entity instead of around it.
 - `FT_TO_M = 0.3048` — the AI returns dimensions in **feet**; the VR world is **metres** (1 unit = 1 m).
   Conversion happens backend-side; Kotlin consumes metres directly.
-- `SCALE = 2.0f` in `HouseGenerator.kt` — **every** position, dimension and spawn point from the JSON is
+- `SCALE = 1.0f` in `HouseGenerator.kt` (real size; it was 2, which looked twice life size in the headset
+  however high the eyes were put) — **every** position, dimension and spawn point from the JSON is
   multiplied by it on the Kotlin side. Anything you add to the geometry JSON must be scaled too, or it
-  lands at half size / half distance relative to the rest of the house.
+  lands at the wrong size / distance if SCALE ever changes again.
 
 **Layout is a nested-split tree** the AI returns as `project_structure.layout`: a footprint
 (`length` along x, `width` along z, street side at z = 0) recursively divided by `"split": "x"|"z"` into
@@ -207,8 +208,8 @@ species' `form` builder makes a low-poly mesh of color groups; trees/shrubs are 
 (`exterior.plant_meshes`, instanced by `exterior.plants` with position/scale/yaw), beds and hedges one baked
 mesh each. Plants are nudged out of rooms. Nothing is stored but the description. `refine` gives the AI a
 `site_summary` (rooms, front door, which way it faces and ready-made spots beside it, and the names of the
-photo plant models). Headset side: `ExteriorBuilder.kt` (roof and plant meshes via
-`registerMeshCreator("mesh://exterior/N")`; x-ray hides roof and finish).
+photo plant models). Headset side: `ExteriorBuilder.kt` (roof meshes via
+`registerMeshCreator("mesh://exterior/N")`, plants through `MeshInstances.kt`; x-ray hides roof and finish).
 
 **Plant models from photos** (`services/plant_model_service.py`, table `plant_models`, routes
 `/api/v1/plants/models`, dashboard page `/plants` → `PlantsView.vue`): a named plant ("Coral rose") with a
@@ -219,8 +220,29 @@ makes every model stand 1 m tall on its origin; files live in `plant_models/<id>
 `/plant_models/...` (outside `/api/v1`). Jobs only run in this process, so a restart marks pending ones
 failed (Retry). `build_exterior` swaps a landscape item for a ready model when its name matches
 (`_plant_model`, by `name_key`, or `model_id`) and lists it in `exterior.models` (`scale` = height in m);
-`ExteriorBuilder.buildModel` loads it from `SERVER_URL` + url. Deleting a model sends houses back to the
-drawn plant.
+`MeshInstances.buildModel` loads it from `SERVER_URL` + url. Deleting a model sends houses back to the
+drawn plant. The same table holds furniture models (`kind` = `plant` | `furniture`; routes
+`/api/v1/furniture/models`, dashboard page `/furniture`; both pages are `ModelLibraryView.vue`, and
+`ready_models(db, kind)` keeps the two apart).
+
+**Furniture** (`services/vr_furniture.py`, column `floor_plans.furniture`): `{auto, rooms: {"<room name>":
+[items]}}`, sizes in feet. `furniture_spec` cleans what the AI sends (`find_piece` matches words against
+`PIECES` with aliases, and a plain "chair"/"table"/"sink" by `room_kind`; bed sizes, color and wood words);
+the prompt text is `FURNITURE_FORMAT` in `ai_planning_service.py` — keep the two in step. `auto: true`
+furnishes every room *not* listed by its kind (`auto_items`); a listed room gets exactly its items. Like
+the exterior: new versions carry it over (renamed with `rename_rooms`, pruned to rooms that still exist),
+and a refine with `scope: "furniture"` updates the current version in place, the AI returning only the
+rooms that change (`merge_furniture`). `build_furniture` places the pieces (a `RoomSpace` per room):
+nothing in front of a doorway (0.9 m kept clear; openings carry a `kind` — door, open, bay, window — set in
+`vr_geometry_service`), nothing taller than a window sill in front of a window (`_wall_height`: a bed counts
+only its mattress, counters just under the sill), big pieces against the wall with the longest free run,
+then what goes with them (nightstands by the bed, coffee table before the sofa, chairs round a table as
+part of the table, stools at the island), then corners and rugs. `x`/`z` (feet from the room's front-left
+corner) place a piece exactly. Pieces are low-poly meshes **in metres** (base at y = 0, front toward +z,
+cached per kind/size/colors and shared), instanced with `scale` 1 in `geometry.furniture` (`meshes`,
+`pieces` with a plan `outline` for the dashboard, `models` for photo models); what didn't fit (unless it was
+only auto furniture) goes to `geometry.notes`. Headset side: `FurnitureBuilder.kt` (through
+`MeshInstances.kt`, which `ExteriorBuilder` uses for plants too); dashboard: outlines in `FloorPlanView.vue`.
 
 ### VR app — Kotlin + Meta Spatial SDK (`construction-quest/app/src/main/java/.../`)
 - `ImmersiveActivity.kt` — main activity; orchestrates the whole pipeline: voice capture, the
@@ -234,6 +256,12 @@ drawn plant.
   `buildFromGeometry` calls `clearAllEntities()` first, so rebuilding replaces the house rather than
   stacking a second one; entity handles live in `roomEntities`/`doorEntities`/`windowEntities` (the
   outside in `ExteriorBuilder`) and anything you create must be tracked there or it leaks across rebuilds.
+- **Eye height**: the player is lifted to a 6 ft person's eye level: `placeViewer` (spawn,
+  teleport, return to the panels) raises the view origin so the eyes are at `EYE_HEIGHT_M` (1.71 m, a 6 ft
+  person) × `SCALE` above the floor, measured from the real head height at that moment (sitting or
+  standing gives the same view); walking keeps that lift and follows `HouseGenerator.floorLevelAt`
+  (floor inside, the yard's `GROUND_TOP` outside). Panels go through `panelY(y)` so they keep their height
+  relative to the head; `clearHouse` drops the lift.
 - `ProgressBar.kt` — two-entity (background + fill) VR progress bar driven by the image-progress WS.
 - `PanelActivity.kt` — WebView-backed confirmation/info panels (HTML rendered in VR).
 - Networking is OkHttp (HTTP + WebSocket).

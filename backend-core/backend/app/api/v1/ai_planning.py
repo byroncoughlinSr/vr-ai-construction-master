@@ -416,6 +416,7 @@ async def generate_vr_from_prompt(
                 rooms_ft=list(project_structure.get("rooms", []) or []),
                 layout=project_structure.get("layout"),
                 exterior=project_structure.get("exterior"),
+                furniture=project_structure.get("furniture"),
                 materials=plan.get("material_list"),
                 project_id=saved["id"] if saved else None,
                 project_name=project_data.get("project_name") or "Generated House",
