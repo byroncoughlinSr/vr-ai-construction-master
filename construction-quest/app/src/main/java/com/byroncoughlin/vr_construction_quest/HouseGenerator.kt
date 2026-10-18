@@ -38,12 +38,18 @@ data class RoomInfo(
 class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity) {
     companion object {
         private const val TAG = "HouseGenerator"
-        const val SCALE = 2.0f
+        // World units per metre. 1: the house at its real size, so with the eyes at a
+        // 6 ft person's height (ImmersiveActivity.EYE_HEIGHT_M) rooms, furniture and
+        // the yard all look as they would in person. (It was 2, which made the house
+        // look twice life size against the headset's sense of scale.)
+        const val SCALE = 1.0f
         // Backend WALL_T (vr_geometry_service.py) is the HALF thickness in metres; walls
         // are centred on room edges, and floors/corners are extended by WALL_T to meet
         // their faces. Full thickness in world units is therefore 2 * WALL_T * SCALE.
         private const val WALL_HALF_THICKNESS_M = 0.1f
         private const val WALL_THICKNESS = 2 * WALL_HALF_THICKNESS_M * SCALE
+        // The yard's surface, below the floors: vr_exterior.GROUND_TOP (metres).
+        private const val GROUND_TOP_M = -0.10f
         // Must outlast the backend's planning budget (settings.planning_timeout_seconds,
         // 200 s) so the server's error, not a client timeout, reaches the user.
         private const val PLAN_CALL_TIMEOUT_S = 240L
@@ -65,6 +71,11 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
     private val wallCeilingEntities = mutableListOf<Entity>()
     private val roomInfoList = mutableListOf<RoomInfo>()
     private val exterior = ExteriorBuilder(activity)
+    /** Where there is floor (x0, x1, z0, z1, world units): rooms and bay bump-outs. */
+    private val floorAreas = mutableListOf<FloatArray>()
+    /** The height of the ground outside: the yard when the plan has one, else the floor's. */
+    private var groundY = 0f
+    private val furniture = FurnitureBuilder(activity)
     private var spawnPosition = Vector3(0f, 1.6f, -3.0f)
 
     /**
@@ -201,7 +212,12 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
         }
 
         // Roof, wall finish and yard, when the plan describes the outside.
-        geometry.optJSONObject("exterior")?.let { exterior.build(it) }
+        geometry.optJSONObject("exterior")?.let {
+            exterior.build(it)
+            groundY = GROUND_TOP_M * SCALE
+        }
+        // Furniture in the rooms, when the plan has any.
+        geometry.optJSONObject("furniture")?.let { furniture.build(it) }
 
         val doors = geometry.optJSONArray("doors")
         val doorCount = doors?.length() ?: 0
@@ -237,6 +253,9 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
         val roomWidth = dimensions.optDouble("length", 0.0).toFloat() * SCALE
         val roomDepth = dimensions.optDouble("width", 0.0).toFloat() * SCALE
         roomInfoList.add(RoomInfo(roomName, centerX, centerZ, ceilingY, roomWidth, roomDepth))
+        floorAreas.add(floatArrayOf(
+            centerX - roomWidth / 2, centerX + roomWidth / 2, centerZ - roomDepth / 2, centerZ + roomDepth / 2,
+        ))
 
         // Generate floor
         val floor = roomJson.optJSONObject("floor")
@@ -261,6 +280,13 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
 
         // A bay window's walls come with the room's; its bump-out has its own floor and ceiling.
         roomJson.optJSONObject("bay_window")?.let { bay ->
+            bay.optJSONArray("outline")?.let { outline ->
+                if (outline.length() > 0) {
+                    val xs = (0 until outline.length()).map { outline.getJSONObject(it).optDouble("x").toFloat() * SCALE }
+                    val zs = (0 until outline.length()).map { outline.getJSONObject(it).optDouble("z").toFloat() * SCALE }
+                    floorAreas.add(floatArrayOf(xs.min(), xs.max(), zs.min(), zs.max()))
+                }
+            }
             bay.optJSONObject("floor")?.let { generateFloor(it, roomName) }
             bay.optJSONObject("ceiling")?.let { generateCeiling(it, roomName) }
         }
@@ -606,8 +632,18 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
         windowEntities.clear()
         wallCeilingEntities.clear()  // entities already destroyed above
         roomInfoList.clear()
+        floorAreas.clear()
+        groundY = 0f
         exterior.clear()
+        furniture.clear()
     }
+
+    /**
+     * The height (world units) of what the player stands on at (x, z): a room's
+     * floor (0) inside the house, the yard's ground outside it.
+     */
+    fun floorLevelAt(x: Float, z: Float): Float =
+        if (floorAreas.any { x >= it[0] && x <= it[1] && z >= it[2] && z <= it[3] }) 0f else groundY
 
     /**
      * Toggle x-ray vision — hides/shows walls and ceilings so floors remain visible.

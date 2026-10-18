@@ -1,9 +1,11 @@
-"""3D models of real plants, made from a photo (or a description).
+"""3D models of real plants and furniture, made from a photo (or a description).
 
 The procedural plants in ``vr_plants`` look like *a* rose; this makes *that* rose:
 someone uploads a photo of the plant they bought (or describes it, and Stable
 Diffusion draws it), an image-to-3D model turns it into a textured ``.glb``, and
-every plan that names the plant ("coral rose") draws the model instead.
+every plan that names the plant ("coral rose") draws the model instead. Furniture
+works the same way (``kind`` "furniture"): a photo of grandma's armchair becomes
+the model every piece named "Grandma's armchair" is drawn with (``vr_furniture``).
 
 Providers (``settings.plant_model_provider``):
 
@@ -44,6 +46,7 @@ from ..models.plant_model import PlantModel
 
 logger = logging.getLogger(__name__)
 
+KINDS = ("plant", "furniture")
 MAX_PHOTO_BYTES = 15 * 1024 * 1024
 PHOTO_MAX_SIDE = 1024
 URL_PREFIX = "/plant_models"
@@ -343,17 +346,26 @@ def provider_status() -> dict:
 
 # --- Pictures from descriptions -------------------------------------------------------
 
-async def image_from_description(description: str, out: Path) -> Path:
-    """Draw the plant with Stable Diffusion, whole and on plain white, for the 3D model."""
+async def image_from_description(description: str, out: Path, kind: str = "plant") -> Path:
+    """Draw the plant (or piece of furniture) with Stable Diffusion, whole and on
+    plain white, for the 3D model."""
     from . import get_image_service
 
-    prompt = (
-        f"{description}, a single whole plant, full plant visible from the ground up, side view, "
-        "isolated on a plain white background, product photo, sharp focus, natural colors"
-    )
+    if kind == "furniture":
+        prompt = (
+            f"{description}, a single piece of furniture, whole, three-quarter front view, "
+            "isolated on a plain white background, product photo, studio lighting, sharp focus"
+        )
+        negative = "cropped, room, multiple objects, cut off, text, watermark, people, blurry, dark background"
+    else:
+        prompt = (
+            f"{description}, a single whole plant, full plant visible from the ground up, side view, "
+            "isolated on a plain white background, product photo, sharp focus, natural colors"
+        )
+        negative = "cropped, multiple plants, cut off, text, watermark, people, hands, blurry, dark background"
     result = await get_image_service().generate_image(
         prompt=prompt,
-        negative_prompt="cropped, multiple plants, cut off, text, watermark, people, hands, blurry, dark background",
+        negative_prompt=negative,
         width=512, height=512, num_inference_steps=30, guidance_scale=7.5,
         generation_id=f"plant-{uuid.uuid4().hex[:8]}",
     )
@@ -368,6 +380,7 @@ async def image_from_description(description: str, out: Path) -> Path:
 def serialize(model: PlantModel) -> dict:
     return {
         "id": model.id,
+        "kind": model.kind or "plant",
         "name": model.name,
         "description": model.description,
         "source": model.source,
@@ -383,8 +396,11 @@ def serialize(model: PlantModel) -> dict:
     }
 
 
-def list_models(db: Session) -> list[PlantModel]:
-    models = db.query(PlantModel).order_by(PlantModel.name, PlantModel.id).all()
+def list_models(db: Session, kind: str | None = None) -> list[PlantModel]:
+    query = db.query(PlantModel)
+    if kind:
+        query = query.filter(PlantModel.kind == kind)
+    models = query.order_by(PlantModel.name, PlantModel.id).all()
     # A job this process is not running was cut off by a restart.
     stale = [m for m in models if m.status in ("pending", "generating") and m.id not in _active]
     for m in stale:
@@ -394,31 +410,41 @@ def list_models(db: Session) -> list[PlantModel]:
     return models
 
 
-def ready_models(db: Session) -> list[dict]:
-    """The finished models, as ``vr_exterior.build_exterior`` takes them."""
+def ready_models(db: Session, kind: str = "plant") -> list[dict]:
+    """The finished models of one kind, as ``vr_exterior.build_exterior`` (plants) and
+    ``vr_furniture.build_furniture`` (furniture) take them."""
     return [
         {"id": m.id, "name": m.name, "url": file_url(m.model_path), "aspect": m.aspect, "height_ft": m.height_ft}
-        for m in db.query(PlantModel).filter(PlantModel.status == "ready").order_by(PlantModel.id.desc()).all()
+        for m in db.query(PlantModel)
+        .filter(PlantModel.status == "ready", PlantModel.kind == kind)
+        .order_by(PlantModel.id.desc()).all()
         if m.model_path
     ]
 
 
 def create(
     db: Session, name: str, photo: bytes | None = None, description: str | None = None,
-    height_ft: float | None = None,
+    height_ft: float | None = None, kind: str = "plant",
 ) -> PlantModel:
-    """Add a plant to the library (committed); ``start`` then makes its model."""
+    """Add a plant (or piece of furniture) to the library (committed); ``start`` then
+    makes its model."""
+    if kind not in KINDS:
+        raise PlantModelError(f"unknown kind '{kind}'")
+    thing = "plant" if kind == "plant" else "piece"
     name = " ".join(str(name or "").split())[:120]
     description = " ".join(str(description or "").split())[:500] or None
     if not name:
-        raise PlantModelError("give the plant a name, e.g. 'Coral rose'")
+        raise PlantModelError(
+            "give the plant a name, e.g. 'Coral rose'" if kind == "plant"
+            else "give the piece a name, e.g. 'Grandma's armchair'"
+        )
     if not photo and not description:
-        raise PlantModelError("add a photo of the plant or describe it")
+        raise PlantModelError(f"add a photo of the {thing} or describe it")
     jpeg = prepare_photo(photo) if photo else None
     if height_ft is not None and not (0.1 <= height_ft <= 150):
         raise PlantModelError("the height should be between 0.1 and 150 ft")
     model = PlantModel(
-        name=name, description=description, source="photo" if jpeg else "description",
+        kind=kind, name=name, description=description, source="photo" if jpeg else "description",
         status="pending", height_ft=height_ft,
     )
     db.add(model)
@@ -430,7 +456,7 @@ def create(
         model.image_path = f"{model.id}/source.jpg"
     db.commit()
     db.refresh(model)
-    logger.info(f"🌱 Plant model {model.id} '{model.name}' added (from {model.source})")
+    logger.info(f"🌱 {kind.title()} model {model.id} '{model.name}' added (from {model.source})")
     return model
 
 
@@ -487,7 +513,9 @@ async def _make(model_id: int) -> None:
         if model.image_path:
             image = models_root() / model.image_path
         else:
-            image = await image_from_description(model.description or model.name, folder / "source.jpg")
+            image = await image_from_description(
+                model.description or model.name, folder / "source.jpg", model.kind or "plant",
+            )
             _update(model_id, image_path=f"{model_id}/source.jpg")
         with tempfile.TemporaryDirectory(prefix=f"plant-{model_id}-") as tmp:
             raw = await provider.reconstruct(image, Path(tmp))

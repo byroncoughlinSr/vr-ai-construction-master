@@ -1,10 +1,7 @@
 <template>
   <q-page class="q-pa-md">
-    <div class="text-h4 q-mb-xs">Plant Library</div>
-    <div class="text-grey-7 q-mb-md">
-      Add a plant you bought (a photo, or a description to draw it from) and it gets a 3D model.
-      Any house whose landscaping names it, e.g. "coral rose", is then drawn with that model.
-    </div>
+    <div class="text-h4 q-mb-xs">{{ text.title }}</div>
+    <div class="text-grey-7 q-mb-md">{{ text.intro }}</div>
 
     <q-banner v-if="status && !status.provider_ready" class="bg-orange-1 text-orange-10 q-mb-md" rounded>
       <template #avatar><q-icon name="warning" /></template>
@@ -13,10 +10,10 @@
 
     <q-card class="q-mb-lg">
       <q-card-section>
-        <div class="text-h6 q-mb-sm">Add a plant</div>
-        <q-form class="row q-col-gutter-md" @submit.prevent="addPlant">
+        <div class="text-h6 q-mb-sm">{{ text.add }}</div>
+        <q-form class="row q-col-gutter-md" @submit.prevent="addModel">
           <q-input
-            v-model="form.name" class="col-12 col-sm-4" label="Name *" hint="What plans call it, e.g. Coral rose"
+            v-model="form.name" class="col-12 col-sm-4" label="Name *" :hint="`What plans call it, e.g. ${text.example}`"
             outlined dense :rules="[v => !!v?.trim() || 'Give it a name']"
           />
           <q-input
@@ -32,11 +29,11 @@
           </q-file>
           <q-input
             v-model="form.description" class="col-12" type="textarea" autogrow outlined dense
-            label="Description" hint="Used to draw the plant when there's no photo, e.g. a coral-pink shrub rose in full bloom"
+            label="Description" :hint="text.describe"
           />
           <div class="col-12 row items-center q-gutter-sm">
             <q-btn
-              type="submit" color="primary" icon="add" label="Add plant" :loading="adding"
+              type="submit" color="primary" icon="add" :label="text.add" :loading="adding"
               :disable="!canAdd"
             />
             <span v-if="!form.photo && !form.description?.trim()" class="text-grey-7">
@@ -50,15 +47,15 @@
 
     <div v-if="loading && !models.length" class="text-center q-pa-lg"><q-spinner size="32px" /></div>
     <div v-else-if="!models.length" class="text-grey-6 text-center q-pa-lg">
-      <q-icon name="yard" size="48px" />
-      <div class="q-mt-sm">No plants yet. Houses use the drawn plants until you add one.</div>
+      <q-icon :name="text.icon" size="48px" />
+      <div class="q-mt-sm">{{ text.empty }}</div>
     </div>
 
     <div class="row q-col-gutter-md">
       <div v-for="m in models" :key="m.id" class="col-12 col-sm-6 col-md-4 col-lg-3">
         <q-card class="plant-card">
           <q-img v-if="m.image_url" :src="fileSrc(m.image_url)" :ratio="1" fit="contain" class="bg-white" />
-          <div v-else class="plant-placeholder flex flex-center bg-grey-2"><q-icon name="yard" size="48px" color="grey-5" /></div>
+          <div v-else class="plant-placeholder flex flex-center bg-grey-2"><q-icon :name="text.icon" size="48px" color="grey-5" /></div>
           <q-card-section class="q-pb-xs">
             <div class="row items-center no-wrap">
               <div class="text-subtitle1 ellipsis col">{{ m.name }}</div>
@@ -92,12 +89,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { apiClient } from 'src/services/api'
 
-// A plant in the library, as plant_model_service.serialize returns it.
+// A plant or piece of furniture in a library, as plant_model_service.serialize returns it.
 export interface PlantModel {
   id: number
+  kind?: 'plant' | 'furniture'
   name: string
   description: string | null
   source: string
@@ -117,6 +115,35 @@ interface ProviderStatus {
   provider_ready: boolean
   provider_problem: string | null
 }
+
+// One page for both libraries: /plants and /furniture (routes pass the kind).
+const props = withDefaults(defineProps<{ kind?: 'plant' | 'furniture' }>(), { kind: 'plant' })
+
+const TEXT = {
+  plant: {
+    title: 'Plant Library',
+    intro: 'Add a plant you bought (a photo, or a description to draw it from) and it gets a 3D model. ' +
+      'Any house whose landscaping names it, e.g. "coral rose", is then drawn with that model.',
+    add: 'Add plant',
+    example: 'Coral rose',
+    describe: "Used to draw the plant when there's no photo, e.g. a coral-pink shrub rose in full bloom",
+    empty: 'No plants yet. Houses use the drawn plants until you add one.',
+    icon: 'yard',
+    endpoint: '/plants/models'
+  },
+  furniture: {
+    title: 'Furniture Library',
+    intro: 'Add a piece you own or want (a photo, or a description to draw it from) and it gets a 3D model. ' +
+      'Any room whose furniture names it, e.g. "Grandma\'s armchair", is then drawn with that model.',
+    add: 'Add furniture',
+    example: "Grandma's armchair",
+    describe: "Used to draw the piece when there's no photo, e.g. a mid-century walnut armchair with green cushions",
+    empty: 'No furniture yet. Houses use the drawn furniture until you add a piece.',
+    icon: 'chair',
+    endpoint: '/furniture/models'
+  }
+}
+const text = computed(() => TEXT[props.kind])
 
 const MAX_PHOTO_BYTES = 15 * 1024 * 1024
 const POLL_MS = 5000
@@ -161,18 +188,18 @@ const schedulePoll = () => {
 async function load() {
   loading.value = true
   try {
-    const { data } = await apiClient.client.get('/plants/models')
+    const { data } = await apiClient.client.get(text.value.endpoint)
     models.value = data.models ?? []
     status.value = { provider: data.provider, provider_ready: data.provider_ready, provider_problem: data.provider_problem }
   } catch (err) {
-    error.value = errorMessage(err, 'Could not load the plant library')
+    error.value = errorMessage(err, `Could not load the ${props.kind} library`)
   } finally {
     loading.value = false
     schedulePoll()
   }
 }
 
-async function addPlant() {
+async function addModel() {
   if (!canAdd.value) return
   adding.value = true
   error.value = ''
@@ -182,11 +209,11 @@ async function addPlant() {
   if (form.height && form.height > 0) body.append('height_ft', String(form.height))
   if (form.photo) body.append('photo', form.photo)
   try {
-    await apiClient.client.post('/plants/models', body)
+    await apiClient.client.post(text.value.endpoint, body)
     Object.assign(form, { name: '', height: null, photo: null, description: '' })
     await load()
   } catch (err) {
-    error.value = errorMessage(err, 'Could not add the plant')
+    error.value = errorMessage(err, `Could not add the ${props.kind === 'plant' ? 'plant' : 'piece'}`)
   } finally {
     adding.value = false
   }
@@ -195,7 +222,7 @@ async function addPlant() {
 async function retry(m: PlantModel) {
   error.value = ''
   try {
-    await apiClient.client.post(`/plants/models/${m.id}/retry`)
+    await apiClient.client.post(`${text.value.endpoint}/${m.id}/retry`)
     await load()
   } catch (err) {
     error.value = errorMessage(err, 'Could not restart the model')
@@ -205,14 +232,20 @@ async function retry(m: PlantModel) {
 async function remove(m: PlantModel) {
   error.value = ''
   try {
-    await apiClient.client.delete(`/plants/models/${m.id}`)
+    await apiClient.client.delete(`${text.value.endpoint}/${m.id}`)
     models.value = models.value.filter(x => x.id !== m.id)
   } catch (err) {
-    error.value = errorMessage(err, 'Could not delete the plant')
+    error.value = errorMessage(err, `Could not delete the ${props.kind === 'plant' ? 'plant' : 'piece'}`)
   }
 }
 
 onMounted(load)
+// The same component serves both routes: reload when moving between them.
+watch(() => props.kind, () => {
+  models.value = []
+  error.value = ''
+  load()
+})
 onBeforeUnmount(() => clearTimeout(timer))
 </script>
 

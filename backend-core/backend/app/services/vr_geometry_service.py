@@ -698,7 +698,7 @@ def build_bay(
     x0, x1 = min(xs) - WALL_T, max(xs) + WALL_T
     z0, z1 = min(zs) - WALL_T, max(zs) + WALL_T
     return {
-        "opening": {"axis": axis, "line": line, "lo": lo, "hi": hi, "bottom": 0.0, "top": height + 1.0},
+        "opening": {"axis": axis, "line": line, "lo": lo, "hi": hi, "bottom": 0.0, "top": height + 1.0, "kind": "bay"},
         "walls": walls,
         "windows": windows,
         "bounds": {"x0": x0, "x1": x1, "z0": z0, "z1": z1},
@@ -963,6 +963,8 @@ def build_geometry_from_rooms(
     layout: dict | None = None,
     exterior: dict | None = None,
     plant_models: list[dict] | None = None,
+    furniture: dict | None = None,
+    furniture_models: list[dict] | None = None,
 ) -> dict:
     """Build a VR geometry payload from a list of rooms.
 
@@ -990,6 +992,9 @@ def build_geometry_from_rooms(
         plant_models: Finished 3D models made from photos
             (``plant_model_service.ready_models``); a plant naming one is drawn
             with it instead of its procedural mesh.
+        furniture: The plan's furniture by room (see ``vr_furniture.furniture_spec``).
+        furniture_models: Finished photo models of kind "furniture"; a piece whose
+            name matches one is drawn with it.
 
     Returns:
         The ``geometry`` dict sent to the Quest. Walls are pre-split around door
@@ -1016,7 +1021,7 @@ def build_geometry_from_rooms(
     for a, b in open_pairs:
         axis, line, lo, hi = shared[(a, b)]
         top = min(rooms_m[a]["dimensions"]["height"], rooms_m[b]["dimensions"]["height"])
-        openings.append({"axis": axis, "line": line, "lo": lo, "hi": hi, "bottom": 0.0, "top": top})
+        openings.append({"axis": axis, "line": line, "lo": lo, "hi": hi, "bottom": 0.0, "top": top, "kind": "open"})
         open_walls.append({
             "rooms": [a + 1, b + 1],
             "start": _point(axis, line, lo),
@@ -1034,7 +1039,7 @@ def build_geometry_from_rooms(
         openings.append({
             "axis": axis, "line": line,
             "lo": center - width / 2, "hi": center + width / 2,
-            "bottom": 0.0, "top": DOOR_H,
+            "bottom": 0.0, "top": DOOR_H, "kind": "door",
         })
         doors.append({
             "id": 100 + len(doors) + 1,
@@ -1170,7 +1175,7 @@ def build_geometry_from_rooms(
         openings.append({
             "axis": axis, "line": line,
             "lo": center - win_w / 2, "hi": center + win_w / 2,
-            "bottom": WINDOW_SILL, "top": WINDOW_SILL + WINDOW_H,
+            "bottom": WINDOW_SILL, "top": WINDOW_SILL + WINDOW_H, "kind": "window",
         })
         windows.append({
             "id": 200 + len(windows) + 1,
@@ -1256,6 +1261,15 @@ def build_geometry_from_rooms(
         open_rects, openings, shared, bays, plant_models,
     )
 
+    from .vr_furniture import build_furniture, furniture_spec
+
+    furniture_out, furniture_notes = build_furniture(
+        furniture_spec(furniture),
+        [{"id": r["id"], "name": r["name"], "bounds": r["bounds"]} for r in rooms_out],
+        openings, furniture_models,
+    )
+    notes += furniture_notes
+
     return {
         "project_id": project_id,
         "project_name": project_name,
@@ -1269,6 +1283,8 @@ def build_geometry_from_rooms(
         "open_areas": [{"bounds": {k: round(v, 4) for k, v in r.items()}} for r in open_rects],
         # Roof meshes, wall finish, ground and landscaping, or null (see vr_exterior.py).
         "exterior": exterior_out,
+        # Pieces placed in the rooms, their shared meshes and photo models, or null (vr_furniture.py).
+        "furniture": furniture_out,
         # Outside the front door (or in front of the entry if it had no room for one).
         "spawn_position": spawn or {
             "x": rooms_out[0]["position"]["x"] if rooms_out else 0.0,

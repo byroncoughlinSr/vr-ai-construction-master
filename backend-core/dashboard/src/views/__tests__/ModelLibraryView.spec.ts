@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { Quasar } from 'quasar'
-import PlantsView from '../PlantsView.vue'
+import ModelLibraryView from '../ModelLibraryView.vue'
 
 const get = vi.fn()
 const post = vi.fn()
@@ -29,11 +29,12 @@ const library = (models: unknown[], ready = true) => ({
 })
 
 // QPage only renders inside a QLayout, so it is stubbed down to its content.
-const mountView = () => mount(PlantsView, {
+const mountView = (kind: 'plant' | 'furniture' = 'plant') => mount(ModelLibraryView, {
+  props: { kind },
   global: { plugins: [Quasar], stubs: { QPage: { template: '<div><slot /></div>' } } }
 })
 
-describe('PlantsView', () => {
+describe('ModelLibraryView', () => {
   beforeEach(() => {
     get.mockReset(); post.mockReset(); del.mockReset()
   })
@@ -65,7 +66,7 @@ describe('PlantsView', () => {
     vm.form.name = ' Lilac '
     vm.form.description = 'a purple lilac bush'
     vm.form.height = 8
-    await vm.addPlant()
+    await vm.addModel()
     expect(post).toHaveBeenCalledTimes(1)
     const [url, body] = post.mock.calls[0]
     expect(url).toBe('/plants/models')
@@ -82,7 +83,7 @@ describe('PlantsView', () => {
     await flushPromises()
     const vm = wrapper.vm as any
     vm.form.name = 'Lilac'
-    await vm.addPlant()
+    await vm.addModel()
     expect(post).not.toHaveBeenCalled()
   })
 
@@ -95,5 +96,24 @@ describe('PlantsView', () => {
     await flushPromises()
     expect(del).toHaveBeenCalledWith('/plants/models/1')
     expect(wrapper.findAll('.plant-card')).toHaveLength(0)
+  })
+
+  it('serves the furniture library from its own endpoint', async () => {
+    const chair = { ...rose, id: 3, kind: 'furniture', name: "Grandma's armchair", model_url: null, status: 'generating' }
+    get.mockResolvedValue(library([chair]))
+    post.mockResolvedValue({ data: { ...chair, id: 4 } })
+    const wrapper = mountView('furniture')
+    await flushPromises()
+    expect(get).toHaveBeenCalledWith('/furniture/models')
+    expect(wrapper.text()).toContain('Furniture Library')
+    expect(wrapper.text()).toContain('Making model')
+    const vm = wrapper.vm as any
+    vm.form.name = 'Walnut desk'
+    vm.form.description = 'a mid-century walnut desk'
+    await vm.addModel()
+    expect(post.mock.calls[0][0]).toBe('/furniture/models')
+    await vm.remove(chair)
+    expect(del).toHaveBeenCalledWith('/furniture/models/3')
+    wrapper.unmount()
   })
 })

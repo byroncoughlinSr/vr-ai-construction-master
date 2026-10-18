@@ -121,16 +121,31 @@
               />
 
               <!-- Rooms -->
-              <g v-for="room in rooms" :key="room.id">
-                <rect
-                  :x="room.bounds.x0"
-                  :y="svgY(room.bounds.z1)"
-                  :width="room.bounds.x1 - room.bounds.x0"
-                  :height="room.bounds.z1 - room.bounds.z0"
-                  :fill="roomColor(room.name)"
-                  stroke="#37474F"
-                  :stroke-width="WALL"
-                />
+              <rect
+                v-for="room in rooms" :key="room.id"
+                :x="room.bounds.x0"
+                :y="svgY(room.bounds.z1)"
+                :width="room.bounds.x1 - room.bounds.x0"
+                :height="room.bounds.z1 - room.bounds.z0"
+                :fill="roomColor(room.name)"
+                stroke="#37474F"
+                :stroke-width="WALL"
+              />
+
+              <!-- Furniture (vr_furniture.py), seen from above; rugs first, under the rest -->
+              <polygon
+                v-for="(piece, i) in furnitureToDraw" :key="`f${i}`"
+                class="furniture"
+                :class="{ rug: piece.type === 'rug', 'furniture-model': piece.model_id }"
+                :points="outlinePoints(piece)"
+                :fill="rgb(piece.color)"
+                :stroke="piece.model_id ? '#6A1B9A' : 'rgba(0,0,0,0.45)'"
+                stroke-width="0.03"
+                :stroke-dasharray="piece.model_id ? '0.12 0.08' : undefined"
+              ><title>{{ piece.name ?? words(piece.type) }}{{ piece.model_id ? ' (from a photo)' : '' }}</title></polygon>
+
+              <!-- Room names over the furniture -->
+              <g v-for="room in rooms" :key="`t${room.id}`">
                 <text
                   :x="(room.bounds.x0 + room.bounds.x1) / 2"
                   :y="svgY((room.bounds.z0 + room.bounds.z1) / 2) - 0.1"
@@ -208,6 +223,9 @@
                 {{ words(exterior.walls.material) }} walls
               </span>
               <span v-if="exterior.landscape?.length">{{ landscapeSummary }}</span>
+            </div>
+            <div v-if="furniture.length" class="text-caption text-grey-8 q-mt-xs furniture-summary">
+              🛋 {{ furnitureSummary }}
             </div>
 
             <div v-if="floorPlan?.image_url" class="q-mt-md">
@@ -391,6 +409,16 @@ interface ExteriorPlant {
   baked?: boolean
   line?: { from: { x: number; z: number }; to: { x: number; z: number }; width: number }
 }
+// A piece of furniture (vr_furniture.py): its plan outline in metres; model_id when
+// it is drawn with a 3D model made from a photo.
+interface FurniturePiece {
+  type: string
+  name?: string
+  room: number
+  outline: [number, number][]
+  color: { r: number; g: number; b: number }
+  model_id?: number
+}
 // A plant drawn with a 3D model made from a photo (plant_model_service.py).
 interface ExteriorModel {
   model_id: number
@@ -480,6 +508,9 @@ const plantModels = ref<ExteriorModel[]>([])
 // A flower bed's flowers are shown by the bed itself.
 const plantsToDraw = computed(() => plants.value.filter(p => !p.baked || p.line))
 const exterior = ref<ExteriorSpec | null>(null)
+const furniture = ref<FurniturePiece[]>([])
+const furnitureToDraw = computed(() =>
+  [...furniture.value].sort((a, b) => Number(b.type === 'rug') - Number(a.type === 'rug')))
 const floorPlan = ref<FloorPlan | null>(null)
 const history = ref<FloorPlan[]>([])
 const showHistory = ref(false)
@@ -535,6 +566,24 @@ const along = (o: Opening) => {
   const rad = (o.rotation * Math.PI) / 180
   return { dx: Math.cos(rad), dz: Math.sin(rad) }
 }
+
+const outlinePoints = (piece: FurniturePiece) =>
+  piece.outline.map(([x, z]) => `${x},${svgY(z)}`).join(' ')
+
+const furnitureSummary = computed(() => {
+  const counts = new Map<string, number>()
+  for (const piece of furniture.value) {
+    if (piece.type === 'rug') continue
+    const name = words(piece.type)
+    counts.set(name, (counts.get(name) ?? 0) + 1)
+  }
+  const fromPhotos = furniture.value.filter(p => p.model_id).length
+  const total = [...counts.values()].reduce((a, b) => a + b, 0)
+  const top = [...counts].sort((a, b) => b[1] - a[1]).slice(0, 4)
+    .map(([name, n]) => `${n} ${name}${n > 1 && !name.endsWith('s') ? 's' : ''}`)
+  return `${total} pieces of furniture` + (top.length ? ` (${top.join(', ')}${counts.size > 4 ? ', …' : ''})` : '') +
+    (fromPhotos ? `, ${fromPhotos} from photos` : '')
+})
 
 const wallLine = (o: OpenWall) => ({ x1: o.start.x, y1: svgY(o.start.z), x2: o.end.x, y2: svgY(o.end.z) })
 
@@ -625,6 +674,7 @@ const showGeometry = (geometry: any) => {
   plants.value = geometry?.exterior?.plants ?? []
   plantModels.value = geometry?.exterior?.models ?? []
   exterior.value = geometry?.exterior?.spec ?? null
+  furniture.value = [...(geometry?.furniture?.pieces ?? []), ...(geometry?.furniture?.models ?? [])]
 }
 
 const load = async () => {
@@ -859,6 +909,13 @@ watch(() => props.projectId, load, { immediate: true })
   max-height: 480px;
   display: block;
 }
+.room-name,
+.room-size {
+  /* A halo, so the names read over the furniture */
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.75);
+  stroke-width: 0.08px;
+}
 .room-name {
   font-size: 0.42px;
   font-weight: 600;
@@ -877,6 +934,12 @@ watch(() => props.projectId, load, { immediate: true })
   font-size: 0.4px;
   font-weight: 600;
   fill: #2E7D32;
+}
+.furniture {
+  fill-opacity: 0.85;
+}
+.furniture.rug {
+  fill-opacity: 0.45;
 }
 .swatch {
   display: inline-block;

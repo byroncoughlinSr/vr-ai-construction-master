@@ -40,7 +40,14 @@ const router = createRouter({
         {
           path: '/plants',
           name: 'plants',
-          component: () => import('../views/PlantsView.vue')
+          component: () => import('../views/ModelLibraryView.vue'),
+          props: { kind: 'plant' }
+        },
+        {
+          path: '/furniture',
+          name: 'furniture',
+          component: () => import('../views/ModelLibraryView.vue'),
+          props: { kind: 'furniture' }
         }
       ]
     },

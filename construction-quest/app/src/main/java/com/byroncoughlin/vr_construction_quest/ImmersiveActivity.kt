@@ -183,9 +183,9 @@ class ImmersiveActivity : AppSystemActivity() {
         private const val PANEL_DISTANCE = 2.6f
         // Web dashboard panel: left of the prompt panel (which spans x -0.3 .. 0.9).
         private const val WEB_PANEL_X = -1.9f
-        // Left-stick walking speed (m/s). The house is built at 2x scale, so this is brisk
-        // enough to get round a large house to the back yard.
-        private const val WALK_SPEED = 3.0f
+        // Left-stick walking speed (m/s): a brisk walk, enough to get round a large
+        // house to the back yard (the house is at its real size, HouseGenerator.SCALE).
+        private const val WALK_SPEED = 1.5f
         // Right-trigger teleport: furthest point on the ground that can be aimed at (m).
         private const val TELEPORT_RANGE = 40f
         // How far a controller ray looks for a panel before treating a trigger/grip
@@ -204,6 +204,12 @@ class ImmersiveActivity : AppSystemActivity() {
         private const val HOUSE_SIGN_WIDTH = 1.6f
         private const val HOUSE_SIGN_HEIGHT = 0.4f
         private const val HOUSE_SIGN_Y = 2.45f
+        // Eye level of a 6 ft person (6 ft less 4.5 in), in house metres. The house is
+        // built at HouseGenerator.SCALE, so the eyes are put this high times SCALE above
+        // the floor, whatever the wearer's real height or whether they sit or stand.
+        private const val EYE_HEIGHT_M = 1.71f
+        // Assumed real head height when the headset has no tracked pose yet.
+        private const val DEFAULT_HEAD_HEIGHT = 1.6f
         // Prompt numbers passed through recording/transcription; 3 is a floor-plan change.
         private const val PHASE_REFINE = 3
         // From gradle.properties (serverHost) via app/build.gradle.kts.
@@ -726,7 +732,7 @@ class ImmersiveActivity : AppSystemActivity() {
         val spawnPos = houseGenerator?.buildFromGeometry(geometry)
         Log.i(TAG, "🏠 House built. Spawn: $spawnPos")
         if (spawnPos != null) {
-            scene.setViewOrigin(spawnPos.x, 0f, spawnPos.z, 0f)
+            placeViewer(spawnPos.x, spawnPos.z, 0f)
         }
         locomotionEnabled = true
         if (!roomLabelsVisible) toggleRoomLabels()
@@ -742,7 +748,7 @@ class ImmersiveActivity : AppSystemActivity() {
      * or version changes). UI thread only.
      */
     private fun showHouseSign() {
-        val pose = Pose(t = Vector3(panelAnchor.x + 0.3f, HOUSE_SIGN_Y, panelAnchor.z - PANEL_DISTANCE))
+        val pose = Pose(t = Vector3(panelAnchor.x + 0.3f, panelY(HOUSE_SIGN_Y), panelAnchor.z - PANEL_DISTANCE))
         val existing = houseSignEntity
         if (existing != null) {
             existing.setComponent(Transform(pose))
@@ -1010,7 +1016,7 @@ class ImmersiveActivity : AppSystemActivity() {
         val entity = Entity.create()
         entity.setComponent(Panel(R.layout.image_panel))
         entity.setComponent(Transform(Pose(
-            t = Vector3(anchor.x, 1.6f, anchor.z - (PANEL_DISTANCE - 0.2f)),
+            t = Vector3(anchor.x, panelY(1.6f), anchor.z - (PANEL_DISTANCE - 0.2f)),
             q = com.meta.spatial.core.Quaternion(0f, 0f, 0f)
         )))
         entity.setComponent(Grabbable())
@@ -1045,7 +1051,7 @@ class ImmersiveActivity : AppSystemActivity() {
         val entity = Entity.create()
         entity.setComponent(Panel(R.layout.review_image_panel))
         entity.setComponent(Transform(Pose(
-            t = Vector3(panelAnchor.x + REVIEW_PANEL_X, REVIEW_PANEL_Y, panelAnchor.z + REVIEW_PANEL_Z)
+            t = Vector3(panelAnchor.x + REVIEW_PANEL_X, panelY(REVIEW_PANEL_Y), panelAnchor.z + REVIEW_PANEL_Z)
         )))
         entity.setComponent(Grabbable())
         entity.setComponent(Visible(true))
@@ -1192,6 +1198,31 @@ class ImmersiveActivity : AppSystemActivity() {
         wv.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
     }
 
+    /**
+     * How far (world units) the tracking floor is raised above the floor the player
+     * stands on, so their eyes are at [EYE_HEIGHT_M] in the house. Panels and labels
+     * are raised by it too, to stay where they were relative to the head. 0 without a house.
+     */
+    private var eyeLift = 0f
+
+    /**
+     * Move the player to (x, z) facing [yaw] and set their eye height to a 6 ft
+     * person's: the lift is measured from the real head height now, so leaning or
+     * crouching afterwards still moves the view naturally. UI thread only.
+     */
+    private fun placeViewer(x: Float, z: Float, yaw: Float) {
+        val head = scene.getViewerPose().t.y - scene.getViewOrigin().y
+        val realHeight = if (head in 0.5f..2.3f) head else DEFAULT_HEAD_HEIGHT
+        eyeLift = EYE_HEIGHT_M * HouseGenerator.SCALE - realHeight
+        val floor = houseGenerator?.floorLevelAt(x, z) ?: 0f
+        scene.setViewOrigin(x, floor + eyeLift, z, yaw)
+        Log.i(TAG, "👁️ Eyes at ${"%.2f".format(EYE_HEIGHT_M)} m (head ${"%.2f".format(realHeight)} m, lift ${"%.2f".format(eyeLift)})")
+    }
+
+    /** A panel's height: [y] as it was with the tracking floor on the ground, raised with it. */
+    private fun panelY(y: Float): Float =
+        y + if (eyeLift == 0f) 0f else eyeLift + (houseGenerator?.floorLevelAt(panelAnchor.x, panelAnchor.z) ?: 0f)
+
     private fun handleTeleportation(pose: Pose) {
         val forward = pose.q * Vector3(0f, 0f, -1f)
         if (forward.y >= 0f) return  // must aim downward toward floor
@@ -1199,8 +1230,9 @@ class ImmersiveActivity : AppSystemActivity() {
         if (t < 0.3f || t > TELEPORT_RANGE) return  // too close or too far
         val tx = pose.t.x + forward.x * t
         val tz = pose.t.z + forward.z * t
-        // Keep the way the player faces (snap turns), not reset it to 0.
-        scene.setViewOrigin(tx, 0f, tz, scene.getViewSceneRotation())
+        // Keep the way the player faces (snap turns), not reset it to 0; the eye
+        // height is set again, so sitting down or standing up is evened out here.
+        placeViewer(tx, tz, scene.getViewSceneRotation())
         Log.i(TAG, "🌀 Teleported to (${"%.1f".format(tx)}, ${"%.1f".format(tz)})")
     }
 
@@ -1235,16 +1267,15 @@ class ImmersiveActivity : AppSystemActivity() {
         // Right of the facing direction (fx, fz) is (-fz, fx).
         val step = WALK_SPEED * dt
         val origin = scene.getViewOrigin()
-        scene.setViewOrigin(
-            origin.x + (fx * ahead - fz * side) * step,
-            0f,
-            origin.z + (fz * ahead + fx * side) * step,
-            scene.getViewSceneRotation(),
-        )
+        val x = origin.x + (fx * ahead - fz * side) * step
+        val z = origin.z + (fz * ahead + fx * side) * step
+        // Up or down a step when walking between the floors and the yard.
+        val floor = houseGenerator?.floorLevelAt(x, z) ?: 0f
+        scene.setViewOrigin(x, floor + eyeLift, z, scene.getViewSceneRotation())
     }
 
     private fun returnToPanels() {
-        scene.setViewOrigin(panelAnchor.x, 0f, panelAnchor.z, 0f)
+        placeViewer(panelAnchor.x, panelAnchor.z, 0f)
         Log.i(TAG, "🚪 Returned to the front door (${"%.1f".format(panelAnchor.x)}, ${"%.1f".format(panelAnchor.z)})")
     }
 
@@ -1271,7 +1302,8 @@ class ImmersiveActivity : AppSystemActivity() {
                 roomLabelInfo[entity] = room
                 entity.setComponent(Panel(R.layout.room_label))
                 entity.setComponent(Transform(Pose(
-                    t = Vector3(room.centerX, 1.6f, labelZ),
+                    // At a 6 ft person's eye level, a little above.
+                    t = Vector3(room.centerX, (EYE_HEIGHT_M + 0.15f) * HouseGenerator.SCALE, labelZ),
                     q = com.meta.spatial.core.Quaternion(0f, 180f, 0f)
                 )))
                 entity.setComponent(Visible(true))
@@ -1414,6 +1446,9 @@ class ImmersiveActivity : AppSystemActivity() {
         currentHouseName = null
         currentFloorPlanVersion = null
         destroyHouseSign()
+        // No house: back to the real floor and real eye height.
+        eyeLift = 0f
+        scene.getViewOrigin().let { scene.setViewOrigin(it.x, 0f, it.z, scene.getViewSceneRotation()) }
         panelAnchor = Vector3(0f, 0f, 0f)
         placePromptPanel()
         showPanel()
@@ -1423,14 +1458,14 @@ class ImmersiveActivity : AppSystemActivity() {
     /** The prompt panel and the web dashboard panel, in front of [panelAnchor]. */
     private fun placePromptPanel() {
         dashboardPanelEntity?.setComponent(Transform(Pose(
-            t = Vector3(panelAnchor.x + 0.3f, 1.1f, panelAnchor.z - PANEL_DISTANCE)
+            t = Vector3(panelAnchor.x + 0.3f, panelY(1.1f), panelAnchor.z - PANEL_DISTANCE)
         )))
         webPanelEntity?.setComponent(Transform(Pose(
-            t = Vector3(panelAnchor.x + WEB_PANEL_X, 1.1f, panelAnchor.z - PANEL_DISTANCE)
+            t = Vector3(panelAnchor.x + WEB_PANEL_X, panelY(1.1f), panelAnchor.z - PANEL_DISTANCE)
         )))
     }
 
-    private fun progressBarPosition() = Vector3(panelAnchor.x, 1.5f, panelAnchor.z - 1.0f)
+    private fun progressBarPosition() = Vector3(panelAnchor.x, panelY(1.5f), panelAnchor.z - 1.0f)
 
     private fun loadPrompt2Html(wv: WebView) {
         val refineHint = if (currentProjectId != null) """

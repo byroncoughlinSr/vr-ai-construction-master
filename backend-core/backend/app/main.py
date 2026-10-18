@@ -26,7 +26,7 @@ from .api.v1.designs import router as designs_router
 from .api.v1.materials import router as materials_router
 from .api.v1.voice import router as voice_router
 from .api.v1.websocket import router as websocket_router
-from .api.v1.plants import router as plants_router
+from .api.v1.plants import furniture_router, router as plants_router
 
 # Configure structured logging
 setup_logging(
@@ -162,6 +162,12 @@ app.include_router(
     plants_router,
     prefix="/api/v1/plants",
     tags=["Plant Models"]
+)
+
+app.include_router(
+    furniture_router,
+    prefix="/api/v1/furniture",
+    tags=["Furniture Models"]
 )
 
 app.include_router(

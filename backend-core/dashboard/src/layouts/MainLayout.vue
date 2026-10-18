@@ -180,6 +180,15 @@
           </q-item-section>
         </q-item>
 
+        <q-item clickable to="/furniture" active-class="bg-primary-1">
+          <q-item-section avatar>
+            <q-icon name="chair" />
+          </q-item-section>
+          <q-item-section>
+            <q-item-label>Furniture</q-item-label>
+          </q-item-section>
+        </q-item>
+
         <q-separator class="q-my-md" />
 
         <q-item-label header>Quick Actions</q-item-label>
