@@ -82,6 +82,7 @@ class ImmersiveActivity : AppSystemActivity() {
     private val activityJob = Job()
     private val activityScope = CoroutineScope(Dispatchers.Main + activityJob)
     private val nativeEntities = mutableMapOf<Int, Entity>()
+    private var nativeFloorId: Int? = null
     private var voiceController: VoiceController? = null
     private var roomWebSocket: WebSocket? = null
     private var generationWebSocket: WebSocket? = null
@@ -719,9 +720,10 @@ class ImmersiveActivity : AppSystemActivity() {
      * along. Replaces any house already loaded. UI thread only.
      */
     private fun enterHouse(geometry: JSONObject) {
-        // Labels and the walking image belong to the previous house.
+        // Labels, the walking image and any planks placed before belong to the previous house.
         if (roomLabelsVisible) toggleRoomLabels()
         destroyWalkingImagePanel()
+        clearPlacedElements()
 
         currentProjectId = geometry.optInt("project_id", 0).takeIf { it > 0 }
         currentHouseName = geometry.optString("project_name", "").ifBlank { null }
@@ -1242,12 +1244,14 @@ class ImmersiveActivity : AppSystemActivity() {
      */
     /**
      * True when the controller at [pose] points at a grabbable panel within [PANEL_REACH]: its
-     * trigger/grip is then grabbing that panel, not teleporting or recording.
+     * trigger/grip is then grabbing that panel, not teleporting, placing or recording.
+     * Construction elements (the floor, placed planks) are grabbable too but are not panels.
      */
     private fun pointingAtPanel(pose: Pose): Boolean {
         val forward = pose.q * Vector3(0f, 0f, -1f)
         val hit = scene.lineSegmentIntersect(pose.t, pose.t + forward * PANEL_REACH) ?: return false
-        return hit.entity?.hasComponent<Grabbable>() == true
+        val entity = hit.entity ?: return false
+        return entity.hasComponent<Grabbable>() && entity !in nativeEntities.values
     }
 
     /**
@@ -1430,6 +1434,7 @@ class ImmersiveActivity : AppSystemActivity() {
     /** Remove the generated house and its panels and return to step 1. UI thread only. */
     private fun clearHouse() {
         houseGenerator?.clearAllEntities()
+        clearPlacedElements()
         roomLabelEntities.forEach { it.destroy() }
         roomLabelEntities.clear()
         roomLabelInfo.clear()
@@ -2101,6 +2106,8 @@ class ImmersiveActivity : AppSystemActivity() {
         }
 
         private fun handlePlacement(pose: Pose) {
+            // A trigger press on a panel is a click, not a plank.
+            if (pointingAtPanel(pose)) return
             val forward = pose.q * Vector3(0f, 0f, -1f)
             if (forward.y < -0.2f) {
                 val t = -pose.t.y / forward.y
@@ -2138,6 +2145,17 @@ class ImmersiveActivity : AppSystemActivity() {
         if (!isLibraryLoaded) return
         val floorId = nativeAddElement(1, 0f, -0.05f, 0f, 30f, 0.1f, 30f)
         createEntityForElement(floorId, 0f, -0.05f, 0f, 30f, 0.1f, 30f, isFloor = true)
+        nativeFloorId = floorId
+    }
+
+    /** Remove the planks placed in construction mode (or by collaborators); the floor stays. */
+    private fun clearPlacedElements() {
+        val placed = nativeEntities.keys.filter { it != nativeFloorId }
+        for (id in placed) {
+            if (isLibraryLoaded) nativeRemoveElement(id)
+            nativeEntities.remove(id)?.destroy()
+        }
+        if (placed.isNotEmpty()) Log.i(TAG, "🧹 Removed ${placed.size} placed element(s)")
     }
 
     private fun createEntityForElement(

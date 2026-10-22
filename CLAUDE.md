@@ -93,8 +93,9 @@ not committed) must be present to build.
 
 ### Backend — FastAPI (`backend-core/backend/app`)
 - `main.py` mounts all routers under `/api/v1/*` and wires middleware (rate limiting via slowapi,
-  CORS, gzip, request-ID logging). Router prefixes: `image`, `planning`, `projects`, `designs`,
-  `materials`, `voice`, `ws`.
+  CORS, gzip, request-ID logging). Router prefixes: `image`, `planning`, `projects` (two routers:
+  `projects.py` and `project_controls.py`), `designs`, `materials`, `resources`, `crm`, `assistant`,
+  `plants`, `furniture`, `voice`, `ws`.
 - `api/v1/` = HTTP/WS surface; `services/` = the actual AI + geometry logic; `models/` SQLAlchemy,
   `schemas/` Pydantic. Routes stay thin and delegate to services.
 - **AI services** (`services/`): `ai_planning_service.py` (Groq→Ollama→Gemini → phases, tasks,
@@ -266,14 +267,52 @@ only auto furniture) goes to `geometry.notes`. Headset side: `FurnitureBuilder.k
 - `PanelActivity.kt` — WebView-backed confirmation/info panels (HTML rendered in VR).
 - Networking is OkHttp (HTTP + WebSocket).
 
+### Project controls, CRM and the AI copilot (backend)
+- **Project controls** (`api/v1/project_controls.py` → `services/project_controls_service.py`), per project:
+  `GET .../overview` (schedule/budget/compliance summaries, floor plan brief, linked clients, `attention` list),
+  `.../schedule` (+ `POST .../schedule/baseline {start_date}`, phases/tasks CRUD), `.../budget` (earned value),
+  `.../expenses`, `.../change-orders`, `.../compliance` (+ permits/inspections CRUD). Phases and tasks are the
+  ones `_save_project` writes from the AI plan. Progress is **earned with the 50/50 rule** (half a task's
+  duration when it starts, the rest when completed); a status change re-derives the phase's progress/status
+  (`refresh_phase`). BAC = phase budgets (or the plan's estimate) + approved change orders; EV = phase budget ×
+  progress; AC = logged expenses; PV/SPI exist only once the schedule is baselined (planned dates). Expenses are
+  `budget_items` rows (budgeted = actual = amount, optional `phase_id`); `change_orders` is its own table.
+- **Crew & equipment** (`api/v1/resources.py`): the global `labor_resources` / `equipment` tables, each on at
+  most one project.
+- **CRM** (`api/v1/crm.py` → `services/crm_service.py`, tables `clients`, `client_activities`): pipeline
+  `STAGES` with a usual win probability each (a stage change logs a `stage_change` activity and resets it
+  unless one is given); contact activities update `last_contact_at`; `POST /crm/clients/{id}/project` starts
+  (or links) the client's project; `GET /crm/pipeline` = per-stage totals, weighted forecast, follow-ups due.
+  Deleting a project unlinks its clients.
+- **AI** (`services/ai_assistant_service.py`): `complete_json` is a small Groq→Ollama→Gemini chain for short
+  JSON answers (not plans; 60 s budget) using `planning_service`'s clients. Copilot `POST /assistant/chat`,
+  client insights `POST /crm/clients/{id}/ai/insights` (saved on the client), email drafts `.../ai/draft`
+  (never sent). Every prompt carries a DB snapshot and must not invent facts; `budget_reading` states what
+  CPI/SPI/EAC mean because models misread the signs. Copilot `actions` are filtered by `clean_actions` to ones
+  that point at real phases/clients; the dashboard asks before running one. Tests replace `complete_json`.
+
 ### Dashboard — Vue 3 + Quasar + Pinia (`backend-core/dashboard`)
-Management UI for projects, materials, generated images, and run history. Vite + TypeScript
-(`npm run build` runs `vue-tsc` first, so type errors fail the build). `FloorPlanView.vue` on the home
-page draws the selected project's layout (rooms, doorways, windows, entry) as SVG from
-`GET /projects/{id}/generate-vr`, using each room's `bounds`; the street side is drawn at the bottom. For a
-project with a floor plan it also edits it (house name, footprint, split sizes, room names, two-way doorways,
-entry → `PUT .../floor-plan`), applies typed changes (`.../floor-plan/refine`), lists versions with Restore,
-and shows the accepted rendering.
+Project-management and CRM UI around the floor plan. Vite + TypeScript (`npm run build` runs `vue-tsc`
+first, so type errors fail the build). Everything comes from the API — no seeded or localStorage data
+(localStorage only remembers the selected project, theme and CRM view).
+- `MainLayout.vue`: project switcher (the **selected project** is `projects.currentProject`; pages follow it
+  through `composables/useProjectData`), attention bell (overview `attention` + CRM follow-ups), copilot drawer
+  (`components/ai/AiCopilotWidget.vue`), `NewProjectDialog` (AI plan via `/planning/generate-project`, or blank).
+- Pages: Overview (`HomeView`), Design studio (`DesignStudioView`, wraps `FloorPlanView`), CRM (`CrmView`:
+  kanban/table, `ClientDetailDrawer`, `AiOutreachModal`; `?client=ID&draft=purpose` deep-links), Schedule
+  (`TimelineView` + `schedule/GanttChart`), Budget, Materials (BOM from `materials`, CSV export), Crew &
+  equipment, Permits & inspections, plant/furniture model libraries.
+- `FloorPlanView.vue` draws the selected project's layout (rooms, doorways, windows, entry) as SVG from
+  `GET /projects/{id}/generate-vr`, using each room's `bounds`; the street side is drawn at the bottom. For a
+  project with a floor plan it also edits it (house name, footprint, split sizes, room names, two-way doorways,
+  entry → `PUT .../floor-plan`), applies typed changes (`.../floor-plan/refine`), lists versions with Restore,
+  and shows the accepted rendering. It emits `changed` on every new version (the studio offers to log a change
+  order) and exposes `reload` / `refineWith(text)`.
+- **Load to VR** is only the headset WebView bridge `Android.loadProject(id)` (`composables/useLoadToVr`).
+- Breakpoints are custom (`quasar-variables.sass`: md = 1024–1440): use `col-md-*` for desktop layouts —
+  `col-lg-*` only applies above 1440 px. Colors/surfaces are CSS tokens in `App.vue` (light + dark); status
+  badge colors are in `utils/status.ts`; charts (`components/charts/BarChart.vue`) use a validated
+  3-slot palette per mode.
 
 ## Pipeline (the path through the code)
 The headset runs a **two-prompt voice flow**, a state machine on `VoiceState` in `ImmersiveActivity.kt`:

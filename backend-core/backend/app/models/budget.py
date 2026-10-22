@@ -41,6 +41,9 @@ class BudgetItem(Base):
     # Category relationship
     category_id = Column(Integer, ForeignKey("budget_categories.id"), nullable=False)
 
+    # The construction phase the cost belongs to, if any (actual cost per phase)
+    phase_id = Column(Integer, ForeignKey("construction_phases.id", ondelete="SET NULL"))
+
     # Budget details
     budgeted_amount = Column(Float, nullable=False)
     actual_amount = Column(Float, default=0.0)
@@ -73,6 +76,7 @@ class BudgetItem(Base):
     # Relationships
     project = relationship("Project", back_populates="budget_items")
     category = relationship("BudgetCategory", back_populates="budget_items")
+    phase = relationship("ConstructionPhase")
 
     @property
     def variance(self) -> float:
@@ -88,3 +92,31 @@ class BudgetItem(Base):
 
     def __repr__(self):
         return f"<BudgetItem(id={self.id}, name='{self.name}', budgeted=${self.budgeted_amount}, actual=${self.actual_amount})>"
+
+
+class ChangeOrder(Base):
+    """A priced change to the contract: what changes, what it costs, how many
+    days it adds, and whether the owner approved it. Approved change orders
+    are added to the contract value (budget at completion)."""
+
+    __tablename__ = "change_orders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    number = Column(Integer, nullable=False)  # CO-001, CO-002, ... per project
+    title = Column(String(255), nullable=False)
+    description = Column(Text)
+    cost_impact = Column(Float, default=0.0)
+    schedule_impact_days = Column(Float, default=0.0)
+    status = Column(String(30), default="submitted")  # draft, submitted, approved, rejected
+    requested_by = Column(String(255))
+    floor_plan_version = Column(Integer)  # the version the change produced, if any
+    decided_at = Column(DateTime(timezone=True))
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    project = relationship("Project", back_populates="change_orders")
+
+    def __repr__(self):
+        return f"<ChangeOrder(id={self.id}, project={self.project_id}, number={self.number}, status='{self.status}')>"
