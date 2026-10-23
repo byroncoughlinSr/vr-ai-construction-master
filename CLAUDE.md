@@ -282,7 +282,7 @@ only auto furniture) goes to `geometry.notes`. Headset side: `FurnitureBuilder.k
   `change_order`, `permit`, `inspection`). Errors: `PMError` (pm-mcp refused; 404/409) and `PMUnavailable` (503;
   the overview and punch list still answer with `pm_available: false`). The old tables
   (`construction_phases`, `tasks`, `permits`, `inspections`, `budget_items`, `budget_categories`,
-  `change_orders`) are still in the database but unused; punch items' `phase_id` and crew/equipment
+  `change_orders`) were dropped in migration `c1f7e3a9d5b2`; punch items' `phase_id` and crew/equipment
   assignments' `task_id` hold pm-mcp ids.
 - **Project controls** (`api/v1/project_controls.py` → `services/project_controls_service.py`), per project:
   `GET .../overview` (schedule/budget/compliance summaries, floor plan brief, linked clients, `attention` list),
