@@ -1,105 +1,121 @@
 <template>
-  <q-layout view="hHh lpR fFf">
-    <!-- Header -->
-    <q-header elevated class="bg-primary text-white">
-      <q-toolbar>
-        <q-toolbar-title>
-          <q-icon name="home_work" size="sm" class="q-mr-sm" />
-          VR Construction Platform
-        </q-toolbar-title>
+  <q-layout view="hHh LpR fFf">
+    <q-header bordered class="app-header">
+      <q-toolbar class="q-px-sm q-px-md-md" style="min-height: 60px">
+        <q-btn flat dense round icon="menu" aria-label="Menu" class="q-mr-xs" @click="leftDrawerOpen = !leftDrawerOpen" />
+
+        <router-link to="/" class="brand row items-center no-wrap q-mr-md">
+          <q-avatar size="34px" color="primary" text-color="white" icon="architecture" font-size="20px" class="brand-mark" />
+          <div class="gt-sm q-ml-sm">
+            <div class="text-subtitle2 text-weight-bold leading-tight">VR AI Construction</div>
+            <div class="text-caption text-muted leading-tight">Design · Build · Clients</div>
+          </div>
+        </router-link>
+
+        <!-- Project switcher -->
+        <q-select
+          :model-value="projects.currentProjectId"
+          :options="projectOptions"
+          emit-value
+          map-options
+          outlined
+          dense
+          options-dense
+          :loading="projects.loading"
+          class="project-switcher"
+          :display-value="projects.currentProject?.name ?? (projects.loading ? 'Loading…' : 'No project')"
+          aria-label="Project"
+          @update:model-value="onSelectProject"
+        >
+          <template #prepend><q-icon name="home_work" size="20px" /></template>
+          <template #option="{ itemProps, opt }">
+            <q-item v-bind="itemProps">
+              <q-item-section>
+                <q-item-label>{{ opt.label }}</q-item-label>
+                <q-item-label caption>{{ opt.caption }}</q-item-label>
+              </q-item-section>
+              <q-item-section side>
+                <q-badge :color="statusColor('project', opt.status)" :label="titleCase(opt.status)" />
+              </q-item-section>
+            </q-item>
+          </template>
+          <template #after-options>
+            <q-separator />
+            <q-item clickable @click="ui.openNewProject()">
+              <q-item-section avatar><q-icon name="add" color="primary" /></q-item-section>
+              <q-item-section class="text-primary">New project</q-item-section>
+            </q-item>
+          </template>
+          <template #no-option>
+            <q-item clickable @click="ui.openNewProject()">
+              <q-item-section avatar><q-icon name="add" color="primary" /></q-item-section>
+              <q-item-section class="text-primary">New project</q-item-section>
+            </q-item>
+          </template>
+        </q-select>
 
         <q-space />
 
-        <!-- Project Selector -->
-        <q-select
-          v-model="selectedProjectId"
-          :options="projectOptions"
-          option-value="id"
-          option-label="name"
-          label="Select Project"
-          dark
-          outlined
-          dense
-          style="min-width: 250px"
-          class="q-mr-md"
-          @update:model-value="onProjectChange"
-          :loading="projectsStore.loading"
+        <q-btn
+          v-if="headset && projects.currentProjectId"
+          flat
+          no-caps
+          icon="view_in_ar"
+          :label="$q.screen.gt.sm ? 'Load to VR' : undefined"
+          class="q-mr-xs"
+          @click="loadToVr(projects.currentProjectId, projects.currentProject?.name)"
         />
 
-        <!-- Export Menu -->
-        <q-btn-dropdown flat dense label="Export" icon="download" class="q-mr-sm">
-          <q-list>
-            <q-item clickable v-close-popup @click="exportPDF">
-              <q-item-section avatar>
-                <q-icon name="picture_as_pdf" color="red" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>PDF Report</q-item-label>
-              </q-item-section>
-            </q-item>
-            <q-item clickable v-close-popup @click="exportExcel">
-              <q-item-section avatar>
-                <q-icon name="table_chart" color="green" />
-              </q-item-section>
-              <q-item-section>
-                <q-item-label>Excel Report</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-btn-dropdown>
+        <q-btn
+          unelevated
+          no-caps
+          color="primary"
+          icon="auto_awesome"
+          :label="$q.screen.gt.xs ? 'Copilot' : undefined"
+          class="q-mr-xs"
+          @click="copilot.toggleOpen()"
+        />
 
-        <!-- Notifications -->
-        <q-btn flat dense round icon="notifications" class="q-mr-sm">
-          <q-badge color="negative" floating>3</q-badge>
-          <q-menu>
-            <q-list style="min-width: 300px">
-              <q-item-label header>Notifications</q-item-label>
-              <q-item clickable>
+        <!-- What needs attention -->
+        <q-btn flat round dense icon="notifications_none" aria-label="Needs attention">
+          <q-badge v-if="attentionCount" color="negative" floating rounded>{{ attentionCount }}</q-badge>
+          <q-menu anchor="bottom right" self="top right" :offset="[0, 6]">
+            <q-list style="width: 340px; max-width: 92vw" separator>
+              <q-item-label header class="text-weight-bold">Needs attention</q-item-label>
+              <q-item v-for="(item, i) in attentionItems" :key="i" clickable v-close-popup @click="$router.push(item.route)">
                 <q-item-section avatar>
-                  <q-icon name="warning" color="orange" />
+                  <q-icon :name="item.icon" :color="statusColor('severity', item.severity)" />
                 </q-item-section>
                 <q-item-section>
-                  <q-item-label>Material shortage alert</q-item-label>
-                  <q-item-label caption>2 hours ago</q-item-label>
+                  <q-item-label class="ellipsis-2">{{ item.title }}</q-item-label>
+                  <q-item-label v-if="item.detail" caption class="ellipsis">{{ item.detail }}</q-item-label>
                 </q-item-section>
+              </q-item>
+              <q-item v-if="!attentionItems.length">
+                <q-item-section class="text-muted text-body2">Nothing needs you right now.</q-item-section>
               </q-item>
             </q-list>
           </q-menu>
         </q-btn>
 
-        <!-- User Menu -->
-        <q-btn flat dense round>
-          <q-avatar size="32px">
-            <q-icon name="person" />
-          </q-avatar>
-          <q-menu>
-            <q-list style="min-width: 200px">
-              <q-item clickable>
+        <q-btn flat round dense :icon="$q.dark.isActive ? 'light_mode' : 'dark_mode'" class="q-ml-xs" aria-label="Toggle dark mode" @click="toggleDark">
+          <q-tooltip>{{ $q.dark.isActive ? 'Light mode' : 'Dark mode' }}</q-tooltip>
+        </q-btn>
+
+        <q-btn flat round dense class="q-ml-xs" aria-label="Account">
+          <q-avatar size="32px" color="primary" text-color="white" font-size="13px">{{ initials(auth.fullName || 'User') }}</q-avatar>
+          <q-menu anchor="bottom right" self="top right">
+            <q-list style="min-width: 220px">
+              <q-item>
                 <q-item-section>
-                  <q-item-label>{{ authStore.fullName }}</q-item-label>
-                  <q-item-label caption>{{ authStore.user?.email }}</q-item-label>
+                  <q-item-label class="text-weight-bold">{{ auth.fullName || 'Signed in' }}</q-item-label>
+                  <q-item-label caption>{{ auth.user?.email || (devMode ? 'Development mode' : '') }}</q-item-label>
                 </q-item-section>
               </q-item>
               <q-separator />
-              <q-item clickable @click="toggleDarkMode">
-                <q-item-section avatar>
-                  <q-icon name="dark_mode" />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>Dark Mode</q-item-label>
-                </q-item-section>
-                <q-item-section side>
-                  <q-toggle v-model="$q.dark.isActive" />
-                </q-item-section>
-              </q-item>
-              <q-separator />
-              <q-item clickable @click="logout">
-                <q-item-section avatar>
-                  <q-icon name="logout" />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label>Logout</q-item-label>
-                </q-item-section>
+              <q-item v-if="!devMode" clickable v-close-popup @click="logout">
+                <q-item-section avatar><q-icon name="logout" /></q-item-section>
+                <q-item-section>Sign out</q-item-section>
               </q-item>
             </q-list>
           </q-menu>
@@ -107,384 +123,259 @@
       </q-toolbar>
     </q-header>
 
-    <!-- Left Drawer -->
-    <q-drawer
-      v-model="leftDrawerOpen"
-      show-if-above
-      bordered
-      :width="250"
-    >
-      <q-list>
-        <q-item-label header class="text-primary">Navigation</q-item-label>
-
-        <q-item clickable to="/" exact active-class="bg-primary-1">
-          <q-item-section avatar>
-            <q-icon name="dashboard" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Dashboard</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable to="/timeline" active-class="bg-primary-1">
-          <q-item-section avatar>
-            <q-icon name="event" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Timeline</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable to="/materials" active-class="bg-primary-1">
-          <q-item-section avatar>
-            <q-icon name="inventory" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Materials</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable to="/budget" active-class="bg-primary-1">
-          <q-item-section avatar>
-            <q-icon name="attach_money" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Budget</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable to="/resources" active-class="bg-primary-1">
-          <q-item-section avatar>
-            <q-icon name="engineering" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Resources</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable to="/compliance" active-class="bg-primary-1">
-          <q-item-section avatar>
-            <q-icon name="gavel" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Compliance</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable to="/plants" active-class="bg-primary-1">
-          <q-item-section avatar>
-            <q-icon name="yard" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Plants</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable to="/furniture" active-class="bg-primary-1">
-          <q-item-section avatar>
-            <q-icon name="chair" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Furniture</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-separator class="q-my-md" />
-
-        <q-item-label header>Quick Actions</q-item-label>
-
-        <q-item clickable @click="createNewProject" v-if="authStore.canManageProjects">
-          <q-item-section avatar>
-            <q-icon name="add" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>New Project</q-item-label>
-          </q-item-section>
-        </q-item>
-
-        <q-item clickable @click="refreshData">
-          <q-item-section avatar>
-            <q-icon name="refresh" />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>Refresh Data</q-item-label>
-          </q-item-section>
-        </q-item>
-      </q-list>
+    <q-drawer v-model="leftDrawerOpen" show-if-above bordered :width="252" class="app-drawer">
+      <div class="column fit no-wrap">
+        <q-scroll-area class="col">
+          <q-list class="nav q-py-sm">
+            <template v-for="section in navigation" :key="section.title">
+              <q-item-label header class="nav-header">{{ section.title }}</q-item-label>
+              <q-item
+                v-for="item in section.items"
+                :key="item.to"
+                clickable
+                :to="item.to"
+                :exact="item.to === '/'"
+                active-class="nav-active"
+                class="nav-item"
+              >
+                <q-item-section avatar class="nav-icon"><q-icon :name="item.icon" size="20px" /></q-item-section>
+                <q-item-section>{{ item.label }}</q-item-section>
+                <q-item-section v-if="item.badge" side>
+                  <q-badge :color="item.badgeColor ?? 'primary'" :label="item.badge" rounded />
+                </q-item-section>
+              </q-item>
+            </template>
+          </q-list>
+        </q-scroll-area>
+        <q-separator />
+        <div class="q-px-md q-py-sm text-caption text-muted row items-center no-wrap">
+          <q-icon name="circle" size="9px" :color="websocketService.connected.value ? 'positive' : 'grey-5'" class="q-mr-xs" />
+          <span class="ellipsis">{{ websocketService.connected.value ? 'Live updates on' : 'Live updates off' }} · {{ serverHost }}</span>
+        </div>
+      </div>
     </q-drawer>
 
-    <!-- Main Content -->
     <q-page-container>
       <router-view />
     </q-page-container>
 
-    <!-- Footer -->
-    <q-footer elevated class="bg-grey-8 text-white">
-      <q-toolbar>
-        <q-toolbar-title class="text-caption">
-          VR Construction Platform v{{ appVersion }}
-        </q-toolbar-title>
-        <q-space />
-        <div class="text-caption">
-          {{ connectionStatus }}
-        </div>
-      </q-toolbar>
-    </q-footer>
+    <ai-copilot-widget />
+    <new-project-dialog />
   </q-layout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
-import { useRouter } from 'vue-router'
-import { useProjectsStore } from 'stores/projects'
-import { useAuthStore } from 'stores/auth'
+import { useProjectsStore } from 'src/stores/projects'
+import { useAuthStore } from 'src/stores/auth'
+import { useCrmStore } from 'src/stores/crm'
+import { useAiCopilotStore } from 'src/stores/aiCopilot'
+import { useUiStore } from 'src/stores/ui'
 import { websocketService } from 'src/services/websocket'
+import { inHeadset, useLoadToVr } from 'src/composables/useLoadToVr'
+import { initials, titleCase } from 'src/utils/format'
+import { statusColor } from 'src/utils/status'
+import AiCopilotWidget from 'src/components/ai/AiCopilotWidget.vue'
+import NewProjectDialog from 'src/components/projects/NewProjectDialog.vue'
 
 const $q = useQuasar()
+const route = useRoute()
 const router = useRouter()
-const projectsStore = useProjectsStore()
-const authStore = useAuthStore()
+const projects = useProjectsStore()
+const auth = useAuthStore()
+const crm = useCrmStore()
+const copilot = useAiCopilotStore()
+const ui = useUiStore()
+const loadToVr = useLoadToVr()
 
-// Reactive state
-const leftDrawerOpen = ref(true)
-const selectedProjectId = ref<number | null>(null)
+const leftDrawerOpen = ref(false)
+const headset = inHeadset()
+const devMode = import.meta.env.VITE_DEV_MODE === 'true'
+const serverHost = (() => {
+  try {
+    return new URL(String(import.meta.env.VITE_API_BASE_URL)).host
+  } catch {
+    return 'local API'
+  }
+})()
 
-// Computed properties
+// Light/dark: the user's choice is remembered per browser; until then, the system's.
+const THEME_KEY = 'dashboard.theme'
+try {
+  const saved = localStorage.getItem(THEME_KEY)
+  if (saved === 'dark' || saved === 'light') $q.dark.set(saved === 'dark')
+} catch {
+  // storage unavailable: follow the system
+}
+const toggleDark = () => {
+  $q.dark.toggle()
+  try {
+    localStorage.setItem(THEME_KEY, $q.dark.isActive ? 'dark' : 'light')
+  } catch {
+    // not remembered; fine
+  }
+}
+
 const projectOptions = computed(() =>
-  projectsStore.projects.map(project => ({
-    id: project.id,
-    name: project.name,
-    label: `${project.name} (${project.project_type})`
+  projects.projects.map(p => ({
+    value: p.id,
+    label: p.name,
+    caption: p.address || p.description?.slice(0, 60) || `Project #${p.id}`,
+    status: p.status
   }))
 )
 
-const appVersion = computed(() => import.meta.env.VITE_APP_VERSION || '1.0.0')
-
-const connectionStatus = computed(() => {
-  const state = websocketService.getConnectionState()
-  switch (state) {
-    case 'connected':
-      return '🟢 Connected'
-    case 'connecting':
-      return '🟡 Connecting...'
-    case 'disconnected':
-      return '🔴 Disconnected'
-    default:
-      return '⚪ Unknown'
+const attentionItems = computed(() => {
+  const items = (projects.overview?.attention ?? []).map(a => ({
+    ...a,
+    icon: a.kind.startsWith('task') ? 'event_busy' : a.kind.startsWith('inspection') ? 'fact_check'
+      : a.kind.startsWith('permit') ? 'gavel' : 'request_quote'
+  }))
+  for (const f of crm.pipeline?.follow_ups_due ?? []) {
+    items.push({
+      kind: 'follow_up', severity: 'medium', title: `Follow up with ${f.name}`,
+      detail: f.next_action ?? '', route: `/crm?client=${f.id}`, icon: 'person_search'
+    })
   }
+  return items
 })
+const attentionCount = computed(() => attentionItems.value.length)
 
-// Methods
-const loadProjects = async () => {
-  console.log('[MainLayout] Loading projects...')
-  try {
-    await projectsStore.fetchProjects()
-    console.log('[MainLayout] Projects loaded:', projectsStore.projects.length)
-    
-    if (projectsStore.projects.length > 0 && !selectedProjectId.value) {
-      selectedProjectId.value = projectsStore.projects[0].id
-      console.log('[MainLayout] Auto-selected project:', selectedProjectId.value)
-      await onProjectChange(projectsStore.projects[0].id)
-    } else if (projectsStore.projects.length === 0) {
-      console.warn('[MainLayout] No projects found')
-      $q.notify({
-        type: 'warning',
-        message: 'No projects found',
-        caption: 'Create a new project to get started'
-      })
-    }
-  } catch (error) {
-    console.error('[MainLayout] Failed to load projects:', error)
-    $q.notify({
-      type: 'negative',
-      message: 'Failed to load projects',
-      caption: error instanceof Error ? error.message : 'Unknown error'
-    })
+const pendingCos = computed(() =>
+  (projects.overview?.attention ?? []).filter(a => a.kind === 'change_order_pending').length
+)
+
+const navigation = computed(() => [
+  {
+    title: 'Workspace',
+    items: [
+      { to: '/', label: 'Overview', icon: 'space_dashboard' },
+      { to: '/design', label: 'Design studio', icon: 'architecture' }
+    ]
+  },
+  {
+    title: 'Clients',
+    items: [
+      {
+        to: '/crm', label: 'Client CRM', icon: 'groups',
+        badge: crm.followUpsDue ? String(crm.followUpsDue) : undefined, badgeColor: 'warning'
+      }
+    ]
+  },
+  {
+    title: 'Project controls',
+    items: [
+      { to: '/timeline', label: 'Schedule', icon: 'calendar_month' },
+      {
+        to: '/budget', label: 'Budget & cost', icon: 'account_balance_wallet',
+        badge: pendingCos.value ? String(pendingCos.value) : undefined, badgeColor: 'warning'
+      },
+      { to: '/materials', label: 'Materials (BOM)', icon: 'inventory_2' },
+      { to: '/resources', label: 'Crew & equipment', icon: 'engineering' },
+      { to: '/compliance', label: 'Permits & inspections', icon: 'verified' }
+    ]
+  },
+  {
+    title: '3D libraries',
+    items: [
+      { to: '/plants', label: 'Plant models', icon: 'yard' },
+      { to: '/furniture', label: 'Furniture models', icon: 'chair' }
+    ]
   }
+])
+
+const onSelectProject = (id: number) => {
+  projects.selectProject(id)
 }
 
-const onProjectChange = async (projectId: number | { id: number; name: string; label: string }) => {
-  // Handle both direct ID and object from q-select
-  const id = typeof projectId === 'number' ? projectId : projectId.id
-  
-  if (!id) {
-    console.warn('[MainLayout] onProjectChange called with invalid ID:', projectId)
-    return
-  }
-
-  console.log('[MainLayout] Changing to project:', id)
-  
-  try {
-    await projectsStore.fetchProjectSummary(id)
-    console.log('[MainLayout] Project loaded:', projectsStore.currentProject?.name)
-    
-    // Subscribe to WebSocket updates if connected
-    if (websocketService.connected.value) {
-      await websocketService.subscribeToProject(id)
-      console.log('[MainLayout] Subscribed to project WebSocket updates')
-    }
-
-    $q.notify({
-      type: 'positive',
-      message: `Loaded project: ${projectsStore.currentProject?.name}`,
-      timeout: 2000
-    })
-  } catch (error) {
-    console.error('[MainLayout] Failed to load project:', error)
-    $q.notify({
-      type: 'negative',
-      message: 'Failed to load project data',
-      caption: error instanceof Error ? error.message : 'Unknown error'
-    })
-  }
+const refreshOverview = () => {
+  projects.fetchOverview().catch(err => console.warn('[MainLayout] overview failed', err))
 }
 
-const toggleDarkMode = () => {
-  $q.dark.toggle()
-}
+// The selected project: overview for the bell, live updates for its room.
+watch(
+  () => projects.currentProjectId,
+  async id => {
+    if (!id) return
+    refreshOverview()
+    if (websocketService.connected.value) websocketService.subscribeToProject(id)
+  }
+)
+// Pages change things; the bell catches up when you move on.
+watch(() => route.path, () => {
+  if (projects.currentProjectId) refreshOverview()
+})
 
 const logout = async () => {
   try {
-    await authStore.logout()
+    await auth.logout()
+  } finally {
     router.push('/login')
-  } catch (error) {
-    console.error('Logout failed:', error)
   }
 }
 
-const exportPDF = async () => {
-  if (!projectsStore.currentProject) return
-
-  $q.loading.show({ message: 'Generating PDF...' })
-
-  try {
-    // This would integrate with your backend PDF generation
-    const response = await fetch(`/api/projects/${projectsStore.currentProject.id}/report/pdf`)
-    const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${projectsStore.currentProject.name}_Report.pdf`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    window.URL.revokeObjectURL(url)
-
-    $q.notify({
-      type: 'positive',
-      message: 'PDF downloaded successfully'
-    })
-  } catch (error) {
-    $q.notify({
-      type: 'negative',
-      message: 'Failed to generate PDF'
-    })
-  } finally {
-    $q.loading.hide()
-  }
-}
-
-const exportExcel = async () => {
-  if (!projectsStore.currentProject) return
-
-  $q.loading.show({ message: 'Generating Excel...' })
-
-  try {
-    // This would integrate with your backend Excel generation
-    const response = await fetch(`/api/projects/${projectsStore.currentProject.id}/report/excel`)
-    const blob = await response.blob()
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${projectsStore.currentProject.name}_Report.xlsx`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    window.URL.revokeObjectURL(url)
-
-    $q.notify({
-      type: 'positive',
-      message: 'Excel downloaded successfully'
-    })
-  } catch (error) {
-    $q.notify({
-      type: 'negative',
-      message: 'Failed to generate Excel'
-    })
-  } finally {
-    $q.loading.hide()
-  }
-}
-
-const createNewProject = () => {
-  // This would open a project creation dialog
-  $q.notify({
-    type: 'info',
-    message: 'Project creation dialog would open here'
-  })
-}
-
-const refreshData = async () => {
-  $q.loading.show({ message: 'Refreshing data...' })
-
-  try {
-    await Promise.all([
-      loadProjects(),
-      selectedProjectId.value ? projectsStore.fetchProjectSummary(selectedProjectId.value) : Promise.resolve()
-    ])
-
-    $q.notify({
-      type: 'positive',
-      message: 'Data refreshed successfully'
-    })
-  } catch (error) {
-    $q.notify({
-      type: 'negative',
-      message: 'Failed to refresh data'
-    })
-  } finally {
-    $q.loading.hide()
-  }
-}
-
-// WebSocket connection
-const connectWebSocket = async () => {
-  try {
-    console.log('[MainLayout] Attempting WebSocket connection...')
-    await websocketService.connect()
-    console.log('[MainLayout] WebSocket connected successfully')
-  } catch (error) {
-    console.warn('[MainLayout] WebSocket connection failed:', error)
-    // Don't fail the app if WebSocket doesn't connect
-    $q.notify({
-      type: 'warning',
-      message: 'Real-time updates unavailable',
-      caption: 'WebSocket connection failed - some features may be limited',
-      timeout: 3000
-    })
-  }
-}
-
-// Lifecycle
 onMounted(async () => {
-  await loadProjects()
-  await connectWebSocket()
+  try {
+    await projects.fetchProjects()
+  } catch {
+    $q.notify({ type: 'negative', message: 'Could not reach the backend', caption: String(import.meta.env.VITE_API_BASE_URL) })
+  }
+  crm.load().catch(err => console.warn('[MainLayout] CRM failed to load', err))
+  websocketService.connect().catch(err => console.warn('[MainLayout] WebSocket connection failed:', err))
 })
 
-// Watch for authentication changes
-watch(() => authStore.isAuthenticated, async (isAuthenticated) => {
-  // Only redirect to login if not in dev mode
-  if (!isAuthenticated && import.meta.env.VITE_DEV_MODE !== 'true') {
-    console.log('[MainLayout] User not authenticated, redirecting to login')
-    router.push('/login')
-  }
+watch(() => auth.isAuthenticated, isAuthenticated => {
+  if (!isAuthenticated && !devMode) router.push('/login')
 })
 </script>
 
 <style lang="sass" scoped>
-.q-drawer
-  .q-item--active
-    background-color: rgba(var(--q-primary-rgb), 0.1)
+.app-header
+  background: var(--app-surface)
+  color: var(--app-text)
+  border-color: var(--app-border)
+
+.brand
+  color: inherit
+  text-decoration: none
+
+.brand-mark
+  border-radius: 10px
+
+.leading-tight
+  line-height: 1.15
+
+.project-switcher
+  width: 300px
+  max-width: 46vw
+
+.app-drawer
+  background: var(--app-surface)
+
+.nav-header
+  font-size: 0.7rem
+  font-weight: 700
+  letter-spacing: 0.08em
+  text-transform: uppercase
+  color: var(--app-muted)
+  padding: 14px 20px 6px
+
+.nav-item
+  margin: 1px 10px
+  border-radius: 8px
+  min-height: 38px
+  color: var(--app-text)
+
+.nav-icon
+  min-width: 34px
+  color: var(--app-muted)
+
+.nav-active
+  background: var(--app-accent-soft)
+  color: var(--q-primary)
+  font-weight: 600
+  .nav-icon
     color: var(--q-primary)
 </style>

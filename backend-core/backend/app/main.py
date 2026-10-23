@@ -27,6 +27,10 @@ from .api.v1.materials import router as materials_router
 from .api.v1.voice import router as voice_router
 from .api.v1.websocket import router as websocket_router
 from .api.v1.plants import furniture_router, router as plants_router
+from .api.v1.project_controls import router as project_controls_router
+from .api.v1.resources import router as resources_router
+from .api.v1.crm import router as crm_router
+from .api.v1.assistant import router as assistant_router
 
 # Configure structured logging
 setup_logging(
@@ -138,6 +142,31 @@ app.include_router(
     projects_router,
     prefix="/api/v1/projects",
     tags=["Project Management"]
+)
+
+# Schedule, budget, compliance and overview of one project (same prefix).
+app.include_router(
+    project_controls_router,
+    prefix="/api/v1/projects",
+    tags=["Project Controls"]
+)
+
+app.include_router(
+    resources_router,
+    prefix="/api/v1/resources",
+    tags=["Crew & Equipment"]
+)
+
+app.include_router(
+    crm_router,
+    prefix="/api/v1/crm",
+    tags=["Client CRM"]
+)
+
+app.include_router(
+    assistant_router,
+    prefix="/api/v1/assistant",
+    tags=["AI Copilot"]
 )
 
 app.include_router(

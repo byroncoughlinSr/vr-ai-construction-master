@@ -13,6 +13,16 @@ const router = createRouter({
           component: () => import('../views/HomeView.vue')
         },
         {
+          path: '/design',
+          name: 'design',
+          component: () => import('../views/DesignStudioView.vue')
+        },
+        {
+          path: '/crm',
+          name: 'crm',
+          component: () => import('../views/CrmView.vue')
+        },
+        {
           path: '/timeline',
           name: 'timeline',
           component: () => import('../views/TimelineView.vue')

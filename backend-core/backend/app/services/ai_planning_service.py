@@ -159,6 +159,7 @@ class AIPlanningService:
             ("Gemini", lambda: self.gemini_available, self._generate_with_gemini),
         ]
         last_error: Optional[Exception] = None
+        failures: List[str] = []
         for name, available, generate in providers:
             if not available():
                 continue
@@ -178,10 +179,15 @@ class AIPlanningService:
                 last_error = Exception(f"{name} planning timed out after {remaining:.0f}s")
                 logger.warning(f"{last_error}; trying next provider")
             except Exception as e:
-                last_error = e
+                last_error = Exception(f"{name}: {e}")
                 logger.warning(f"{name} planning failed, trying next provider: {e}")
+            failures.append(str(last_error).split("\n")[0][:200])
 
-        raise last_error or Exception("No AI services available for planning")
+        if failures:
+            # Name every provider's failure: the last one alone (often a fallback's
+            # bad key) hides why the primary planner failed.
+            raise Exception("All planners failed — " + "; ".join(failures))
+        raise Exception("No AI services available for planning")
 
     async def _generate_with_groq(self, prompt: str) -> Dict[str, Any]:
         """Generate construction plan using the Groq cloud API (primary planner)."""
@@ -191,6 +197,7 @@ class AIPlanningService:
             loop = asyncio.get_running_loop()
 
             max_tokens = 4096
+            extra: Dict[str, Any] = {}
 
             def _groq_generate():
                 return self.groq_client.chat.completions.create(
@@ -200,6 +207,7 @@ class AIPlanningService:
                     top_p=0.9,
                     max_tokens=max_tokens,
                     response_format={'type': 'json_object'},
+                    **extra,
                 )
 
             # Groq is fast; a short timeout is plenty. JSON mode rejects a whole
@@ -215,7 +223,15 @@ class AIPlanningService:
                 except BadRequestError as e:
                     failed = ((getattr(e, "body", None) or {}).get("error") or {}).get("failed_generation")
                     if not failed:
-                        raise
+                        # Nothing written at all: a reasoning model (gpt-oss) can spend
+                        # the whole max_tokens thinking about a big house. Ask again
+                        # with less thinking so the answer fits.
+                        if attempt == 2:
+                            raise
+                        if "gpt-oss" in settings.groq_model:
+                            extra["reasoning_effort"] = "low"
+                        logger.warning("Groq's JSON check failed on an empty answer — asking Groq again")
+                        continue
                     logger.warning("Groq's JSON check failed — repairing its output instead")
                     result = self._parse_structured_plan(self._salvage_groq_json(failed), "groq")
                     if result.get("success") or attempt == 2:

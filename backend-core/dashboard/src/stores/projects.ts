@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
 import { apiClient } from 'src/services/api'
-import type { Project, ProjectSummary } from 'src/types/models'
+import type { Project } from 'src/types/models'
+import type { ProjectOverview } from 'src/types/controls'
 
 // Shape returned by the backend /api/v1/projects/ endpoint
-interface BackendProject {
+export interface BackendProject {
   id: number
   name: string
   description: string
@@ -27,6 +28,17 @@ interface BackendProjectListResponse {
   page: number
   page_size: number
   total_pages: number
+}
+
+// The editable fields, as the backend names them (ProjectCreate / ProjectUpdate).
+export interface ProjectFields {
+  name?: string
+  description?: string | null
+  status?: string
+  budget?: number | null
+  address?: string | null
+  start_date?: string | null
+  estimated_completion_date?: string | null
 }
 
 /** Map backend field names to the frontend Project model. */
@@ -54,71 +66,90 @@ function mapProject(p: BackendProject): Project {
   }
 }
 
+// Which project was selected last, so a reload comes back to it (per browser).
+const SELECTED_KEY = 'dashboard.selectedProjectId'
+
+function rememberedProjectId(): number | null {
+  try {
+    const value = Number(localStorage.getItem(SELECTED_KEY))
+    return Number.isFinite(value) && value > 0 ? value : null
+  } catch {
+    return null
+  }
+}
+
+function rememberProjectId(id: number | null): void {
+  try {
+    if (id) localStorage.setItem(SELECTED_KEY, String(id))
+    else localStorage.removeItem(SELECTED_KEY)
+  } catch {
+    // Storage may be unavailable (private window, headset WebView); not needed.
+  }
+}
+
 interface ProjectsState {
   projects: Project[]
-  currentProject: ProjectSummary | null
+  raw: Record<number, BackendProject>
+  currentProject: Project | null
+  overview: ProjectOverview | null
+  overviewLoading: boolean
   loading: boolean
+  loaded: boolean
   error: string | null
 }
 
 export const useProjectsStore = defineStore('projects', {
   state: (): ProjectsState => ({
     projects: [],
+    raw: {},
     currentProject: null,
+    overview: null,
+    overviewLoading: false,
     loading: false,
+    loaded: false,
     error: null
   }),
 
   getters: {
+    currentProjectId: (state): number | null => state.currentProject?.id ?? null,
+
+    /** The selected project with the backend's own fields (dates, cost). */
+    currentRaw: (state): BackendProject | null =>
+      state.currentProject ? state.raw[state.currentProject.id] ?? null : null,
+
     getProjectById: (state): ((id: number) => Project | undefined) => {
-      return (id: number): Project | undefined => {
-        return state.projects.find(project => project.id === id)
-      }
+      return (id: number): Project | undefined => state.projects.find(project => project.id === id)
     },
 
-    activeProjects: (state): Project[] => {
-      return state.projects.filter(p => p.status !== 'completed')
-    },
-
-    totalBudget: (state): number => {
-      return state.projects.reduce((sum, p) => sum + (p.target_budget || 0), 0)
-    },
-
-    projectsByType: (state): Record<string, Project[]> => {
-      return state.projects.reduce((acc, project) => {
-        const type = project.project_type
-        if (!acc[type]) {
-          acc[type] = []
-        }
-        acc[type].push(project)
-        return acc
-      }, {} as Record<string, Project[]>)
-    },
-
-    overdueProjects: (state): Project[] => {
-      const now = new Date()
-      return state.projects.filter(p =>
-        p.target_completion_days &&
-        p.started_at &&
-        new Date(p.started_at).getTime() + (p.target_completion_days * 24 * 60 * 60 * 1000) < now.getTime() &&
-        p.status !== 'completed'
-      )
-    }
+    activeProjects: (state): Project[] => state.projects.filter(p => p.status !== 'completed')
   },
 
   actions: {
+    _store(p: BackendProject): Project {
+      this.raw[p.id] = p
+      const mapped = mapProject(p)
+      const index = this.projects.findIndex(x => x.id === p.id)
+      if (index === -1) this.projects.unshift(mapped)
+      else this.projects[index] = mapped
+      if (this.currentProject?.id === p.id) this.currentProject = mapped
+      return mapped
+    },
+
     async fetchProjects(): Promise<Project[]> {
       this.loading = true
       this.error = null
       try {
-        const response = await apiClient.get<BackendProjectListResponse>('/projects/')
-        const mapped = (response.projects ?? []).map(mapProject)
-        this.projects = mapped
-        // Auto-select the first project if none is currently selected
-        if (!this.currentProject && mapped.length > 0) {
-          this.currentProject = mapped[0] as ProjectSummary
-        }
-        return mapped
+        const response = await apiClient.get<BackendProjectListResponse>('/projects/', { page_size: 100 })
+        const list = response.projects ?? []
+        this.raw = Object.fromEntries(list.map(p => [p.id, p]))
+        this.projects = list.map(mapProject)
+        // Keep the selection if it still exists, else the one picked last, else the newest.
+        const keep = this.currentProject && this.projects.find(p => p.id === this.currentProject?.id)
+        const remembered = rememberedProjectId()
+        this.currentProject =
+          keep ?? this.projects.find(p => p.id === remembered) ?? this.projects[0] ?? null
+        this.loaded = true
+        return this.projects
       } catch (error) {
         this.error = (error as Error).message
         console.error('Error fetching projects:', error)
@@ -128,105 +159,63 @@ export const useProjectsStore = defineStore('projects', {
       }
     },
 
-    async fetchProjectSummary(projectId: number): Promise<ProjectSummary> {
-      this.loading = true
-      this.error = null
+    selectProject(projectId: number | null): void {
+      this.currentProject = projectId ? this.projects.find(p => p.id === projectId) ?? null : null
+      this.overview = null
+      rememberProjectId(this.currentProject?.id ?? null)
+    },
+
+    async fetchOverview(forProject?: number | null): Promise<ProjectOverview | null> {
+      const projectId = forProject ?? this.currentProjectId
+      if (!projectId) return null
+      this.overviewLoading = true
       try {
-        const response = await apiClient.get<BackendProject>(`/projects/${projectId}`)
-        const mapped: ProjectSummary = {
-          ...mapProject(response),
-          total_spent: 0,
-          spent_percentage: 0,
-          material_count: 0,
-          task_count: 0,
-          completed_tasks: 0
-        }
-        this.currentProject = mapped
-        return mapped
-      } catch (error) {
-        this.error = (error as Error).message
-        console.error('Error fetching project summary:', error)
-        throw error
+        const overview = await apiClient.get<ProjectOverview>(`/projects/${projectId}/overview`)
+        // Ignore an answer for a project that is no longer selected.
+        if (projectId === this.currentProjectId) this.overview = overview
+        return overview
       } finally {
-        this.loading = false
+        this.overviewLoading = false
       }
     },
 
-    async createProject(projectData: Partial<Project>): Promise<Project> {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await apiClient.post<Project>('/projects', projectData)
-        this.projects.push(response)
-        return response
-      } catch (error) {
-        this.error = (error as Error).message
-        console.error('Error creating project:', error)
-        throw error
-      } finally {
-        this.loading = false
-      }
+    async createProject(fields: ProjectFields): Promise<Project> {
+      const created = await apiClient.post<BackendProject>('/projects/', { status: 'planning', ...fields })
+      const project = this._store(created)
+      this.selectProject(project.id)
+      return project
     },
 
-    async updateProject(projectId: number, projectData: Partial<Project>): Promise<Project> {
-      this.loading = true
-      this.error = null
-      try {
-        const response = await apiClient.put<Project>(`/projects/${projectId}`, projectData)
+    /** Generate a whole project (plan, phases, tasks, materials, floor plan v1)
+     * from a description with the AI planner, then select it. Takes a minute or two. */
+    async generateProject(prompt: string, budget?: number | null): Promise<Project> {
+      const result = await apiClient.post<{ project_id: number }>('/planning/generate-project', {
+        prompt,
+        budget: budget || null,
+        generate_image: false
+      })
+      const created = await apiClient.get<BackendProject>(`/projects/${result.project_id}`)
+      const project = this._store(created)
+      this.selectProject(project.id)
+      return project
+    },
 
-        const index = this.projects.findIndex(p => p.id === projectId)
-        if (index !== -1) {
-          this.projects[index] = response
-        }
-
-        if (this.currentProject?.id === projectId) {
-          this.currentProject = response as ProjectSummary
-        }
-
-        return response
-      } catch (error) {
-        this.error = (error as Error).message
-        console.error('Error updating project:', error)
-        throw error
-      } finally {
-        this.loading = false
-      }
+    async updateProject(projectId: number, fields: ProjectFields): Promise<Project> {
+      const updated = await apiClient.put<BackendProject>(`/projects/${projectId}`, fields)
+      return this._store(updated)
     },
 
     async deleteProject(projectId: number): Promise<void> {
-      this.loading = true
-      this.error = null
-      try {
-        await apiClient.delete(`/projects/${projectId}`)
-        this.projects = this.projects.filter(p => p.id !== projectId)
-
-        if (this.currentProject?.id === projectId) {
-          this.currentProject = null
-        }
-      } catch (error) {
-        this.error = (error as Error).message
-        console.error('Error deleting project:', error)
-        throw error
-      } finally {
-        this.loading = false
-      }
+      await apiClient.delete(`/projects/${projectId}`)
+      this.projects = this.projects.filter(p => p.id !== projectId)
+      delete this.raw[projectId]
+      if (this.currentProject?.id === projectId) this.selectProject(this.projects[0]?.id ?? null)
     },
 
-    setCurrentProject(project: ProjectSummary | null): void {
-      this.currentProject = project
-    },
-
-    clearError(): void {
-      this.error = null
-    },
-
-    // Bulk operations
-    async updateProjectStatus(projectId: number, status: Project['status']): Promise<Project> {
-      return this.updateProject(projectId, { status })
-    },
-
-    async updateProjectProgress(projectId: number, progress: number): Promise<Project> {
-      return this.updateProject(projectId, { progress_percentage: progress })
+    /** The floor plan renames the house; keep the list and header in step. */
+    renameLocally(projectId: number, name: string): void {
+      const raw = this.raw[projectId]
+      if (raw) this._store({ ...raw, name })
     }
   }
 })

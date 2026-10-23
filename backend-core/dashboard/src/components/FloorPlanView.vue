@@ -485,8 +485,12 @@ interface Draft {
 }
 
 const props = defineProps<{ projectId?: number }>()
-// The floor plan's name is the house (and project) name.
-const emit = defineEmits<{ (e: 'renamed', name: string): void }>()
+// The floor plan's name is the house (and project) name. `changed` follows
+// every new version (edit, AI change, restore) with its version and note.
+const emit = defineEmits<{
+  (e: 'renamed', name: string): void
+  (e: 'changed', plan: { version: number; change_note: string | null; change_type: string | null }): void
+}>()
 
 // Wall stroke width in plan units (metres).
 const WALL = 0.2
@@ -839,6 +843,7 @@ const applyNewVersion = (data: any) => {
   history.value = []
   showHistory.value = false
   if (renamed) emit('renamed', data.floor_plan.name)
+  emit('changed', data.floor_plan)
 }
 
 const save = async (body: Record<string, unknown>) => {
@@ -901,6 +906,14 @@ const restore = (version: FloorPlan) =>
   })
 
 watch(() => props.projectId, load, { immediate: true })
+
+// The Design Studio reloads the plan after it was changed elsewhere (copilot)
+// and sends its suggested changes through the same refine as the text box.
+const refineWith = (text: string) => {
+  instruction.value = text
+  return refine()
+}
+defineExpose({ reload: load, refineWith })
 </script>
 
 <style scoped>
