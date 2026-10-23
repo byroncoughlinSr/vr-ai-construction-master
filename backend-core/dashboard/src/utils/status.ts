@@ -1,12 +1,19 @@
 // Badge colors for the statuses the backend uses, so every page shows them alike.
 
 const colors: Record<string, Record<string, string>> = {
-  task: { pending: 'blue-grey-5', in_progress: 'primary', completed: 'positive', blocked: 'negative' },
+  task: { pending: 'blue-grey-5', in_progress: 'primary', completed: 'positive', blocked: 'negative', cancelled: 'grey-5' },
   phase: { pending: 'blue-grey-5', in_progress: 'primary', completed: 'positive', delayed: 'negative' },
   priority: { low: 'blue-grey-5', medium: 'primary', high: 'warning', critical: 'negative' },
-  changeOrder: { draft: 'blue-grey-5', submitted: 'warning', approved: 'positive', rejected: 'negative' },
-  permit: { applied: 'info', approved: 'teal', issued: 'positive', expired: 'negative', rejected: 'negative' },
-  inspection: { scheduled: 'info', passed: 'positive', failed: 'negative', cancelled: 'blue-grey-5' },
+  changeOrder: { draft: 'blue-grey-5', submitted: 'warning', approved: 'positive', rejected: 'negative', void: 'grey-5' },
+  permit: {
+    not_applied: 'blue-grey-5', applied: 'info', in_review: 'primary', corrections_required: 'warning',
+    approved: 'positive', rejected: 'negative', expired: 'negative'
+  },
+  punch: { open: 'warning', in_progress: 'primary', ready: 'info', closed: 'positive' },
+  inspection: {
+    not_scheduled: 'blue-grey-5', scheduled: 'info', passed: 'positive', failed: 'negative', partial: 'warning',
+    cancelled: 'grey-5'
+  },
   equipment: { available: 'positive', in_use: 'primary', maintenance: 'warning', out_of_service: 'negative' },
   bom: { available: 'blue-grey-5', ordered: 'warning', delivered: 'teal', used: 'positive' },
   expense: { pending: 'warning', paid: 'positive' },
@@ -24,7 +31,35 @@ export const TASK_STATUS_OPTIONS = [
   { value: 'pending', label: 'Not started' },
   { value: 'in_progress', label: 'In progress' },
   { value: 'completed', label: 'Completed' },
-  { value: 'blocked', label: 'Blocked' }
+  { value: 'blocked', label: 'Blocked' },
+  { value: 'cancelled', label: 'Cancelled' }
+]
+
+// pm-mcp's permit and inspection statuses (they hold the plan's permit and inspection gates).
+export const PERMIT_STATUS_OPTIONS = [
+  { value: 'not_applied', label: 'Not applied' },
+  { value: 'applied', label: 'Applied' },
+  { value: 'in_review', label: 'In review' },
+  { value: 'corrections_required', label: 'Corrections required' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'expired', label: 'Expired' }
+]
+
+export const INSPECTION_STATUS_OPTIONS = [
+  { value: 'not_scheduled', label: 'Not scheduled' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'passed', label: 'Passed' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'partial', label: 'Partial' },
+  { value: 'cancelled', label: 'Cancelled' }
+]
+
+export const PUNCH_STATUS_OPTIONS = [
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'ready', label: 'Ready for sign-off' },
+  { value: 'closed', label: 'Closed' }
 ]
 
 export const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'critical'].map(v => ({

@@ -48,6 +48,11 @@ const router = createRouter({
           component: () => import('../views/ComplianceView.vue')
         },
         {
+          path: '/punch-list',
+          name: 'punch-list',
+          component: () => import('../views/PunchListView.vue')
+        },
+        {
           path: '/plants',
           name: 'plants',
           component: () => import('../views/ModelLibraryView.vue'),

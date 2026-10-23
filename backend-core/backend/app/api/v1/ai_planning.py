@@ -12,7 +12,9 @@ from ...services.vr_geometry_service import build_geometry_from_rooms
 from ...services import floor_plan_service
 from ...config import settings
 from ...database import SessionLocal
-from ...models import Project, ConstructionPhase, Task, Material, AIGeneration
+from ...models import Project, Material, AIGeneration
+from ...services import project_controls_service as controls
+from ...services.pm_client import PMError, PMUnavailable, get_pm
 from .image_jobs import start_image_generation
 
 logger = logging.getLogger(__name__)
@@ -157,11 +159,13 @@ async def list_available_models():
 
 
 def _save_project(prompt: str, budget: Optional[float], project_data: dict) -> dict:
-    """Save a generated project with its plan, floor plan (version 1), phases,
-    tasks and materials.
+    """Save a generated project with its plan, floor plan (version 1) and
+    materials, then put its phases and tasks into pm-mcp.
 
-    One transaction: either everything is saved or nothing is. Runs in a worker
-    thread because the session is synchronous.
+    The project is one transaction: either everything here is saved or nothing
+    is. The phases go to pm-mcp afterwards; if pm-mcp is down the project is
+    still saved and ``construction_plan`` says so (a template can be applied
+    later). Runs in a worker thread because the session and client are synchronous.
     """
     plan = project_data.get("plan", {}) or {}
     total_cost = plan.get("total_cost")
@@ -202,30 +206,6 @@ def _save_project(prompt: str, budget: Optional[float], project_data: dict) -> d
             except floor_plan_service.FloorPlanError as e:
                 logger.warning(f"⚠️  Plan for project {project.id} has no usable floor plan: {e}")
 
-            phases = plan.get("phases", []) or []
-            for idx, phase_data in enumerate(phases):
-                phase = ConstructionPhase(
-                    project_id=project.id,
-                    name=phase_data.get("name", f"Phase {idx+1}"),
-                    description=phase_data.get("description", ""),
-                    phase_order=idx + 1,
-                    budgeted_cost=phase_data.get("estimated_cost", 0),
-                    status="pending",
-                )
-                db.add(phase)
-                db.flush()  # assigns phase.id for its tasks
-                for task_idx, task_data in enumerate(phase_data.get("tasks", []) or []):
-                    db.add(Task(
-                        project_id=project.id,
-                        phase_id=phase.id,
-                        name=task_data.get("name", f"Task {task_idx+1}"),
-                        description=task_data.get("description", ""),
-                        task_order=task_idx + 1,
-                        planned_duration_days=task_data.get("duration_days", 1),
-                        budgeted_cost=task_data.get("estimated_cost", 0),
-                        status="pending",
-                    ))
-
             materials = plan.get("material_list", []) or []
             for material_data in materials:
                 db.add(Material(
@@ -244,12 +224,25 @@ def _save_project(prompt: str, budget: Optional[float], project_data: dict) -> d
             db.rollback()
             raise
 
+        phases = plan.get("phases", []) or []
+        construction_plan = "none"
+        if phases:
+            try:
+                pm = get_pm()
+                controls.ensure_pm_project(db, pm, project)
+                controls.import_ai_phases(pm, controls.load_plan(pm, project), phases)
+                construction_plan = "saved"
+            except (PMError, PMUnavailable) as e:
+                logger.warning(f"⚠️  Project {project.id} saved without its phases in pm-mcp: {e}")
+                construction_plan = "pm_unavailable"
+
         return {
             "id": project.id,
             "name": project.name,
             "description": project.description,
             "estimated_cost": project.estimated_cost,
             "phases_count": len(phases),
+            "construction_plan": construction_plan,
             "materials_count": len(materials),
             "floor_plan_version": floor_plan_version,
         }

@@ -96,6 +96,23 @@
                       aria-label="Actual spend by category"
                     />
                     <empty-state v-else dense icon="receipt" title="Nothing spent yet" message="Logged expenses show up here by category." />
+                    <div class="q-mt-md">
+                      <div class="row items-baseline no-wrap">
+                        <div class="text-subtitle2 col">Materials estimate</div>
+                        <div class="text-subtitle2 tabular">{{ formatCurrency(sum.materials_cost) }}</div>
+                      </div>
+                      <template v-if="sum.materials_cost">
+                        <q-linear-progress :value="Math.min(materialsSpent / sum.materials_cost, 1)" rounded size="6px" class="q-my-xs"
+                          :color="materialsSpent > sum.materials_cost ? 'negative' : 'primary'" />
+                        <div class="text-caption text-muted">
+                          {{ formatCurrency(materialsSpent) }} logged as materials expenses ({{ formatPercent(100 * materialsSpent / sum.materials_cost) }}).
+                          From the <router-link to="/materials">bill of materials</router-link>; not part of the BAC.
+                        </div>
+                      </template>
+                      <div v-else class="text-caption text-muted">
+                        No materials listed yet — add them on the <router-link to="/materials">Materials</router-link> page.
+                      </div>
+                    </div>
                   </div>
                 </div>
               </q-tab-panel>
@@ -241,6 +258,8 @@ const phaseActualTotal = computed(() => (sum.value?.by_phase ?? []).reduce((t, p
 const categoryRows = computed(() =>
   [...(sum.value?.by_category ?? [])].sort((a, b) => b.actual - a.actual).map(c => ({ label: titleCase(c.category), actual: c.actual }))
 )
+
+const materialsSpent = computed(() => sum.value?.by_category.find(c => c.category === 'materials')?.actual ?? 0)
 
 const money = (v: number) => formatCurrency(v)
 const phaseColumns = [

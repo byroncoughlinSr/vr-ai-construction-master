@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     plant_model_up_axis: Optional[str] = None
     plant_model_timeout_seconds: float = 900.0
 
+    # pm-mcp (/development/pm-mcp) holds each project's construction plan:
+    # phases, tasks, permits, inspections, budget lines and change orders. It runs
+    # beside the backend as an MCP server over HTTP (start_all.sh starts it).
+    pm_mcp_url: str = "http://127.0.0.1:8765/mcp"
+    pm_mcp_timeout_seconds: float = 15.0
+
     class Config:
         env_file = ".env"
         case_sensitive = False

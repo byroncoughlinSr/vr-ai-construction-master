@@ -2,7 +2,7 @@
 // routes (app/api/v1/project_controls.py, resources.py, materials.py). Dates are
 // ISO strings ("2026-11-02"); money is USD.
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked'
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'blocked' | 'cancelled'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical'
 
 export interface ScheduleTask {
@@ -20,7 +20,11 @@ export interface ScheduleTask {
   actual_end: string | null
   budgeted_cost: number
   actual_cost: number
+  // An inspection task can't be completed until its inspection passes.
   requires_inspection: boolean
+  kind: 'task' | 'approval' | 'milestone' | 'inspection' | 'permit'
+  roles: string[]
+  assignee: string | null
   late: boolean
 }
 
@@ -55,7 +59,22 @@ export interface ScheduleSummary {
 
 export interface Schedule extends ScheduleSummary {
   project_id: number
+  // The plan lives in pm-mcp; this is its project there.
+  pm_project_id: number | null
+  pm_available: boolean
   phases: SchedulePhase[]
+}
+
+// A pm-mcp construction plan template (GET /projects/{id}/construction-templates).
+export interface ConstructionTemplate {
+  key: string
+  name: string
+  description: string
+  source: 'builtin' | 'custom'
+  project_type: string | null
+  phases: string[]
+  task_count: number
+  roles: string[]
 }
 
 export interface BudgetSummary {
@@ -97,7 +116,7 @@ export interface Expense {
   created_at: string | null
 }
 
-export type ChangeOrderStatus = 'draft' | 'submitted' | 'approved' | 'rejected'
+export type ChangeOrderStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'void'
 
 export interface ChangeOrder {
   id: number
@@ -115,12 +134,14 @@ export interface ChangeOrder {
   created_at: string | null
 }
 
-export type PermitStatus = 'applied' | 'approved' | 'issued' | 'expired' | 'rejected'
+export type PermitStatus =
+  'not_applied' | 'applied' | 'in_review' | 'corrections_required' | 'approved' | 'rejected' | 'expired'
 
 export interface Permit {
   id: number
   project_id: number
-  permit_number: string
+  title: string
+  permit_number: string | null
   permit_type: string
   description: string | null
   jurisdiction: string | null
@@ -133,13 +154,23 @@ export interface Permit {
   contact_name: string | null
   contact_phone: string | null
   contact_email: string | null
+  // The plan's permit task that waits on this permit, if any.
+  task_id: number | null
 }
 
-export type InspectionStatus = 'scheduled' | 'passed' | 'failed' | 'cancelled'
+export type InspectionStatus = 'not_scheduled' | 'scheduled' | 'passed' | 'failed' | 'partial' | 'cancelled'
+
+export interface InspectionAttempt {
+  date: string
+  result: 'passed' | 'failed' | 'partial'
+  notes: string
+  inspector: string | null
+}
 
 export interface Inspection {
   id: number
   project_id: number
+  title: string
   permit_id: number | null
   permit_number: string | null
   task_id: number | null
@@ -152,6 +183,11 @@ export interface Inspection {
   result_details: string | null
   critical_findings: string | null
   requires_followup: boolean
+  attempts: InspectionAttempt[]
+  // Set on the response to recording a result: the task it completed, or the
+  // correction task it added.
+  completed_task?: number
+  correction_task?: number
 }
 
 export interface ComplianceSummary {
@@ -184,10 +220,13 @@ export interface FloorPlanBrief {
 
 export interface ProjectOverview {
   project_id: number
+  pm_project_id: number | null
+  pm_available: boolean
   floor_plan: FloorPlanBrief | null
   schedule: ScheduleSummary
   budget: BudgetSummary
   compliance: ComplianceSummary
+  punch_list: PunchSummary
   clients: Array<{ id: number; name: string; stage: string }>
   materials: { count: number; ordered: number; delivered: number }
   attention: AttentionItem[]
@@ -242,4 +281,38 @@ export interface BomItem {
   supplier_contact: string | null
   status: BomStatus
   total_cost: number
+}
+
+export type PunchStatus = 'open' | 'in_progress' | 'ready' | 'closed'
+
+export interface PunchItem {
+  id: number
+  project_id: number
+  number: number
+  code: string
+  title: string
+  description: string | null
+  room: string | null
+  trade: string
+  priority: TaskPriority
+  status: PunchStatus
+  assignee: string | null
+  due_date: string | null
+  phase_id: number | null
+  phase_name: string | null
+  overdue: boolean
+  closed_at: string | null
+  created_at: string | null
+}
+
+export interface PunchSummary {
+  total: number
+  open: number
+  in_progress: number
+  ready: number
+  closed: number
+  overdue: number
+  high_priority_open: number
+  percent_closed: number | null
+  open_by_room: Array<{ room: string; open: number }>
 }
