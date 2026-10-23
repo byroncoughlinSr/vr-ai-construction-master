@@ -11,10 +11,11 @@ from .budget import BudgetCategory, BudgetItem, ChangeOrder
 from .compliance import Permit, Inspection
 from .documents import Document, DocumentComment
 from .crm import Client, ClientActivity
+from .punch_list import PunchItem
 
 __all__ = [
     "Project", "Design", "DesignElement", "Material", "MaterialCategory", "AIGeneration", "FloorPlan", "PlantModel",
     "ConstructionPhase", "Task", "LaborResource", "Equipment", "LaborAssignment", "EquipmentAssignment",
     "BudgetCategory", "BudgetItem", "ChangeOrder", "Permit", "Inspection", "Document", "DocumentComment",
-    "Client", "ClientActivity",
+    "Client", "ClientActivity", "PunchItem",
 ]

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 CHAT_TIMEOUT_S = 60.0
 ACTION_TYPES = ("refine_floor_plan", "create_task", "draft_email", "create_change_order", "navigate")
-ROUTES = ("/", "/design", "/crm", "/timeline", "/budget", "/materials", "/resources", "/compliance")
+ROUTES = ("/", "/design", "/crm", "/timeline", "/budget", "/materials", "/resources", "/compliance", "/punch-list")
 EMAIL_PURPOSES = {
     "follow_up": "a friendly follow-up that moves the conversation to the next step",
     "vr_invite": "an invitation to walk through their house in VR on a Meta Quest headset",
@@ -210,6 +210,15 @@ def project_snapshot(db: Session, project: Project, today: date) -> dict:
                 {k: i[k] for k in ("inspection_type", "scheduled_date", "inspector_name")} for i in upcoming
             ],
         },
+        "punch_list": {
+            **{k: v for k, v in overview["punch_list"].items() if k != "open_by_room"},
+            "open_by_room": overview["punch_list"]["open_by_room"][:6],
+            "open_items": [
+                {"code": f"PL-{p.number:03d}", "title": _clip(p.title, 80), "room": p.room,
+                 "status": p.status, "priority": p.priority, "due": controls.iso(p.due_date)}
+                for p in (project.punch_items or []) if p.status != "closed"
+            ][:6],
+        },
         "materials": overview["materials"],
         "attention": [{k: a[k] for k in ("title", "detail")} for a in overview["attention"][:8]],
         "clients": overview["clients"],
@@ -266,7 +275,7 @@ Offer an action only when it directly helps; the user confirms each one. Action 
 - {"type": "create_task", "label": "...", "phase_id": <id from SNAPSHOT>, "name": "...", "priority": "low"|"medium"|"high"|"critical", "duration_days": n}
 - {"type": "draft_email", "label": "...", "client_id": <id from SNAPSHOT>, "purpose": "follow_up"|"vr_invite"|"progress_update"|"change_order"|"proposal"}
 - {"type": "create_change_order", "label": "...", "title": "...", "description": "...", "cost_impact": n (0 unless the user gave it)}
-- {"type": "navigate", "label": "...", "route": "/"|"/design"|"/crm"|"/timeline"|"/budget"|"/materials"|"/resources"|"/compliance"}"""
+- {"type": "navigate", "label": "...", "route": "/"|"/design"|"/crm"|"/timeline"|"/budget"|"/materials"|"/resources"|"/compliance"|"/punch-list"}"""
 
 
 def clean_actions(actions: Any, phase_ids: set[int], client_ids: set[int], has_floor_plan: bool) -> list[dict]:

@@ -1,6 +1,6 @@
 """Project controls for one project: schedule (phases, tasks, baseline), budget
-(earned value, expenses, change orders), compliance (permits, inspections) and
-an overview with what needs attention. The figures are worked out in
+(earned value, expenses, change orders), compliance (permits, inspections), the
+punch list and an overview with what needs attention. The figures are worked out in
 ``project_controls_service``. Mounted under /api/v1/projects beside projects.py.
 """
 
@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ...database import get_db
-from ...models import BudgetItem, ChangeOrder, ConstructionPhase, Inspection, Permit, Project, Task
+from ...models import BudgetItem, ChangeOrder, ConstructionPhase, Inspection, Permit, Project, PunchItem, Task
 from ...services import project_controls_service as controls
 from ...services.project_controls_service import ControlsError, at_midnight
 
@@ -430,3 +430,80 @@ def delete_inspection(project_id: int, inspection_id: int, db: Session = Depends
     db.delete(_owned(db, Inspection, inspection_id, project_id, "Inspection"))
     _commit(db)
     return {"deleted": inspection_id}
+
+
+# --- punch list ------------------------------------------------------------
+
+class PunchItemCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    room: Optional[str] = Field(None, max_length=100)
+    trade: str = "general"
+    priority: str = "medium"
+    status: str = "open"
+    assignee: Optional[str] = Field(None, max_length=255)
+    due_date: Optional[date] = None
+    phase_id: Optional[int] = None
+
+
+class PunchItemUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    room: Optional[str] = Field(None, max_length=100)
+    trade: Optional[str] = None
+    priority: Optional[str] = None
+    status: Optional[str] = None
+    assignee: Optional[str] = Field(None, max_length=255)
+    due_date: Optional[date] = None
+    phase_id: Optional[int] = None
+
+
+def _check_punch_fields(db: Session, project_id: int, data: dict) -> None:
+    try:
+        controls.check(data.get("trade"), controls.PUNCH_TRADES, "trade")
+        controls.check(data.get("priority"), controls.TASK_PRIORITIES, "priority")
+        controls.check(data.get("status"), controls.PUNCH_STATUSES, "punch item status")
+    except ControlsError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    if data.get("phase_id") is not None:
+        _owned(db, ConstructionPhase, data["phase_id"], project_id, "Phase")
+
+
+@router.get("/{project_id}/punch-list")
+def get_punch_list(project_id: int, db: Session = Depends(get_db)):
+    """Punch items (open first, most urgent first), their summary, and the
+    floor plan's rooms and the trades an item can be given."""
+    return controls.punch_list(db, _project(db, project_id), date.today())
+
+
+@router.post("/{project_id}/punch-items", status_code=201)
+def create_punch_item(project_id: int, body: PunchItemCreate, db: Session = Depends(get_db)):
+    project = _project(db, project_id)
+    data = body.model_dump()
+    _check_punch_fields(db, project_id, data)
+    status = data.pop("status")
+    item = PunchItem(project_id=project.id, number=controls.next_punch_number(project), **data)
+    controls.set_punch_status(item, status)
+    db.add(item)
+    _commit(db)
+    return controls.serialize_punch_item(item, date.today())
+
+
+@router.patch("/{project_id}/punch-items/{item_id}")
+def update_punch_item(project_id: int, item_id: int, body: PunchItemUpdate, db: Session = Depends(get_db)):
+    """Edit an item or move it along (closing records when; reopening clears it)."""
+    item = _owned(db, PunchItem, item_id, project_id, "Punch item")
+    data = body.model_dump(exclude_unset=True)
+    _check_punch_fields(db, project_id, data)
+    if "status" in data:
+        controls.set_punch_status(item, data.pop("status"))
+    _apply(item, data)
+    _commit(db)
+    return controls.serialize_punch_item(item, date.today())
+
+
+@router.delete("/{project_id}/punch-items/{item_id}")
+def delete_punch_item(project_id: int, item_id: int, db: Session = Depends(get_db)):
+    db.delete(_owned(db, PunchItem, item_id, project_id, "Punch item"))
+    _commit(db)
+    return {"deleted": item_id}

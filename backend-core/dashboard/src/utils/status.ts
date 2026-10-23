@@ -6,6 +6,7 @@ const colors: Record<string, Record<string, string>> = {
   priority: { low: 'blue-grey-5', medium: 'primary', high: 'warning', critical: 'negative' },
   changeOrder: { draft: 'blue-grey-5', submitted: 'warning', approved: 'positive', rejected: 'negative' },
   permit: { applied: 'info', approved: 'teal', issued: 'positive', expired: 'negative', rejected: 'negative' },
+  punch: { open: 'warning', in_progress: 'primary', ready: 'info', closed: 'positive' },
   inspection: { scheduled: 'info', passed: 'positive', failed: 'negative', cancelled: 'blue-grey-5' },
   equipment: { available: 'positive', in_use: 'primary', maintenance: 'warning', out_of_service: 'negative' },
   bom: { available: 'blue-grey-5', ordered: 'warning', delivered: 'teal', used: 'positive' },
@@ -25,6 +26,13 @@ export const TASK_STATUS_OPTIONS = [
   { value: 'in_progress', label: 'In progress' },
   { value: 'completed', label: 'Completed' },
   { value: 'blocked', label: 'Blocked' }
+]
+
+export const PUNCH_STATUS_OPTIONS = [
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'ready', label: 'Ready for sign-off' },
+  { value: 'closed', label: 'Closed' }
 ]
 
 export const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'critical'].map(v => ({

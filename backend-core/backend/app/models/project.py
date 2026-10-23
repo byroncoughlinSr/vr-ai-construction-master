@@ -50,6 +50,9 @@ class Project(Base):
         "ChangeOrder", back_populates="project", cascade="all, delete-orphan",
         order_by="ChangeOrder.number", passive_deletes=True,
     )
+    punch_items = relationship(
+        "PunchItem", back_populates="project", cascade="all, delete-orphan", order_by="PunchItem.number",
+    )
     # Deleting a project keeps its clients, unlinked.
     clients = relationship("Client", back_populates="project")
     permits = relationship("Permit", back_populates="project", cascade="all, delete-orphan")

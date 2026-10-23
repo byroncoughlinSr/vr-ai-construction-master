@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from ..models import (
     BudgetCategory, BudgetItem, ChangeOrder, Client, ConstructionPhase, Equipment,
-    Inspection, LaborResource, Permit, Project, Task,
+    Inspection, LaborResource, Permit, Project, PunchItem, Task,
 )
 from . import floor_plan_service
 
@@ -31,6 +31,11 @@ CHANGE_ORDER_STATUSES = ("draft", "submitted", "approved", "rejected")
 PERMIT_STATUSES = ("applied", "approved", "issued", "expired", "rejected")
 INSPECTION_STATUSES = ("scheduled", "passed", "failed", "cancelled")
 EQUIPMENT_STATUSES = ("available", "in_use", "maintenance", "out_of_service")
+PUNCH_STATUSES = ("open", "in_progress", "ready", "closed")
+PUNCH_TRADES = (
+    "general", "carpentry", "drywall", "paint", "flooring", "tile", "cabinets", "electrical",
+    "plumbing", "hvac", "roofing", "siding", "windows_doors", "landscaping", "cleaning",
+)
 
 # A phase with no tasks still takes time when the schedule is baselined.
 DEFAULT_PHASE_DAYS = 7
@@ -481,6 +486,90 @@ def compliance_summary(project: Project, today: date) -> dict:
     }
 
 
+# --- punch list ------------------------------------------------------------
+
+def next_punch_number(project: Project) -> int:
+    return max((p.number for p in project.punch_items or []), default=0) + 1
+
+
+def set_punch_status(item: PunchItem, status: str) -> None:
+    """Move an item along open → in_progress → ready → closed; closing records
+    when, reopening clears it."""
+    check(status, PUNCH_STATUSES, "punch item status")
+    item.status = status
+    if status == "closed":
+        if not item.closed_at:
+            item.closed_at = datetime.now().astimezone()
+    else:
+        item.closed_at = None
+
+
+def _punch_overdue(item: PunchItem, today: date) -> bool:
+    return _is_late(item.due_date, item.status == "closed", today)
+
+
+def serialize_punch_item(item: PunchItem, today: date) -> dict:
+    return {
+        "id": item.id,
+        "project_id": item.project_id,
+        "number": item.number,
+        "code": f"PL-{item.number:03d}",
+        "title": item.title,
+        "description": item.description,
+        "room": item.room,
+        "trade": item.trade or "general",
+        "priority": item.priority or "medium",
+        "status": item.status or "open",
+        "assignee": item.assignee,
+        "due_date": iso(as_date(item.due_date)),
+        "phase_id": item.phase_id,
+        "phase_name": item.phase.name if item.phase else None,
+        "overdue": _punch_overdue(item, today),
+        "closed_at": iso(item.closed_at),
+        "created_at": iso(item.created_at),
+    }
+
+
+def punch_summary(project: Project, today: date) -> dict:
+    items = project.punch_items or []
+    open_items = [i for i in items if i.status != "closed"]
+    by_room: dict[str, int] = {}
+    for item in open_items:
+        room = item.room or "Unassigned"
+        by_room[room] = by_room.get(room, 0) + 1
+    return {
+        "total": len(items),
+        "open": sum(i.status == "open" for i in items),
+        "in_progress": sum(i.status == "in_progress" for i in items),
+        "ready": sum(i.status == "ready" for i in items),
+        "closed": sum(i.status == "closed" for i in items),
+        "overdue": sum(_punch_overdue(i, today) for i in items),
+        "high_priority_open": sum(i.priority in ("high", "critical") for i in open_items),
+        "percent_closed": round(100 * (len(items) - len(open_items)) / len(items), 1) if items else None,
+        "open_by_room": [{"room": k, "open": v} for k, v in sorted(by_room.items(), key=lambda kv: (-kv[1], kv[0]))],
+    }
+
+
+def punch_list(db: Session, project: Project, today: date) -> dict:
+    """Open items first (critical, then soonest due), closed ones last; the
+    floor plan's rooms are what the dashboard offers as locations."""
+    rank = {p: n for n, p in enumerate(reversed(TASK_PRIORITIES))}
+    items = sorted(
+        project.punch_items or [],
+        key=lambda i: (
+            i.status == "closed", rank.get(i.priority or "medium", 9),
+            i.due_date is None, as_date(i.due_date) or date.max, i.number,
+        ),
+    )
+    plan = floor_plan_brief(db, project)
+    return {
+        "summary": punch_summary(project, today),
+        "rooms": [r for r in (plan or {}).get("rooms", []) if r],
+        "trades": list(PUNCH_TRADES),
+        "items": [serialize_punch_item(i, today) for i in items],
+    }
+
+
 # --- resources -------------------------------------------------------------
 
 def serialize_crew(member: LaborResource) -> dict:
@@ -552,6 +641,20 @@ def attention(project: Project, today: date) -> list[dict]:
             items.append({"kind": "change_order_pending", "severity": "medium",
                           "title": f"CO-{co.number:03d} awaiting approval: {co.title}",
                           "detail": f"${co.cost_impact or 0:,.0f}", "route": "/budget"})
+    # A punch list runs to dozens of items: one line each for what is overdue
+    # and what waits for sign-off, not one per item.
+    punch = project.punch_items or []
+    overdue = [p for p in punch if _punch_overdue(p, today)]
+    if overdue:
+        first = min(overdue, key=lambda p: (as_date(p.due_date), p.number))
+        items.append({"kind": "punch_overdue", "severity": "high",
+                      "title": f"{len(overdue)} punch item{'s' if len(overdue) != 1 else ''} overdue",
+                      "detail": f"PL-{first.number:03d} {first.title}", "route": "/punch-list"})
+    ready = [p for p in punch if p.status == "ready"]
+    if ready:
+        items.append({"kind": "punch_ready", "severity": "medium",
+                      "title": f"{len(ready)} punch item{'s' if len(ready) != 1 else ''} ready for sign-off",
+                      "detail": ", ".join(f"PL-{p.number:03d}" for p in ready[:5]), "route": "/punch-list"})
     order = {"high": 0, "medium": 1, "low": 2}
     return sorted(items, key=lambda i: order[i["severity"]])
 
@@ -581,6 +684,7 @@ def overview(db: Session, project: Project, today: date) -> dict:
         "schedule": schedule_summary(project, today),
         "budget": budget_summary(project, today),
         "compliance": compliance_summary(project, today),
+        "punch_list": punch_summary(project, today),
         "clients": [{"id": c.id, "name": c.name, "stage": c.stage} for c in clients],
         "materials": {
             "count": len(project.materials or []),

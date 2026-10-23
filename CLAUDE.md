@@ -277,6 +277,11 @@ only auto furniture) goes to `geometry.notes`. Headset side: `FurnitureBuilder.k
   (`refresh_phase`). BAC = phase budgets (or the plan's estimate) + approved change orders; EV = phase budget ×
   progress; AC = logged expenses; PV/SPI exist only once the schedule is baselined (planned dates). Expenses are
   `budget_items` rows (budgeted = actual = amount, optional `phase_id`); `change_orders` is its own table.
+- **Punch list** (table `punch_items`, routes in `project_controls.py`): `GET .../punch-list` (items open-first by
+  priority and due date, `summary`, the current floor plan's `rooms`, `trades`), `POST .../punch-items`,
+  `PATCH`/`DELETE .../punch-items/{id}`. Numbered `PL-001`… per project; status `open → in_progress → ready →
+  closed` (closing stamps `closed_at`, reopening clears it). The overview carries `punch_list` (summary) and adds
+  **one** attention line for all overdue items and one for items ready for sign-off; the copilot snapshot sees it.
 - **Crew & equipment** (`api/v1/resources.py`): the global `labor_resources` / `equipment` tables, each on at
   most one project.
 - **CRM** (`api/v1/crm.py` → `services/crm_service.py`, tables `clients`, `client_activities`): pipeline
@@ -301,7 +306,7 @@ first, so type errors fail the build). Everything comes from the API — no seed
 - Pages: Overview (`HomeView`), Design studio (`DesignStudioView`, wraps `FloorPlanView`), CRM (`CrmView`:
   kanban/table, `ClientDetailDrawer`, `AiOutreachModal`; `?client=ID&draft=purpose` deep-links), Schedule
   (`TimelineView` + `schedule/GanttChart`), Budget, Materials (BOM from `materials`, CSV export), Crew &
-  equipment, Permits & inspections, plant/furniture model libraries.
+  equipment, Permits & inspections, Punch list (`PunchListView`, store `punchList`), plant/furniture model libraries.
 - `FloorPlanView.vue` draws the selected project's layout (rooms, doorways, windows, entry) as SVG from
   `GET /projects/{id}/generate-vr`, using each room's `bounds`; the street side is drawn at the bottom. For a
   project with a floor plan it also edits it (house name, footprint, split sizes, room names, two-way doorways,

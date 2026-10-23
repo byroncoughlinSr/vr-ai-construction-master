@@ -188,6 +188,7 @@ export interface ProjectOverview {
   schedule: ScheduleSummary
   budget: BudgetSummary
   compliance: ComplianceSummary
+  punch_list: PunchSummary
   clients: Array<{ id: number; name: string; stage: string }>
   materials: { count: number; ordered: number; delivered: number }
   attention: AttentionItem[]
@@ -242,4 +243,38 @@ export interface BomItem {
   supplier_contact: string | null
   status: BomStatus
   total_cost: number
+}
+
+export type PunchStatus = 'open' | 'in_progress' | 'ready' | 'closed'
+
+export interface PunchItem {
+  id: number
+  project_id: number
+  number: number
+  code: string
+  title: string
+  description: string | null
+  room: string | null
+  trade: string
+  priority: TaskPriority
+  status: PunchStatus
+  assignee: string | null
+  due_date: string | null
+  phase_id: number | null
+  phase_name: string | null
+  overdue: boolean
+  closed_at: string | null
+  created_at: string | null
+}
+
+export interface PunchSummary {
+  total: number
+  open: number
+  in_progress: number
+  ready: number
+  closed: number
+  overdue: number
+  high_priority_open: number
+  percent_closed: number | null
+  open_by_room: Array<{ room: string; open: number }>
 }
