@@ -40,6 +40,9 @@ its `get_db` override in a fixture and removes it afterwards — don't set `app.
 at import time, or modules clobber each other's database. `app/services/__init__.py` imports lazily,
 so `vr_geometry_service` loads without torch; `test_vr_geometry.py` and `test_planning_service.py`
 make no network calls. `test_compel_integration.py` needs a GPU and real models (its async tests are skipped).
+Tests of plan-backed routes start a real pm-mcp server once per run (`tests/pm_server.py`, `use_pm()`; skipped
+when `/development/pm-mcp/.venv/bin/pm-mcp` or `PM_MCP_COMMAND` is missing). That server outlives each test's
+database, so give test projects `unique()` names.
 Config comes from `.env` (copy `.env.example`); `app/config.py` is the Pydantic settings source of truth.
 
 **LLM provider chain** (`ai_planning_service.py`, in priority order):
@@ -268,20 +271,45 @@ only auto furniture) goes to `geometry.notes`. Headset side: `FurnitureBuilder.k
 - Networking is OkHttp (HTTP + WebSocket).
 
 ### Project controls, CRM and the AI copilot (backend)
+- **Construction plan in pm-mcp.** Phases, tasks, permits, inspections, budget lines, expenses and change orders
+  are **not in Postgres**: they live in pm-mcp (`/development/pm-mcp`, an MCP server shared with AI agents and
+  other apps), reached over HTTP by `services/pm_client.py` (a small JSON-RPC client; the `mcp` package needs a
+  newer Starlette than this FastAPI). `start_all.sh` starts pm-mcp on :8765 (`PM_MCP_URL`, board file
+  `~/.local/share/pm-mcp/pm.db`). A project gets its pm-mcp project on first use (`ensure_pm_project`, stored in
+  `projects.pm_project_id`, linked in pm-mcp as `vr-construction:<id>`); deleting a project archives it there.
+  Each request loads the plan once (`load_plan` → `export_project`) into a `Plan`; phases are pm-mcp milestones,
+  tasks pm-mcp tasks, the rest pm-mcp records (`budget_item` with `data.line` `phase_budget` or `expense`,
+  `change_order`, `permit`, `inspection`). Errors: `PMError` (pm-mcp refused; 404/409) and `PMUnavailable` (503;
+  the overview and punch list still answer with `pm_available: false`). The old tables
+  (`construction_phases`, `tasks`, `permits`, `inspections`, `budget_items`, `budget_categories`,
+  `change_orders`) are still in the database but unused; punch items' `phase_id` and crew/equipment
+  assignments' `task_id` hold pm-mcp ids.
 - **Project controls** (`api/v1/project_controls.py` → `services/project_controls_service.py`), per project:
   `GET .../overview` (schedule/budget/compliance summaries, floor plan brief, linked clients, `attention` list),
   `.../schedule` (+ `POST .../schedule/baseline {start_date}`, phases/tasks CRUD), `.../budget` (earned value),
-  `.../expenses`, `.../change-orders`, `.../compliance` (+ permits/inspections CRUD). Phases and tasks are the
-  ones `_save_project` writes from the AI plan. Progress is **earned with the 50/50 rule** (half a task's
-  duration when it starts, the rest when completed); a status change re-derives the phase's progress/status
-  (`refresh_phase`). BAC = phase budgets (or the plan's estimate) + approved change orders; EV = phase budget ×
-  progress; AC = logged expenses; PV/SPI exist only once the schedule is baselined (planned dates). Expenses are
-  `budget_items` rows (budgeted = actual = amount, optional `phase_id`); `change_orders` is its own table.
+  `.../expenses`, `.../change-orders`, `.../compliance` (+ permits/inspections CRUD), `GET
+  .../construction-templates` and `POST .../construction-plan {template, start_date?}` (lay a pm-mcp template
+  into the plan). The AI plan's phases and tasks go to pm-mcp from `_save_project` (`import_ai_phases`) after the
+  project commits; if pm-mcp is down the project is still saved (`construction_plan: "pm_unavailable"`). The plan
+  here is **sequential**: tasks this app adds are chained with pm-mcp dependencies (`_chain_predecessor`; deleting
+  one reconnects the chain), so pm-mcp's scheduler lays them end to end in calendar days (`workdays_only` false);
+  template plans keep their own dependencies. A task's `planned_end` is exclusive (pm-mcp's `planned_finish` + 1).
+  Progress is **earned with the 50/50 rule** (half a task's duration when it starts, the rest when completed);
+  phase progress/status are derived from the tasks on every read. BAC = budget lines (or the plan's estimate) +
+  approved change orders; a phase's budget is its lines' total (`_set_phase_budget` keeps an own line for what
+  estimators' itemised lines don't cover); EV = phase budget × progress; AC = actual costs on budget lines; PV/SPI
+  exist only once the schedule has planned dates. **Gates**: a task with `requires_inspection` is a pm-mcp
+  `inspection` task with a linked inspection record; completing it is refused (409) until the inspection passes.
+  Recording `passed` completes it, `failed`/`partial` adds a correction task it waits on (the response carries
+  `completed_task` / `correction_task`). Permit and inspection statuses are pm-mcp's
+  (`PERMIT_STATUSES`, `INSPECTION_STATUSES`); approving a template's permit completes its permit task.
 - **Punch list** (table `punch_items`, routes in `project_controls.py`): `GET .../punch-list` (items open-first by
   priority and due date, `summary`, the current floor plan's `rooms`, `trades`), `POST .../punch-items`,
   `PATCH`/`DELETE .../punch-items/{id}`. Numbered `PL-001`… per project; status `open → in_progress → ready →
   closed` (closing stamps `closed_at`, reopening clears it). The overview carries `punch_list` (summary) and adds
   **one** attention line for all overdue items and one for items ready for sign-off; the copilot snapshot sees it.
+  Punch items stay in Postgres (they belong to floor-plan rooms) and are copied one way to pm-mcp
+  `punch_item` records (`sync_punch_item`, `punch_items.pm_record_id`), best effort.
 - **Crew & equipment** (`api/v1/resources.py`): the global `labor_resources` / `equipment` tables, each on at
   most one project.
 - **CRM** (`api/v1/crm.py` → `services/crm_service.py`, tables `clients`, `client_activities`): pipeline

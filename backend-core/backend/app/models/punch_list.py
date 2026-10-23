@@ -22,14 +22,14 @@ class PunchItem(Base):
     status = Column(String(20), default="open")  # open, in_progress, ready, closed
     assignee = Column(String(255))
     due_date = Column(Date)
-    phase_id = Column(Integer, ForeignKey("construction_phases.id", ondelete="SET NULL"))
+    phase_id = Column(Integer)  # a pm-mcp milestone (phase) id
+    pm_record_id = Column(Integer)  # the punch_item record this is copied to in pm-mcp
     closed_at = Column(DateTime(timezone=True))
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     project = relationship("Project", back_populates="punch_items")
-    phase = relationship("ConstructionPhase")
 
     def __repr__(self):
         return f"<PunchItem(id={self.id}, project={self.project_id}, number={self.number}, status='{self.status}')>"

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { apiClient } from 'src/services/api'
-import type { Schedule, SchedulePhase, ScheduleTask, TaskPriority, TaskStatus } from 'src/types/controls'
+import type { ConstructionTemplate, Schedule, SchedulePhase, ScheduleTask, TaskPriority, TaskStatus } from 'src/types/controls'
 
 export interface TaskFields {
   name?: string
@@ -31,7 +31,7 @@ export const useScheduleStore = defineStore('schedule', {
     tasks: (state): Array<ScheduleTask & { phase_name: string }> =>
       (state.schedule?.phases ?? []).flatMap(p => p.tasks.map(t => ({ ...t, phase_name: p.name }))),
     openTasks(): Array<ScheduleTask & { phase_name: string }> {
-      return this.tasks.filter(t => t.status !== 'completed')
+      return this.tasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled')
     }
   },
 
@@ -64,6 +64,21 @@ export const useScheduleStore = defineStore('schedule', {
       if (!this.projectId) return
       this.schedule = await apiClient.post<Schedule>(`/projects/${this.projectId}/schedule/baseline`, {
         start_date: startDate
+      })
+    },
+
+    async loadTemplates(): Promise<ConstructionTemplate[]> {
+      if (!this.projectId) return []
+      const data = await apiClient.get<{ templates: ConstructionTemplate[] }>(`/projects/${this.projectId}/construction-templates`)
+      return data.templates
+    },
+
+    /** Lay a pm-mcp template's phases and tasks into the plan (and baseline it from startDate). */
+    async applyTemplate(template: string, startDate?: string | null) {
+      if (!this.projectId) return
+      this.schedule = await apiClient.post<Schedule>(`/projects/${this.projectId}/construction-plan`, {
+        template,
+        start_date: startDate || null
       })
     },
 

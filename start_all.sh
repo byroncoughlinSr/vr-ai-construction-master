@@ -1,11 +1,17 @@
 #!/bin/bash
-# Start backend (uvicorn :8000) and dashboard (Vite :3001) together.
-# Ctrl+C stops both.
+# Start pm-mcp (:8765, the construction plan), backend (uvicorn :8000) and
+# dashboard (Vite :3001) together. Ctrl+C stops what this script started.
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="$ROOT/backend-core/backend"
 DASHBOARD_DIR="$ROOT/backend-core/dashboard"
 BACKEND_LOG="$BACKEND_DIR/backend.log"
+# pm-mcp holds phases, tasks, permits, inspections, budget lines and change
+# orders. The default board is the one Claude Code and OpenWork use too.
+PM_MCP_BIN="${PM_MCP_BIN:-/development/pm-mcp/.venv/bin/pm-mcp}"
+PM_MCP_DB="${PM_MCP_DB:-$HOME/.local/share/pm-mcp/pm.db}"
+PM_MCP_PORT="${PM_MCP_PORT:-8765}"
+PM_MCP_LOG="$BACKEND_DIR/pm-mcp.log"
 
 cleanup() {
     trap - EXIT INT TERM
@@ -13,8 +19,9 @@ cleanup() {
     echo "🛑 Stopping..."
     [ -n "$DASH_PID" ] && kill "$DASH_PID" 2>/dev/null
     [ -n "$BACKEND_PID" ] && kill "$BACKEND_PID" 2>/dev/null
-    wait "$DASH_PID" "$BACKEND_PID" 2>/dev/null
-    echo "   ✓ Stopped backend and dashboard"
+    [ -n "$PM_PID" ] && kill "$PM_PID" 2>/dev/null
+    wait "$DASH_PID" "$BACKEND_PID" $PM_PID 2>/dev/null
+    echo "   ✓ Stopped backend and dashboard${PM_PID:+ and pm-mcp}"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
@@ -47,7 +54,26 @@ for port in 8000 3001; do
     fi
 done
 
-echo "2. Starting backend (log: $BACKEND_LOG)..."
+echo "2. Starting pm-mcp on :$PM_MCP_PORT..."
+if ss -ltn "sport = :$PM_MCP_PORT" | grep -q LISTEN; then
+    echo "   ✓ Already running; using it"
+elif [ -x "$PM_MCP_BIN" ]; then
+    "$PM_MCP_BIN" --transport streamable-http --port "$PM_MCP_PORT" --db "$PM_MCP_DB" >"$PM_MCP_LOG" 2>&1 &
+    PM_PID=$!
+    for _ in $(seq 1 30); do
+        ss -ltn "sport = :$PM_MCP_PORT" | grep -q LISTEN && break
+        sleep 0.5
+    done
+    if ss -ltn "sport = :$PM_MCP_PORT" | grep -q LISTEN; then
+        echo "   ✓ pm-mcp up on http://127.0.0.1:$PM_MCP_PORT/mcp (board: $PM_MCP_DB, log: $PM_MCP_LOG)"
+    else
+        echo "⚠️  pm-mcp did not start (see $PM_MCP_LOG); the schedule, budget and permits pages need it"
+    fi
+else
+    echo "⚠️  pm-mcp not found at $PM_MCP_BIN; the schedule, budget and permits pages need it"
+fi
+
+echo "3. Starting backend (log: $BACKEND_LOG)..."
 cd "$BACKEND_DIR" || exit 1
 venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload >"$BACKEND_LOG" 2>&1 &
 BACKEND_PID=$!
@@ -64,7 +90,7 @@ for _ in $(seq 1 120); do
 done
 echo "   ✓ Backend up on http://0.0.0.0:8000 (docs: /docs)"
 
-echo "3. Starting dashboard..."
+echo "4. Starting dashboard..."
 cd "$DASHBOARD_DIR" || exit 1
 npm run dev &
 DASH_PID=$!

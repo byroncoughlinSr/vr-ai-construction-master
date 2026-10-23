@@ -38,7 +38,12 @@
               <q-list v-if="compliance.permits.length" separator>
                 <q-item v-for="p in compliance.permits" :key="p.id" clickable @click="openPermit(p)">
                   <q-item-section>
-                    <q-item-label class="text-weight-medium">{{ p.permit_type }} · {{ p.permit_number }}</q-item-label>
+                    <q-item-label class="text-weight-medium">
+                      {{ permitLabel(p) }}
+                      <q-badge v-if="p.task_id" outline color="primary" label="Gate" class="q-ml-xs">
+                        <q-tooltip>Approving this permit completes its task in the schedule</q-tooltip>
+                      </q-badge>
+                    </q-item-label>
                     <q-item-label caption>
                       {{ p.jurisdiction || 'Jurisdiction not set' }}
                       <template v-if="p.issued_date"> · issued {{ formatDate(p.issued_date) }}</template>
@@ -66,13 +71,18 @@
                     <q-icon :name="inspectionIcon(i.status)" :color="statusColor('inspection', i.status)" />
                   </q-item-section>
                   <q-item-section>
-                    <q-item-label class="text-weight-medium">{{ i.inspection_type }}</q-item-label>
+                    <q-item-label class="text-weight-medium">
+                      {{ i.inspection_type }}
+                      <q-badge v-if="i.task_id" outline color="primary" label="Gate" class="q-ml-xs">
+                        <q-tooltip>Its schedule task can't be completed until this inspection passes</q-tooltip>
+                      </q-badge>
+                    </q-item-label>
                     <q-item-label caption>
                       {{ i.scheduled_date ? formatDateTime(i.scheduled_date) : 'Not scheduled' }}
                       <template v-if="i.inspector_name"> · {{ i.inspector_name }}</template>
                       <template v-if="i.permit_number"> · {{ i.permit_number }}</template>
                     </q-item-label>
-                    <q-item-label v-if="i.critical_findings || i.result_details" caption class="ellipsis-2" :class="i.status === 'failed' ? 'text-negative' : ''">
+                    <q-item-label v-if="i.critical_findings || i.result_details" caption class="ellipsis-2" :class="i.status === 'failed' || i.status === 'partial' ? 'text-negative' : ''">
                       {{ i.critical_findings || i.result_details }}
                     </q-item-label>
                   </q-item-section>
@@ -100,7 +110,7 @@
             <q-form @submit.prevent="savePermit">
               <q-card-section class="row q-col-gutter-sm">
                 <div class="col-6"><q-input v-model="permit.permit_type" outlined dense label="Type *" placeholder="Building" :rules="[v => !!(v && v.trim()) || 'Required']" hide-bottom-space /></div>
-                <div class="col-6"><q-input v-model="permit.permit_number" outlined dense label="Number *" :rules="[v => !!(v && v.trim()) || 'Required']" hide-bottom-space /></div>
+                <div class="col-6"><q-input v-model="permit.permit_number" outlined dense label="Number" hint="Once the jurisdiction issues one" /></div>
                 <div class="col-12 col-sm-8"><q-input v-model="permit.jurisdiction" outlined dense label="Jurisdiction" placeholder="City building department" /></div>
                 <div class="col-12 col-sm-4"><q-select v-model="permit.status" outlined dense emit-value map-options :options="permitStatusOptions" label="Status" /></div>
                 <div class="col-4"><q-input v-model="permit.application_date" outlined dense type="date" stack-label label="Applied" /></div>
@@ -179,7 +189,7 @@ import { useProjectData } from 'src/composables/useProjectData'
 import type { Inspection, InspectionStatus, Permit, PermitStatus } from 'src/types/controls'
 import { errorMessage } from 'src/utils/errors'
 import { formatCurrency, formatDate, formatDateTime, formatRelativeDay, isPastDay, parseDate, titleCase } from 'src/utils/format'
-import { statusColor } from 'src/utils/status'
+import { INSPECTION_STATUS_OPTIONS, PERMIT_STATUS_OPTIONS, statusColor } from 'src/utils/status'
 import PageHeader from 'src/components/common/PageHeader.vue'
 import EmptyState from 'src/components/common/EmptyState.vue'
 import NoProject from 'src/components/common/NoProject.vue'
@@ -201,16 +211,17 @@ const nextInspection = computed(() =>
 )
 const saving = ref(false)
 
-const permitStatusOptions = (['applied', 'approved', 'issued', 'expired', 'rejected'] as PermitStatus[]).map(v => ({ value: v, label: titleCase(v) }))
-const inspectionStatusOptions = (['scheduled', 'passed', 'failed', 'cancelled'] as InspectionStatus[]).map(v => ({ value: v, label: titleCase(v) }))
-const permitOptions = computed(() => compliance.permits.map(p => ({ value: p.id, label: `${p.permit_type} · ${p.permit_number}` })))
+const permitStatusOptions = PERMIT_STATUS_OPTIONS
+const inspectionStatusOptions = INSPECTION_STATUS_OPTIONS
+const permitLabel = (p: Permit) => (p.permit_number ? `${p.permit_type} · ${p.permit_number}` : p.title)
+const permitOptions = computed(() => compliance.permits.map(p => ({ value: p.id, label: permitLabel(p) })))
 
 const expiringSoon = (iso: string) => {
   const d = parseDate(iso)
   return !!d && d.getTime() - Date.now() < 30 * 86_400_000
 }
 const inspectionIcon = (status: string) =>
-  ({ passed: 'check_circle', failed: 'cancel', cancelled: 'block' } as Record<string, string>)[status] ?? 'event'
+  ({ passed: 'check_circle', failed: 'cancel', partial: 'error', cancelled: 'block', not_scheduled: 'event_busy' } as Record<string, string>)[status] ?? 'event'
 
 const fail = (err: unknown, fallback: string) => $q.notify({ type: 'negative', message: errorMessage(err, fallback) })
 const afterChange = () => projects.fetchOverview()
@@ -227,7 +238,7 @@ const openPermit = (p: Permit | null) => {
   permitEditing.value = p
   Object.assign(permit, p
     ? {
-        permit_type: p.permit_type, permit_number: p.permit_number, jurisdiction: p.jurisdiction ?? '', status: p.status,
+        permit_type: p.permit_type, permit_number: p.permit_number ?? '', jurisdiction: p.jurisdiction ?? '', status: p.status,
         application_date: p.application_date ?? '', issued_date: p.issued_date ?? '', expiration_date: p.expiration_date ?? '',
         permit_fee: p.permit_fee, contact_name: p.contact_name ?? '', conditions: p.conditions ?? ''
       }
@@ -238,7 +249,7 @@ const savePermit = async () => {
   saving.value = true
   const text = (v: string) => v.trim() || null
   const fields: PermitFields = {
-    permit_type: permit.permit_type.trim(), permit_number: permit.permit_number.trim(), jurisdiction: text(permit.jurisdiction),
+    permit_type: permit.permit_type.trim(), permit_number: text(permit.permit_number), jurisdiction: text(permit.jurisdiction),
     status: permit.status, application_date: permit.application_date || null, issued_date: permit.issued_date || null,
     expiration_date: permit.expiration_date || null, permit_fee: permit.permit_fee || 0,
     contact_name: text(permit.contact_name), conditions: text(permit.conditions)
@@ -256,7 +267,7 @@ const savePermit = async () => {
 const removePermit = () => {
   const p = permitEditing.value
   if (!p) return
-  $q.dialog({ title: 'Delete permit?', message: `${p.permit_type} · ${p.permit_number}. Its inspections are deleted too.`, cancel: { flat: true, noCaps: true }, ok: { unelevated: true, noCaps: true, color: 'negative', label: 'Delete' } })
+  $q.dialog({ title: 'Delete permit?', message: `${permitLabel(p)}. Inspections that name it keep their own details.`, cancel: { flat: true, noCaps: true }, ok: { unelevated: true, noCaps: true, color: 'negative', label: 'Delete' } })
     .onOk(() => compliance.deletePermit(p.id).then(() => { permitOpen.value = false; afterChange() }).catch(err => fail(err, 'Could not delete')))
 }
 
@@ -292,23 +303,30 @@ const saveInspection = async () => {
       status: inspection.status,
       result_details: inspection.result_details.trim() || null,
       critical_findings: inspection.critical_findings.trim() || null,
-      requires_followup: inspection.status === 'failed',
+      requires_followup: inspection.status === 'failed' || inspection.status === 'partial',
       followup_completed: inspection.followup_completed
     })
   }
   try {
-    await compliance.saveInspection(fields, inspectionEditing.value?.id)
+    const result = await compliance.saveInspection(fields, inspectionEditing.value?.id)
     inspectionOpen.value = false
-    afterChange()
+    afterResult(result)
   } catch (err) {
     fail(err, 'Could not save the inspection')
   } finally {
     saving.value = false
   }
 }
+// A result can change the schedule: passing completes the inspection's task,
+// failing adds a correction task it waits on.
+const afterResult = (result: Inspection | undefined) => {
+  afterChange()
+  if (result?.completed_task) $q.notify({ type: 'positive', message: 'Inspection passed: its schedule task is complete' })
+  if (result?.correction_task) $q.notify({ type: 'warning', message: 'A correction task was added to the schedule' })
+}
 const recordResult = (i: Inspection, status: 'passed' | 'failed') => {
   if (status === 'passed') {
-    compliance.saveInspection({ status }, i.id).then(afterChange).catch(err => fail(err, 'Could not record the result'))
+    compliance.saveInspection({ status }, i.id).then(afterResult).catch(err => fail(err, 'Could not record the result'))
     return
   }
   $q.dialog({
@@ -319,7 +337,7 @@ const recordResult = (i: Inspection, status: 'passed' | 'failed') => {
     ok: { unelevated: true, noCaps: true, color: 'negative', label: 'Record failure' }
   }).onOk((findings: string) => {
     compliance.saveInspection({ status, critical_findings: findings.trim() || null, requires_followup: true }, i.id)
-      .then(afterChange).catch(err => fail(err, 'Could not record the result'))
+      .then(afterResult).catch(err => fail(err, 'Could not record the result'))
   })
 }
 const removeInspection = () => {

@@ -1,5 +1,7 @@
 """Punch list: items per project, the open → ready → closed workflow, the
-summary, and what it adds to the overview's attention list (no network calls)."""
+summary, and what it adds to the overview's attention list. Punch items live
+here; their phases are in pm-mcp, so these use the test pm-mcp server
+(tests/pm_server.py); no other network calls."""
 
 from datetime import date, timedelta
 
@@ -11,7 +13,9 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import ConstructionPhase, FloorPlan, Project
+from app.models import FloorPlan, Project
+
+from .pm_server import release_pm, unique, use_pm
 
 engine = create_engine(
     "sqlite:///:memory:",
@@ -41,20 +45,28 @@ def setup_database():
     app.dependency_overrides.pop(get_db, None)
 
 
+@pytest.fixture(autouse=True)
+def pm():
+    yield use_pm()
+    release_pm()
+
+
 @pytest.fixture
 def project_id():
     """A project with one phase and a floor plan of two rooms."""
     with TestingSessionLocal() as db:
-        project = Project(name="Test House", status="active")
+        project = Project(name=unique("Test House"), status="active")
         db.add(project)
         db.flush()
-        db.add(ConstructionPhase(project_id=project.id, name="Finishes", phase_order=1))
         db.add(FloorPlan(
             project_id=project.id, version=1, name="Test House", change_type="generated",
             layout={"length": 30, "width": 20}, rooms=[{"name": "Kitchen"}, {"name": "Primary Bedroom"}],
         ))
         db.commit()
-        return project.id
+        pid = project.id
+    response = client.post(f"/api/v1/projects/{pid}/phases", json={"name": "Finishes"})
+    assert response.status_code == 201, response.text
+    return pid
 
 
 def _add(pid, **fields):
@@ -117,7 +129,7 @@ def test_rejects_unknown_values_and_other_projects_items(project_id):
     assert client.post(url, json={"title": "x", "phase_id": 999}).status_code == 404
 
     with TestingSessionLocal() as db:
-        other = Project(name="Other")
+        other = Project(name=unique("Other"))
         db.add(other)
         db.commit()
         other_id = other.id

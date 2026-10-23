@@ -15,6 +15,7 @@
               text-color="grey-9"
               :options="[{ value: 'phases', icon: 'view_agenda', label: 'Phases' }, { value: 'list', icon: 'format_list_bulleted', label: 'All tasks' }]"
             />
+            <q-btn outline no-caps color="primary" icon="library_add" label="From template" @click="openTemplates" />
             <q-btn outline no-caps color="primary" icon="event_repeat" :label="s?.baselined ? 'Re-baseline' : 'Baseline'" @click="baselineOpen = true" />
             <q-btn unelevated no-caps color="primary" icon="add" label="Phase" @click="addPhase" />
           </template>
@@ -129,8 +130,9 @@
               </q-expansion-item>
             </q-card>
             <q-card v-if="!schedule.phases.length && !schedule.loading" flat class="app-card">
-              <empty-state icon="calendar_month" title="No phases yet" message="An AI-generated project comes with phases and tasks. You can also add them here.">
-                <q-btn unelevated no-caps color="primary" icon="add" label="Add a phase" @click="addPhase" />
+              <empty-state icon="calendar_month" title="No phases yet" message="An AI-generated project comes with phases and tasks. Start from a full construction plan template, or add phases here.">
+                <q-btn unelevated no-caps color="primary" icon="library_add" label="Plan from a template" class="q-mr-sm" @click="openTemplates" />
+                <q-btn outline no-caps color="primary" icon="add" label="Add a phase" @click="addPhase" />
               </empty-state>
             </q-card>
           </template>
@@ -176,7 +178,7 @@
             <q-card-section>
               <div class="text-h6 text-weight-bold">Baseline the schedule</div>
               <div class="text-body2 text-muted q-mt-xs">
-                Lays every phase end to end from the start date, each phase's tasks one after another by their durations
+                Plans every task from the start date along the order tasks depend on each other, by their durations
                 (calendar days). {{ s?.baselined ? 'This replaces the planned dates now in the schedule.' : '' }}
               </div>
             </q-card-section>
@@ -186,6 +188,46 @@
             <q-card-actions align="right" class="q-px-md q-pb-md">
               <q-btn flat no-caps label="Cancel" v-close-popup />
               <q-btn unelevated no-caps color="primary" label="Baseline" :disable="!baselineStart" :loading="baselining" @click="doBaseline" />
+            </q-card-actions>
+          </q-card>
+        </q-dialog>
+
+        <!-- Plan from a pm-mcp template -->
+        <q-dialog v-model="templatesOpen">
+          <q-card class="app-card" style="width: 520px; max-width: 96vw">
+            <q-card-section>
+              <div class="text-h6 text-weight-bold">Plan from a template</div>
+              <div class="text-body2 text-muted q-mt-xs">
+                Adds every phase of a professional construction plan, from pre-design to warranty, with its tasks,
+                permits and inspections. Inspection and permit tasks can only be completed once the inspection passes or
+                the permit is approved. {{ schedule.phases.length ? 'Phases with the same name are reused; the template\'s tasks are added to the plan.' : '' }}
+              </div>
+            </q-card-section>
+            <q-card-section class="q-pt-none q-gutter-sm">
+              <q-select
+                v-model="templateKey"
+                outlined
+                dense
+                emit-value
+                map-options
+                :loading="templatesLoading"
+                :options="templates.map(t => ({ value: t.key, label: t.name, caption: `${t.task_count} tasks · ${t.description}` }))"
+                label="Template"
+              >
+                <template #option="scope">
+                  <q-item v-bind="scope.itemProps">
+                    <q-item-section>
+                      <q-item-label>{{ scope.opt.label }}</q-item-label>
+                      <q-item-label caption>{{ scope.opt.caption }}</q-item-label>
+                    </q-item-section>
+                  </q-item>
+                </template>
+              </q-select>
+              <q-input v-model="templateStart" outlined dense type="date" stack-label label="Start date (optional: baselines the plan)" />
+            </q-card-section>
+            <q-card-actions align="right" class="q-px-md q-pb-md">
+              <q-btn flat no-caps label="Cancel" v-close-popup />
+              <q-btn unelevated no-caps color="primary" label="Add plan" :disable="!templateKey" :loading="applying" @click="doApplyTemplate" />
             </q-card-actions>
           </q-card>
         </q-dialog>
@@ -201,7 +243,7 @@ import { computed, ref } from 'vue'
 import { useQuasar } from 'quasar'
 import { useScheduleStore } from 'src/stores/schedule'
 import { useProjectData } from 'src/composables/useProjectData'
-import type { SchedulePhase, ScheduleTask, TaskStatus } from 'src/types/controls'
+import type { ConstructionTemplate, SchedulePhase, ScheduleTask, TaskStatus } from 'src/types/controls'
 import { errorMessage } from 'src/utils/errors'
 import { formatCompactCurrency, formatCurrency, formatDate, formatPercent, formatShortDate, titleCase, todayIso } from 'src/utils/format'
 import { statusColor, TASK_STATUS_OPTIONS } from 'src/utils/status'
@@ -224,6 +266,13 @@ const lateOnly = ref(false)
 const baselineOpen = ref(false)
 const baselineStart = ref(todayIso())
 const baselining = ref(false)
+
+const templatesOpen = ref(false)
+const templates = ref<ConstructionTemplate[]>([])
+const templatesLoading = ref(false)
+const templateKey = ref<string | null>(null)
+const templateStart = ref('')
+const applying = ref(false)
 
 const taskOpen = ref(false)
 const taskPhase = ref<SchedulePhase | null>(null)
@@ -277,6 +326,34 @@ const addPhase = () => {
       fail(err, 'Could not add the phase')
     }
   })
+}
+
+const openTemplates = async () => {
+  templatesOpen.value = true
+  if (templates.value.length) return
+  templatesLoading.value = true
+  try {
+    templates.value = await schedule.loadTemplates()
+  } catch (err) {
+    fail(err, 'Could not load the templates')
+  } finally {
+    templatesLoading.value = false
+  }
+}
+
+const doApplyTemplate = async () => {
+  if (!templateKey.value) return
+  applying.value = true
+  try {
+    await schedule.applyTemplate(templateKey.value, templateStart.value || null)
+    templatesOpen.value = false
+    const finish = schedule.schedule?.planned_finish
+    $q.notify({ type: 'positive', message: finish ? `Plan added: finishes ${formatDate(finish)}` : 'Plan added' })
+  } catch (err) {
+    fail(err, 'Could not add the plan')
+  } finally {
+    applying.value = false
+  }
 }
 
 const doBaseline = async () => {

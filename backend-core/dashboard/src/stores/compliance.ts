@@ -3,7 +3,7 @@ import { apiClient } from 'src/services/api'
 import type { ComplianceSummary, Inspection, InspectionStatus, Permit, PermitStatus } from 'src/types/controls'
 
 export interface PermitFields {
-  permit_number: string
+  permit_number: string | null
   permit_type: string
   description?: string | null
   jurisdiction?: string | null
@@ -87,11 +87,15 @@ export const useComplianceStore = defineStore('compliance', {
       await this.reload()
     },
 
-    async saveInspection(fields: Partial<InspectionFields>, inspectionId?: number) {
+    /** Create or update an inspection; the response says which schedule task a
+     * result completed or which correction task it added. */
+    async saveInspection(fields: Partial<InspectionFields>, inspectionId?: number): Promise<Inspection | undefined> {
       if (!this.projectId) return
-      if (inspectionId) await apiClient.patch(`/projects/${this.projectId}/inspections/${inspectionId}`, fields)
-      else await apiClient.post(`/projects/${this.projectId}/inspections`, fields)
+      const result = inspectionId
+        ? await apiClient.patch<Inspection>(`/projects/${this.projectId}/inspections/${inspectionId}`, fields)
+        : await apiClient.post<Inspection>(`/projects/${this.projectId}/inspections`, fields)
       await this.reload()
+      return result
     },
 
     async deleteInspection(inspectionId: number) {

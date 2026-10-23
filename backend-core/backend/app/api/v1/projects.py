@@ -16,6 +16,7 @@ from ...services import get_image_service
 from ...services import floor_plan_service, plant_model_service
 from ...services.vr_furniture import furniture_spec, merge_furniture
 from ...services.floor_plan_service import FloorPlanError
+from ...services.pm_client import ACTOR, PMClient, PMError, PMUnavailable, get_pm
 from .image_jobs import start_image_generation
 
 logger = logging.getLogger(__name__)
@@ -173,16 +174,24 @@ def update_project(
 @router.delete("/{project_id}")
 def delete_project(
     project_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    pm: PMClient = Depends(get_pm),
 ):
-    """Delete a project."""
+    """Delete a project. Its construction plan in pm-mcp is archived, not
+    deleted (other apps or agents may still refer to it)."""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    pm_project_id = project.pm_project_id
     try:
         db.delete(project)
         db.commit()
+        if pm_project_id:
+            try:
+                pm.call("update_project", project_id=pm_project_id, status="archived", actor=ACTOR)
+            except (PMError, PMUnavailable) as e:
+                logger.warning(f"⚠️  pm-mcp project {pm_project_id} not archived: {e}")
         return {"message": "Project deleted successfully"}
     except Exception as e:
         db.rollback()

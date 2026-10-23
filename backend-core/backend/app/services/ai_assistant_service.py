@@ -25,6 +25,7 @@ from ..config import settings
 from ..models import Client, Project
 from . import crm_service
 from . import project_controls_service as controls
+from .pm_client import PMClient, get_pm
 
 logger = logging.getLogger(__name__)
 
@@ -158,33 +159,40 @@ def budget_reading(budget: dict) -> list[str]:
     return lines
 
 
-def project_snapshot(db: Session, project: Project, today: date) -> dict:
-    """What the copilot knows about a project, kept compact."""
-    overview = controls.overview(db, project, today)
+def project_snapshot(db: Session, project: Project, today: date, pm: Optional[PMClient] = None) -> dict:
+    """What the copilot knows about a project, kept compact. The plan comes
+    from pm-mcp; when it is down the snapshot says so and has no phases."""
+    pm = pm or get_pm()
+    plan = controls.load_plan_or_empty(pm, project)
+    overview = controls.overview(db, pm, project, today, plan)
     budget = {k: v for k, v in overview["budget"].items() if k not in ("by_phase", "by_category")}
     budget["reading"] = budget_reading(overview["budget"])
     phases = []
-    for phase in controls.ordered_phases(project):
-        open_tasks = [t for t in controls.ordered_tasks(phase) if t.status != "completed"]
+    for phase in plan.phases:
+        open_tasks = [t for t in phase["tasks"] if t["status"] not in ("done", "cancelled")]
+        start, end = controls.phase_dates(phase)
         phases.append({
-            "id": phase.id,
-            "name": phase.name,
+            "id": phase["id"],
+            "name": phase["name"],
             "progress": controls.phase_progress(phase),
-            "status": phase.status,
-            "planned": [controls.iso(controls.as_date(phase.planned_start_date)),
-                        controls.iso(controls.as_date(phase.planned_end_date))],
-            "budgeted_cost": phase.budgeted_cost or 0,
+            "status": controls.phase_status(phase),
+            "planned": [controls.iso(start), controls.iso(end)],
+            "budgeted_cost": controls.phase_budget(plan, phase),
             "open_tasks": [
-                {"id": t.id, "name": _clip(t.name, 80), "status": t.status, "priority": t.priority}
+                {k: v for k, v in controls.serialize_task(t, phase, today).items()
+                 if k in ("id", "status", "priority")} | {"name": _clip(t["title"], 80)}
                 for t in open_tasks[:6]
             ],
             "more_open_tasks": max(len(open_tasks) - 6, 0),
         })
     upcoming = [
-        controls.serialize_inspection(i) for i in project.inspections or [] if i.status == "scheduled"
+        controls.serialize_inspection(project, plan, r) for r in controls.sorted_inspections(plan)
+        if r["status"] == "scheduled"
     ][:4]
+    change_orders = sorted(plan.of_type("change_order"), key=lambda r: r["number"])[-5:]
     return {
         "today": today.isoformat(),
+        "plan_available": plan.available,
         "project": {
             "id": project.id,
             "name": project.name,
@@ -198,13 +206,13 @@ def project_snapshot(db: Session, project: Project, today: date) -> dict:
         "budget": budget,
         "change_orders": [
             {k: co[k] for k in ("code", "title", "cost_impact", "schedule_impact_days", "status")}
-            for co in (controls.serialize_change_order(c) for c in (project.change_orders or [])[-5:])
+            for co in (controls.serialize_change_order(project, r) for r in change_orders)
         ],
         "compliance": {
             **overview["compliance"],
             "permits": [
                 {k: p[k] for k in ("permit_number", "permit_type", "status", "expiration_date")}
-                for p in (controls.serialize_permit(p) for p in project.permits or [])
+                for p in (controls.serialize_permit(project, r) for r in plan.of_type("permit"))
             ][:6],
             "upcoming_inspections": [
                 {k: i[k] for k in ("inspection_type", "scheduled_date", "inspector_name")} for i in upcoming

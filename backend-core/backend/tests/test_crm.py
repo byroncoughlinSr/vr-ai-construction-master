@@ -10,7 +10,9 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
-from app.models import Client, ConstructionPhase, Project
+from app.models import Client, Project
+
+from .pm_server import release_pm, unique, use_pm
 from app.services import ai_assistant_service
 from app.services.ai_assistant_service import AssistantError
 
@@ -200,16 +202,18 @@ def test_email_draft_is_grounded_in_the_project(fake_ai):
 
 def test_copilot_keeps_only_actions_that_point_at_real_things(fake_ai):
     state, calls = fake_ai
+    use_pm()  # the project's phases are in pm-mcp
+    name = unique("Lakeview")
     with TestingSessionLocal() as db:
-        project = Project(name="Lakeview", status="active")
+        project = Project(name=name, status="active")
         db.add(project)
-        db.flush()
-        phase = ConstructionPhase(project_id=project.id, name="Framing", phase_order=1, budgeted_cost=1000)
-        db.add(phase)
         db.add(Client(name="Lee", stage="new_inquiry"))
         db.commit()
-        pid, phase_id = project.id, phase.id
+        pid = project.id
         lee_id = db.query(Client).first().id
+    phase = client.post(f"/api/v1/projects/{pid}/phases", json={"name": "Framing", "budgeted_cost": 1000})
+    assert phase.status_code == 201, phase.text
+    phase_id = phase.json()["id"]
 
     state["answer"] = {
         "reply": "Framing hasn't started yet.",
@@ -232,8 +236,9 @@ def test_copilot_keeps_only_actions_that_point_at_real_things(fake_ai):
          "priority": "medium", "duration_days": 1.0},
         {"type": "draft_email", "label": "Draft email", "client_id": lee_id, "purpose": "follow_up"},
     ]
-    assert '"name": "Lakeview"' in calls[0]["user"]
+    assert f'"name": "{name}"' in calls[0]["user"]
     assert "USER: Where is framing?" in calls[0]["user"]
+    release_pm()
 
 
 def test_copilot_needs_the_users_message_last():
