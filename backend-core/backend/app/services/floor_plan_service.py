@@ -15,7 +15,7 @@ from typing import Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..models import AIGeneration, ConstructionPhase, FloorPlan, Material, Project
+from ..models import AIGeneration, FloorPlan, Material, Project
 from . import plant_model_service
 from .vr_exterior import exterior_spec
 from .vr_furniture import furniture_spec, merge_furniture, prune_furniture, rename_furniture_rooms
@@ -405,7 +405,7 @@ def geometry_for_plan(
 
 def _legacy_rooms(db: Session, project_id: int) -> tuple[list[dict], dict | None]:
     """Rooms for a project saved before floor plans existed: the newest plan in
-    ai_generations, else rooms guessed from phase names."""
+    ai_generations, else none."""
     ai_data = (
         db.query(AIGeneration)
         .filter(
@@ -421,28 +421,7 @@ def _legacy_rooms(db: Session, project_id: int) -> tuple[list[dict], dict | None
         if rooms:
             return rooms, structure.get("layout")
 
-    rooms_ft: list[dict] = []
-    phases = (
-        db.query(ConstructionPhase)
-        .filter(ConstructionPhase.project_id == project_id)
-        .order_by(ConstructionPhase.phase_order)
-        .all()
-    )
-    for phase in phases:
-        name_lower = phase.name.lower()
-        if any(kw in name_lower for kw in ("room", "bedroom", "kitchen", "bathroom", "garage")):
-            dimensions_ft = {"length": 15.0, "width": 12.0, "height": 9.0}
-            if "master" in name_lower:
-                dimensions_ft = {"length": 17.0, "width": 15.0, "height": 9.0}
-            elif "kitchen" in name_lower:
-                dimensions_ft = {"length": 16.0, "width": 14.0, "height": 9.0}
-            elif "bathroom" in name_lower:
-                dimensions_ft = {"length": 10.0, "width": 8.0, "height": 9.0}
-            elif "garage" in name_lower:
-                dimensions_ft = {"length": 20.0, "width": 20.0, "height": 10.0}
-            rooms_ft.append({"name": phase.name, "dimensions": dimensions_ft})
-    logger.info(f"🔄 Fallback: {len(phases)} phases → {len(rooms_ft)} rooms found")
-    return rooms_ft, None
+    return [], None
 
 
 def geometry_for_project(

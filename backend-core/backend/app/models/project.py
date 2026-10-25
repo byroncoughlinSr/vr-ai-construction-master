@@ -24,6 +24,10 @@ class Project(Base):
     end_date = Column(DateTime(timezone=True))
     estimated_completion_date = Column(DateTime(timezone=True))
 
+    # The project's construction plan in pm-mcp (phases, tasks, permits,
+    # inspections, budget lines, change orders); set on first use.
+    pm_project_id = Column(Integer, index=True)
+
     # Location
     address = Column(Text)
     latitude = Column(Float)
@@ -41,19 +45,13 @@ class Project(Base):
         "FloorPlan", back_populates="project", cascade="all, delete-orphan",
         order_by="FloorPlan.version", passive_deletes=True,
     )
-    phases = relationship("ConstructionPhase", back_populates="project", cascade="all, delete-orphan")
-    tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
     labor_resources = relationship("LaborResource", back_populates="current_project")
     equipment = relationship("Equipment", back_populates="assigned_project")
-    budget_items = relationship("BudgetItem", back_populates="project", cascade="all, delete-orphan")
-    change_orders = relationship(
-        "ChangeOrder", back_populates="project", cascade="all, delete-orphan",
-        order_by="ChangeOrder.number", passive_deletes=True,
+    punch_items = relationship(
+        "PunchItem", back_populates="project", cascade="all, delete-orphan", order_by="PunchItem.number",
     )
     # Deleting a project keeps its clients, unlinked.
     clients = relationship("Client", back_populates="project")
-    permits = relationship("Permit", back_populates="project", cascade="all, delete-orphan")
-    inspections = relationship("Inspection", back_populates="project", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="project", cascade="all, delete-orphan")
     labor_assignments = relationship("LaborAssignment", back_populates="project", cascade="all, delete-orphan")
     equipment_assignments = relationship("EquipmentAssignment", back_populates="project", cascade="all, delete-orphan")

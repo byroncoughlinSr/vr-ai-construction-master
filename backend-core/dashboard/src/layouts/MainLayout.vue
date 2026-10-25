@@ -247,6 +247,8 @@ const pendingCos = computed(() =>
   (projects.overview?.attention ?? []).filter(a => a.kind === 'change_order_pending').length
 )
 
+const punchDue = computed(() => projects.overview?.punch_list?.overdue ?? 0)
+
 const navigation = computed(() => [
   {
     title: 'Workspace',
@@ -274,7 +276,11 @@ const navigation = computed(() => [
       },
       { to: '/materials', label: 'Materials (BOM)', icon: 'inventory_2' },
       { to: '/resources', label: 'Crew & equipment', icon: 'engineering' },
-      { to: '/compliance', label: 'Permits & inspections', icon: 'verified' }
+      { to: '/compliance', label: 'Permits & inspections', icon: 'verified' },
+      {
+        to: '/punch-list', label: 'Punch list', icon: 'checklist',
+        badge: punchDue.value ? String(punchDue.value) : undefined, badgeColor: 'negative'
+      }
     ]
   },
   {

@@ -1226,7 +1226,7 @@ class ImmersiveActivity : AppSystemActivity() {
         y + if (eyeLift == 0f) 0f else eyeLift + (houseGenerator?.floorLevelAt(panelAnchor.x, panelAnchor.z) ?: 0f)
 
     private fun handleTeleportation(pose: Pose) {
-        val forward = pose.q * Vector3(0f, 0f, -1f)
+        val forward = pose.forward()
         if (forward.y >= 0f) return  // must aim downward toward floor
         val t = -pose.t.y / forward.y  // parametric distance to y=0 plane
         if (t < 0.3f || t > TELEPORT_RANGE) return  // too close or too far
@@ -1248,9 +1248,14 @@ class ImmersiveActivity : AppSystemActivity() {
      * Construction elements (the floor, placed planks) are grabbable too but are not panels.
      */
     private fun pointingAtPanel(pose: Pose): Boolean {
-        val forward = pose.q * Vector3(0f, 0f, -1f)
-        val hit = scene.lineSegmentIntersect(pose.t, pose.t + forward * PANEL_REACH) ?: return false
-        val entity = hit.entity ?: return false
+        // The SDK's forward is +z (Pose.forward()); -z cast the ray out the back of the controller.
+        val forward = pose.forward()
+        val hit = scene.lineSegmentIntersect(pose.t, pose.t + forward * PANEL_REACH)
+        val entity = hit?.entity
+        Log.d(TAG, "🎯 pointingAtPanel: from=${pose.t} fwd=$forward origin=${scene.getViewOrigin()} " +
+            "hit=$entity at ${hit?.point} grabbable=${entity?.hasComponent<Grabbable>()} " +
+            "web=${webPanelEntity?.getComponent<Transform>()?.transform?.t}")
+        if (entity == null) return false
         return entity.hasComponent<Grabbable>() && entity !in nativeEntities.values
     }
 
@@ -1263,7 +1268,7 @@ class ImmersiveActivity : AppSystemActivity() {
         val ahead = (if (state.stickUp) 1f else 0f) - (if (state.stickDown) 1f else 0f)
         val side = (if (state.stickRight) 1f else 0f) - (if (state.stickLeft) 1f else 0f)
         if (ahead == 0f && side == 0f) return
-        val look = scene.getViewerPose().q * Vector3(0f, 0f, -1f)
+        val look = scene.getViewerPose().forward()
         val len = Math.sqrt((look.x * look.x + look.z * look.z).toDouble()).toFloat()
         if (len < 1e-3f) return  // looking straight up or down
         val fx = look.x / len
@@ -2056,7 +2061,7 @@ class ImmersiveActivity : AppSystemActivity() {
         private fun handleGrabAndMove(state: ControllerState) {
             if (state.grip && grabbedElementId == -1) {
                 val origin = state.pose.t
-                val forward = state.pose.q * Vector3(0f, 0f, -1f)
+                val forward = state.pose.forward()
                 grabbedElementId =
                     nativeRaycast(origin.x, origin.y, origin.z, forward.x, forward.y, forward.z)
                 if (grabbedElementId != -1) {
@@ -2077,7 +2082,7 @@ class ImmersiveActivity : AppSystemActivity() {
                 grabbedElementId = -1
             } else if (grabbedElementId != -1) {
                 val targetPos =
-                    state.pose.t + (state.pose.q * Vector3(0f, 0f, -1f)) * 3.0f + grabOffset
+                    state.pose.t + state.pose.forward() * 3.0f + grabOffset
                 val snapped = nativeSnapToGrid(targetPos.x, targetPos.y, targetPos.z, 0.5f)
                 if (snapped != null) {
                     val d = nativeGetElementData(grabbedElementId) ?: return
@@ -2108,7 +2113,7 @@ class ImmersiveActivity : AppSystemActivity() {
         private fun handlePlacement(pose: Pose) {
             // A trigger press on a panel is a click, not a plank.
             if (pointingAtPanel(pose)) return
-            val forward = pose.q * Vector3(0f, 0f, -1f)
+            val forward = pose.forward()
             if (forward.y < -0.2f) {
                 val t = -pose.t.y / forward.y
                 if (t > 0 && t < 10.0f) {
@@ -2127,7 +2132,7 @@ class ImmersiveActivity : AppSystemActivity() {
         }
 
         private fun handleDeletion(pose: Pose) {
-            val f = pose.q * Vector3(0f, 0f, -1f)
+            val f = pose.forward()
             val hitId = nativeRaycast(pose.t.x, pose.t.y, pose.t.z, f.x, f.y, f.z)
             if (hitId != -1) {
                 if (nativeRemoveElement(hitId)) {

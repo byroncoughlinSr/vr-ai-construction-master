@@ -35,7 +35,9 @@
               <q-input v-model.number="form.actual" outlined dense type="number" min="0" prefix="$" label="Actual cost" hint="Log invoices as expenses for the budget" />
             </div>
           </div>
-          <q-toggle v-model="form.inspection" label="Needs an inspection" />
+          <q-toggle v-model="form.inspection" label="Needs an inspection">
+            <q-tooltip>The task can only be completed once its inspection passes (Permits &amp; inspections)</q-tooltip>
+          </q-toggle>
         </q-card-section>
         <q-card-section v-if="error" class="q-pt-none">
           <q-banner rounded dense class="banner-error">{{ error }}</q-banner>

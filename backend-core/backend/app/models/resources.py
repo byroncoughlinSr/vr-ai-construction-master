@@ -92,7 +92,7 @@ class LaborAssignment(Base):
 
     # Relationships
     labor_resource_id = Column(Integer, ForeignKey("labor_resources.id"), nullable=False)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    task_id = Column(Integer, nullable=False)  # a pm-mcp task id
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
 
     # Assignment details
@@ -113,7 +113,6 @@ class LaborAssignment(Base):
 
     # Relationships
     labor_resource = relationship("LaborResource", back_populates="assignments")
-    task = relationship("Task", back_populates="labor_assignments")
     project = relationship("Project", back_populates="labor_assignments")
 
     def __repr__(self):
@@ -129,7 +128,7 @@ class EquipmentAssignment(Base):
 
     # Relationships
     equipment_id = Column(Integer, ForeignKey("equipment.id"), nullable=False)
-    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    task_id = Column(Integer, nullable=False)  # a pm-mcp task id
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
 
     # Assignment details
@@ -150,7 +149,6 @@ class EquipmentAssignment(Base):
 
     # Relationships
     equipment = relationship("Equipment", back_populates="assignments")
-    task = relationship("Task", back_populates="equipment_assignments")
     project = relationship("Project", back_populates="equipment_assignments")
 
     def __repr__(self):

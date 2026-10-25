@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from app.main import app
 from app.database import Base, get_db
-from app.models import Project, ConstructionPhase, Task, Material
+from app.models import AIGeneration, Material, Project
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -129,21 +129,21 @@ class TestCompleteWorkflow:
     
     def test_vr_geometry_generation(self):
         """Test VR geometry generation from project"""
-        # Create a test project with phases
         project_id = self.test_create_project_manually()
         
-        # Add a phase with room data
+        # Rooms as an AI plan saved before floor plans existed
         db = next(override_get_db())
-        phase = ConstructionPhase(
+        db.add(AIGeneration(
             project_id=project_id,
-            name="Master Bedroom",
-            description="15x12 bedroom",
-            phase_order=1,
-            budgeted_cost=25000
-        )
-        db.add(phase)
+            prompt="A bedroom",
+            generation_type="construction_plan",
+            status="completed",
+            output_data={"project_structure": {"rooms": [
+                {"name": "Master Bedroom", "dimensions": {"length": 15.0, "width": 12.0, "height": 9.0}},
+            ]}},
+        ))
         db.commit()
-        
+
         # Add materials
         material = Material(
             project_id=project_id,
@@ -202,84 +202,6 @@ class TestAPIEndpoints:
         """Test ReDoc documentation is available"""
         response = client.get("/redoc")
         assert response.status_code == 200
-
-
-class TestDatabaseIntegration:
-    """Test database models and relationships"""
-    
-    def test_project_phases_relationship(self):
-        """Test project to phases relationship"""
-        db = next(override_get_db())
-        
-        # Create project
-        project = Project(
-            name="Relationship Test",
-            description="Test relationships",
-            status="planning"
-        )
-        db.add(project)
-        db.commit()
-        db.refresh(project)
-        
-        # Add phases
-        phase1 = ConstructionPhase(
-            project_id=project.id,
-            name="Phase 1",
-            phase_order=1
-        )
-        phase2 = ConstructionPhase(
-            project_id=project.id,
-            name="Phase 2",
-            phase_order=2
-        )
-        db.add(phase1)
-        db.add(phase2)
-        db.commit()
-        
-        # Verify relationship
-        db.refresh(project)
-        assert len(project.phases) == 2
-        assert project.phases[0].name in ["Phase 1", "Phase 2"]
-    
-    def test_phase_tasks_relationship(self):
-        """Test phase to tasks relationship"""
-        db = next(override_get_db())
-        
-        # Create project and phase
-        project = Project(name="Task Test", description="Test")
-        db.add(project)
-        db.commit()
-        db.refresh(project)
-        
-        phase = ConstructionPhase(
-            project_id=project.id,
-            name="Test Phase",
-            phase_order=1
-        )
-        db.add(phase)
-        db.commit()
-        db.refresh(phase)
-        
-        # Add tasks
-        task1 = Task(
-            project_id=project.id,
-            phase_id=phase.id,
-            name="Task 1",
-            task_order=1
-        )
-        task2 = Task(
-            project_id=project.id,
-            phase_id=phase.id,
-            name="Task 2",
-            task_order=2
-        )
-        db.add(task1)
-        db.add(task2)
-        db.commit()
-        
-        # Verify relationship
-        db.refresh(phase)
-        assert len(phase.tasks) == 2
 
 
 if __name__ == "__main__":
