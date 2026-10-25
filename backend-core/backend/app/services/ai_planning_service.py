@@ -114,10 +114,57 @@ class AIPlanningService:
         Returns:
             Dict containing structured construction plan
         """
+        started = time.monotonic()
         prompt = self._build_planning_prompt(
             project_description, budget, timeline_weeks, constraints
         )
-        return await self._run_provider_chain(prompt, "Plan")
+        result = await self._run_provider_chain(prompt, "Plan")
+        # Groq sometimes answers a small building (a one-room shed) with the floor
+        # plan alone: plan its construction for that layout in a second call.
+        plan = result.get("plan") or {}
+        structure = plan.get("project_structure") or {}
+        if result.get("success") and not plan.get("phases") and structure:
+            logger.warning("Plan came back without construction phases — planning them for its floor plan")
+            remaining = settings.planning_timeout_seconds - (time.monotonic() - started)
+            try:
+                construction = await asyncio.wait_for(
+                    self.plan_construction(
+                        project_description, structure, budget, timeline_weeks, constraints
+                    ),
+                    timeout=max(remaining, 1),
+                )
+                self._merge_construction(plan, construction.get("plan") or {})
+            except Exception as e:
+                logger.warning(f"Plan saved without construction phases: {e}")
+        return result
+
+    async def plan_construction(
+        self,
+        project_description: str,
+        structure: Dict[str, Any],
+        budget: Optional[float] = None,
+        timeline_weeks: Optional[int] = None,
+        constraints: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Phases, tasks, materials, cost and duration for an existing floor plan
+        (``project_structure``, feet), without designing the house again."""
+        prompt = self._build_construction_prompt(
+            project_description, structure, budget, timeline_weeks, constraints
+        )
+        return await self._run_provider_chain(prompt, "Construction plan")
+
+    @staticmethod
+    def _merge_construction(plan: Dict[str, Any], construction: Dict[str, Any]) -> None:
+        """Copy a ``plan_construction`` answer into ``plan``, if it has phases."""
+        if not construction.get("phases"):
+            logger.warning("Construction plan came back without phases too")
+            return
+        plan["phases"] = construction["phases"]
+        for key in ("total_cost", "total_duration_weeks"):
+            if construction.get(key):
+                plan[key] = construction[key]
+        if construction.get("material_list") and not plan.get("material_list"):
+            plan["material_list"] = construction["material_list"]
 
     async def refine_floor_plan(
         self, structure: Dict[str, Any], instruction: str, site: Optional[Dict[str, Any]] = None,
@@ -498,18 +545,7 @@ Return ONLY the project name, nothing else."""
 
         prompt = f"""You are an experienced residential architectural designer and construction project manager. First design the house as a real, livable floor plan, then plan its construction.
 
-PROJECT DESCRIPTION: {project_description}
-
-"""
-
-        if budget:
-            prompt += f"BUDGET: ${budget:,.2f}\n"
-
-        if timeline_weeks:
-            prompt += f"DESIRED TIMELINE: {timeline_weeks} weeks\n"
-
-        if constraints:
-            prompt += f"CONSTRAINTS: {', '.join(constraints)}\n"
+{self._project_brief(project_description, budget, timeline_weeks, constraints)}"""
 
         prompt += """
 
@@ -517,7 +553,7 @@ Reply with ONLY a JSON object (no markdown, no explanation). Use this exact stru
 
 {"project_structure":{"total_area_sqft":0,"layout":{"length":0,"width":0,"entry":"Room","split":"z","parts":[{"size":0,"room":"Room"},{"size":0,"split":"x","parts":[{"size":0,"room":"Other Room"}]}]},"rooms":[{"name":"Room","dimensions":{"length":0,"width":0,"height":9},"floor_material":"carpet","wall_material":"drywall","connects_to":["Other Room"]}]},"phases":[{"name":"Phase","duration_weeks":2,"description":"desc","tasks":[{"name":"Task","duration_days":5,"description":"desc","estimated_cost":0}],"estimated_cost":0}],"total_cost":0,"total_duration_weeks":0,"material_list":[{"name":"Material","material_type":"wood","quantity":0,"unit":"sqft","unit_cost":0,"total_cost":0,"supplier_type":"local"}]}
 
-Fill in realistic values based on the project description above. Include room dimensions for VR.
+Fill in realistic values based on the project description above. Include room dimensions for VR. Always fill in "phases", "total_cost" and "material_list", also for a small building such as a shed or a single room.
 
 FLOOR PLAN DESIGN (all sizes in feet):
 - Design it the way an architect would: a coherent house with a natural flow, not a random collection of rooms.
@@ -545,6 +581,48 @@ FLOOR PLAN DESIGN (all sizes in feet):
 """ + FURNITURE_FORMAT
 
         return prompt
+
+    @staticmethod
+    def _project_brief(
+        project_description: str,
+        budget: Optional[float],
+        timeline_weeks: Optional[int],
+        constraints: Optional[List[str]],
+    ) -> str:
+        brief = f"PROJECT DESCRIPTION: {project_description}\n\n"
+        if budget:
+            brief += f"BUDGET: ${budget:,.2f}\n"
+        if timeline_weeks:
+            brief += f"DESIRED TIMELINE: {timeline_weeks} weeks\n"
+        if constraints:
+            brief += f"CONSTRAINTS: {', '.join(constraints)}\n"
+        return brief
+
+    def _build_construction_prompt(
+        self,
+        project_description: str,
+        structure: Dict[str, Any],
+        budget: Optional[float],
+        timeline_weeks: Optional[int],
+        constraints: Optional[List[str]],
+    ) -> str:
+        """Prompt for planning the construction of a floor plan that already exists.
+        Asks for the same phase and material format as ``_build_planning_prompt``."""
+        current = json.dumps(
+            {k: structure.get(k) for k in ("layout", "rooms", "exterior") if structure.get(k)},
+            separators=(",", ":"),
+        )
+        return f"""You are an experienced construction project manager. The building below is already designed; plan its construction.
+
+{self._project_brief(project_description, budget, timeline_weeks, constraints)}
+FLOOR PLAN (JSON, all sizes in feet):
+{current}
+
+Reply with ONLY a JSON object (no markdown, no explanation). Size the plan to the building — a shed or a single room needs fewer, shorter phases and cheaper materials than a house. Use this exact structure with 3-5 phases, 2 tasks per phase, and 6-8 materials:
+
+{{"phases":[{{"name":"Phase","duration_weeks":2,"description":"desc","tasks":[{{"name":"Task","duration_days":5,"description":"desc","estimated_cost":0}}],"estimated_cost":0}}],"total_cost":0,"total_duration_weeks":0,"material_list":[{{"name":"Material","material_type":"wood","quantity":0,"unit":"sqft","unit_cost":0,"total_cost":0,"supplier_type":"local"}}]}}
+
+Fill in realistic values for this building: quantities from its sizes, costs in US dollars, "total_cost" the sum of the phases' costs."""
 
     def _build_refine_prompt(
         self, structure: Dict[str, Any], instruction: str, site: Optional[Dict[str, Any]] = None,

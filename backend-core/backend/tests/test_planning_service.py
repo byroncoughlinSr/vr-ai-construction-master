@@ -189,3 +189,43 @@ def test_both_prompts_describe_furniture():
     assert 'CURRENT FURNITURE (JSON by room; null means none yet):\n{"rooms":{"Den":[{"type":"sofa"}]}}' in refine
     assert '{"scope": "furniture", "furniture":' in refine
     assert '"kitchen island"' in refine
+
+
+def test_plan_without_phases_gets_its_construction_planned():
+    service = _service()
+    shed = {"layout": {"length": 8, "width": 8, "room": "Shed"}, "rooms": [{"name": "Shed"}]}
+    phases = [{"name": "Foundation", "estimated_cost": 800, "tasks": []}]
+    replies = [
+        {"project_structure": shed},
+        {"phases": phases, "total_cost": 3200, "total_duration_weeks": 2,
+         "material_list": [{"name": "2x4 studs"}]},
+    ]
+    prompts = []
+
+    async def groq(prompt):
+        prompts.append(prompt)
+        return {"success": True, "plan": service._validate_and_fill_plan(replies.pop(0)), "source": "groq"}
+
+    service._generate_with_groq = groq
+    result = asyncio.run(service.generate_construction_plan("8 by 8 wood shed"))
+    plan = result["plan"]
+    assert plan["project_structure"] == shed
+    assert plan["phases"] == phases
+    assert plan["total_cost"] == 3200
+    assert plan["material_list"] == [{"name": "2x4 studs"}]
+    assert '"room":"Shed"' in prompts[1]
+    assert "PROJECT DESCRIPTION: 8 by 8 wood shed" in prompts[1]
+
+
+def test_plan_with_phases_is_not_asked_again():
+    service = _service()
+    calls = []
+
+    async def groq(prompt):
+        calls.append(prompt)
+        return {"success": True, "source": "groq", "plan": {
+            "project_structure": {"rooms": [{"name": "Shed"}]}, "phases": [{"name": "Build"}]}}
+
+    service._generate_with_groq = groq
+    asyncio.run(service.generate_construction_plan("shed"))
+    assert len(calls) == 1
