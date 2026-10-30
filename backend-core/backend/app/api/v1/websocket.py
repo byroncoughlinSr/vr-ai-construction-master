@@ -1,11 +1,11 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from starlette.websockets import WebSocketState
 import json
 import asyncio
 import logging
 import time
-from typing import Dict, List, Set, Any
+from typing import Dict, List, Any
 from datetime import datetime
 
 from ...config import settings

@@ -28,6 +28,7 @@ class PlantModel(Base):
     height_ft = Column(Float)  # usual height, when the person gave one
     aspect = Column(Float)  # width / height of the model
     triangles = Column(Integer)
+    turn = Column(Integer, nullable=False, default=0, server_default="0")  # degrees, so its front faces furniture's front
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

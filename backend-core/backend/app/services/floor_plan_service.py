@@ -16,9 +16,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models import AIGeneration, FloorPlan, Material, Project
-from . import plant_model_service
+from . import kitchen_style_service, plant_model_service
 from .vr_exterior import exterior_spec
-from .vr_furniture import furniture_spec, merge_furniture, prune_furniture, rename_furniture_rooms
+from .vr_furniture import MoveError, furniture_spec, merge_furniture, move_piece, prune_furniture, rename_furniture_rooms
 from .vr_geometry_service import (
     FT_TO_M,
     LayoutError,
@@ -27,6 +27,7 @@ from .vr_geometry_service import (
     build_geometry_from_rooms,
     exterior_intervals,
     find_shared_walls,
+    is_rect_layout,
     layout_rects_from_tree,
 )
 
@@ -43,7 +44,7 @@ _ROOM_REFS = ("connects_to", "no_door_to", "open_to")
 
 def rename_rooms(structure: dict, renames: Any) -> dict:
     """A copy of ``structure`` with rooms renamed (``{"Old name": "New name"}``,
-    case-insensitive) everywhere a name appears: layout leaves, ``entry``, the
+    case-insensitive) everywhere a name appears: layout leaves or rectangles, ``entry``, the
     room list, the names in ``connects_to`` / ``no_door_to`` / ``open_to`` and the
     rooms ``furniture`` is listed under."""
     if not isinstance(renames, dict):
@@ -62,7 +63,7 @@ def rename_rooms(structure: dict, renames: Any) -> dict:
         if isinstance(node, dict):
             if isinstance(node.get("room"), str):
                 node["room"] = renamed(node["room"])
-            for part in node.get("parts") or []:
+            for part in (node.get("parts") or []) + (node.get("rects") or []):
                 walk(part)
 
     out = copy.deepcopy(structure)
@@ -92,7 +93,7 @@ def validate_structure(structure: Any) -> dict:
     and, when it has them, the cleaned ``exterior`` and ``furniture``).
 
     Rooms must be objects with names; a ``layout``, when given, must be a valid
-    nested-split tree. Raises FloorPlanError otherwise.
+    nested-split tree or rectangle layout. Raises FloorPlanError otherwise.
     """
     if not isinstance(structure, dict):
         raise FloorPlanError("floor plan must be an object")
@@ -120,6 +121,18 @@ def validate_structure(structure: Any) -> dict:
         for name, _ in placed:
             if name.strip().lower() not in listed:
                 rooms.append({"name": name, "dimensions": {"height": 9}})
+        if is_rect_layout(layout):
+            # The rectangle is the room's size: keep the room list's copy in step
+            # (a dashboard edit only changes the rectangle).
+            sizes = {name.strip().lower(): r for name, r in placed}
+            for room in rooms:
+                r = sizes.get(str(room["name"]).strip().lower())
+                if r:
+                    room["dimensions"] = {
+                        **(room.get("dimensions") or {}),
+                        "length": round((r["x1"] - r["x0"]) / FT_TO_M, 2),
+                        "width": round((r["z1"] - r["z0"]) / FT_TO_M, 2),
+                    }
         layout = copy.deepcopy(layout)
     if not rooms:
         raise FloorPlanError("floor plan has no rooms")
@@ -196,6 +209,33 @@ def update_exterior(db: Session, plan: FloorPlan, exterior: Any, source: str | N
     return plan
 
 
+def move_furniture(db: Session, plan: FloorPlan, ref: dict, x: float, z: float, yaw: float) -> str:
+    """Save a piece of furniture where it was left in the headset (``x``/``z`` world
+    metres, ``yaw`` degrees, the geometry's convention), on ``plan`` itself (committed):
+    in the room on the same floor it now stands in. Returns that room's name. Raises
+    FloorPlanError when the piece or room no longer matches the plan."""
+    geometry = build_geometry_from_rooms(rooms_ft=list(plan.rooms or []), layout=plan.layout)
+    rooms = geometry["rooms"]
+    source = next((r for r in rooms if r["name"].strip().lower() == str(ref.get("room") or "").strip().lower()), None)
+    if source is None:
+        raise FloorPlanError(f"there is no room '{ref.get('room')}' in this house")
+    target = next((r for r in rooms if r.get("level", 0) == source.get("level", 0)
+                   and r["bounds"]["x0"] <= x <= r["bounds"]["x1"] and r["bounds"]["z0"] <= z <= r["bounds"]["z1"]),
+                  source)
+    b = target["bounds"]
+    sizes = {r["name"]: (r["bounds"]["x1"] - r["bounds"]["x0"], r["bounds"]["z1"] - r["bounds"]["z0"]) for r in rooms}
+    try:
+        spec = move_piece(plan.furniture, {**ref, "room": source["name"]}, target["name"],
+                          (x - b["x0"]) / FT_TO_M, (z - b["z0"]) / FT_TO_M, yaw, sizes)
+    except MoveError as e:
+        raise FloorPlanError(str(e))
+    plan.furniture = furniture_spec(spec)
+    db.add(plan)
+    db.commit()
+    logger.info(f"🛋️  Moved a piece of {source['name']} to {target['name']} in project {plan.project_id} v{plan.version}")
+    return target["name"]
+
+
 def update_furniture(db: Session, plan: FloorPlan, furniture: Any, source: str | None = None) -> FloorPlan:
     """Change the furniture on ``plan`` itself, without a new version (not committed):
     the rooms ``furniture`` lists are replaced, the others kept. Raises FloorPlanError
@@ -215,7 +255,7 @@ def update_furniture(db: Session, plan: FloorPlan, furniture: Any, source: str |
 
 
 def site_summary(plan: FloorPlan, plant_models: list[str] | None = None,
-                 furniture_models: list[str] | None = None) -> dict:
+                 furniture_models: list[str] | None = None, kitchen_styles: list[str] | None = None) -> dict:
     """Where things are, in feet, so the AI can place plants and paths around the
     house: the footprint, the front door (and which way it faces), each room's
     rectangle, the other doors to the yard and the open (outdoor) parts of the footprint.
@@ -257,6 +297,7 @@ def site_summary(plan: FloorPlan, plant_models: list[str] | None = None,
     site["rooms"] = [
         {
             "name": r["name"], **{k: ft(v) for k, v in r["bounds"].items()},
+            **({"level": r["level"]} if r.get("level") else {}),
             # One string per wall: the nested form cost ~1k tokens a house, which
             # pushed the refine prompt past Groq's per-minute token limit.
             "walls": {
@@ -291,6 +332,8 @@ def site_summary(plan: FloorPlan, plant_models: list[str] | None = None,
         site["plant_models"] = plant_models[:20]
     if furniture_models:
         site["furniture_models"] = furniture_models[:20]
+    if kitchen_styles:
+        site["kitchen_styles"] = kitchen_styles[:10]
     return site
 
 
@@ -299,23 +342,25 @@ def _walls_by_room(geometry: dict, names: dict[int, str]) -> dict[int, dict]:
     ("outside" or room names), the openings in it, and whether it is kept solid,
     e.g. ``{"back": {"faces": ["outside"], "has": ["window"]}}``."""
     rooms = geometry["rooms"]
-    rects = [r["bounds"] for r in rooms]
-    shared = find_shared_walls(rects)
     walls: dict[int, dict] = {}
-    for idx, room in enumerate(rooms):
-        sides = {}
-        for name, side in zip(_SIDE_NAMES, _room_sides(room["bounds"])):
-            faces = [
-                names[rooms[j if i == idx else i]["id"]]
-                for (i, j), wall in shared.items()
-                if idx in (i, j) and wall[0] == side[0] and abs(wall[1] - side[1]) < 1e-3
-            ]
-            if exterior_intervals(side, shared):
-                faces.append("outside")
-            sides[name] = {"faces": faces, "has": []}
-            if name in (room.get("solid_walls") or []):
-                sides[name]["solid"] = True
-        walls[room["id"]] = sides
+    for level in {r.get("level", 0) for r in rooms}:
+        # Neighbours only on the same floor.
+        group = [r for r in rooms if r.get("level", 0) == level]
+        shared = find_shared_walls([r["bounds"] for r in group])
+        for idx, room in enumerate(group):
+            sides = {}
+            for name, side in zip(_SIDE_NAMES, _room_sides(room["bounds"])):
+                faces = [
+                    names[group[j if i == idx else i]["id"]]
+                    for (i, j), wall in shared.items()
+                    if idx in (i, j) and wall[0] == side[0] and abs(wall[1] - side[1]) < 1e-3
+                ]
+                if exterior_intervals(side, shared):
+                    faces.append("outside")
+                sides[name] = {"faces": faces, "has": []}
+                if name in (room.get("solid_walls") or []):
+                    sides[name]["solid"] = True
+            walls[room["id"]] = sides
 
     def side_of(room_id: int, position: dict, rotation: float) -> str | None:
         b = rooms[room_id - 1]["bounds"]
@@ -377,6 +422,7 @@ def geometry_for_plan(
     optimize_for_vr: bool = True,
     plant_models: list[dict] | None = None,
     furniture_models: list[dict] | None = None,
+    kitchen_styles: list[dict] | None = None,
 ) -> dict:
     """VR geometry for one floor-plan version, named after the house.
     ``plant_models`` / ``furniture_models``: the finished photo models
@@ -388,6 +434,7 @@ def geometry_for_plan(
         plant_models=plant_models,
         furniture=plan.furniture,
         furniture_models=furniture_models,
+        kitchen_styles=kitchen_styles,
         materials=materials,
         project_id=plan.project_id,
         project_name=plan.name,
@@ -442,6 +489,7 @@ def geometry_for_project(
             plan, materials, target_platform, optimize_for_vr,
             plant_models=plant_model_service.ready_models(db, "plant"),
             furniture_models=plant_model_service.ready_models(db, "furniture"),
+            kitchen_styles=kitchen_style_service.ready_styles(db),
         )
 
     rooms_ft, layout = _legacy_rooms(db, project.id)

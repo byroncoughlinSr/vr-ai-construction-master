@@ -205,8 +205,10 @@ export const useProjectsStore = defineStore('projects', {
       return this._store(updated)
     },
 
-    async deleteProject(projectId: number): Promise<void> {
-      await apiClient.delete(`/projects/${projectId}`)
+    /** Delete a project. Its construction plan in pm-mcp is archived, unless `purge`
+     * deletes it completely, with the project's images and documents. */
+    async deleteProject(projectId: number, purge = false): Promise<void> {
+      await apiClient.delete(`/projects/${projectId}${purge ? '?purge=true' : ''}`)
       this.projects = this.projects.filter(p => p.id !== projectId)
       delete this.raw[projectId]
       if (this.currentProject?.id === projectId) this.selectProject(this.projects[0]?.id ?? null)

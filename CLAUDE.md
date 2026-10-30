@@ -14,14 +14,17 @@ construction-quest (Kotlin/Quest)  ──HTTP/WS──►  backend-core/backend 
 ```
 
 - Backend server: `http://192.168.4.249:8000`  (LAN IP — the Quest must reach this, not localhost)
-- Dashboard dev server: `http://localhost:3001` (Vite binds `0.0.0.0`; the Quest loads it by LAN IP)
+- Dashboard: `http://192.168.4.249:8081` — Apache serves the built app (`dist/`) and forwards `/api/v1`
+  (WebSockets too) and the backend's file mounts to :8000 (`deploy/apache/vr-construction.conf`). The
+  Vite dev server on `:3001` is still there for development.
 - WebSocket base: `ws://192.168.4.249:8000/api/v1/ws`
 
 ## Commands
 
 ### Backend (`backend-core/backend`)
 ```bash
-./start_all.sh                    # from repo root: backend (:8000, log → backend/backend.log) + dashboard (:3001); Ctrl+C stops both
+./start_all.sh                    # from repo root: pm-mcp + backend (:8000, log → backend/backend.log), builds the dashboard
+                                  # for Apache (:8081); DASHBOARD_DEV=1 runs Vite on :3001 instead. Ctrl+C stops them
 ./restart_backend.sh              # from repo root: kills port 8000, activates venv, runs uvicorn --reload
 source venv/bin/activate          # the venv lives in backend-core/backend/venv
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload   # manual run (must bind 0.0.0.0 so Quest can reach it)
@@ -45,16 +48,23 @@ when `/development/pm-mcp/.venv/bin/pm-mcp` or `PM_MCP_COMMAND` is missing). Tha
 database, so give test projects `unique()` names.
 Config comes from `.env` (copy `.env.example`); `app/config.py` is the Pydantic settings source of truth.
 
-**LLM provider chain** (`ai_planning_service.py`, in priority order):
-1. **Groq** — the primary planner. `GROQ_API_KEY` + `GROQ_MODEL` (default `openai/gpt-oss-120b`),
-   called with `response_format={'type':'json_object'}`.
-2. **Ollama** — fallback. Runs **natively, not in Docker** (Docker Ollama was OOM-killed); model
+**LLM provider chain** (`ai_planning_service.py`, in priority order for a new house — `PLAN_ORDER`; a change to an
+existing one, i.e. `refine_floor_plan` and its floor-plan fix, uses `EDIT_ORDER`: Groq → Ollama → Gemini → Claude last):
+1. **Claude** — the primary planner (`_generate_with_claude`, streamed). `CLAUDE_API_KEY` or `ANTHROPIC_API_KEY`,
+   `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`), `ANTHROPIC_EFFORT` (`medium`), at most `ANTHROPIC_TIMEOUT_SECONDS`
+   (170 s) per answer. On the 14-room example Sonnet took ~124 s including one fix round (≈ $0.19); Opus 5.5 took
+   ~190 s at `medium` and timed out at `high`. A rejected key logs `❌ Claude API key rejected`; a safety decline is
+   re-run server-side (`fallbacks: "default"`).
+2. **Groq** — first fallback. `GROQ_API_KEY` + `GROQ_MODEL` (default `openai/gpt-oss-120b`),
+   called with `response_format={'type':'json_object'}`. Its room rectangles overlapped on the 14-room example.
+3. **Ollama** — fallback. Runs **natively, not in Docker** (Docker Ollama was OOM-killed); model
    `OLLAMA_MODEL=llama3.1:8b` exactly; `OLLAMA_URL=http://localhost:11434` when uvicorn runs natively
-   (the Docker bridge IP only when the backend is containerised). Unlike Groq/Gemini, Ollama is re-probed
+   (the Docker bridge IP only when the backend is containerised). Unlike the cloud providers, Ollama is re-probed
    (3 s timeout) at most every 30 s while down, and only when the chain reaches it, so starting it
-   (`sudo systemctl start ollama`) needs no backend restart.
+   (`sudo systemctl start ollama`) needs no backend restart. A hand-started `ollama serve` looks in `~/.ollama`,
+   which has no models — the service's are in `/usr/share/ollama`.
    See `QUICK_START.md` / `NATIVE_OLLAMA_SETUP.md`.
-3. **Gemini** — last-resort fallback, `GEMINI_API_KEY`.
+4. **Gemini** — last-resort fallback, `GEMINI_API_KEY`.
 
 A missing key silently demotes to the next provider. Groq's JSON mode sometimes rejects a long plan
 (`json_validate_failed`) over a stray quote and miscounted braces around `"rooms"`; `_generate_with_groq`
@@ -69,14 +79,15 @@ says which planner actually ran.
 ### Dashboard (`backend-core/dashboard`)
 ```bash
 npm run dev        # Vite dev server on :3001
-npm run build      # vue-tsc typecheck + vite build
+npm run build      # vue-tsc typecheck + vite build → dist/, which Apache serves on :8081 (rebuild to update it)
 npm run lint       # eslint --fix (config: .eslintrc.cjs; currently clean)
 npm run test       # vitest (watch)
 npx vitest run src/services/__tests__/imageProgress.spec.ts   # one test file
 ```
-`.env` sets `VITE_API_BASE_URL=http://192.168.4.249:8000/api/v1`, so the app calls the backend by LAN
-IP directly (the `/api` → `localhost:8000` proxy in `vite.config.ts` only matters without it). Vite binds
-`0.0.0.0` so the in-headset WebView can load the dashboard over the LAN.
+`.env` (dev server) sets `VITE_API_BASE_URL=http://192.168.4.249:8000/api/v1`, so the app calls the backend by
+LAN IP directly (the `/api` → `localhost:8000` proxy in `vite.config.ts` only matters without it). A build
+also reads `.env.production`, which points the API, WebSocket and file URLs at Apache (`:8081`), so the
+served dashboard talks only to Apache. Vite binds `0.0.0.0` so a dev server can be loaded over the LAN too.
 
 ### VR app (`construction-quest`)
 ```bash
@@ -158,6 +169,41 @@ as exterior (windows, front door); the geometry lists open parts as `open_areas`
 as "Outside"), and the spawn point stops halfway across one if a room is on the far side. `project_structure.rooms` then only supplies
 height, materials and `connects_to`. `layout.entry` names the room that gets the front door (it becomes
 room id 1). The prompt in `_build_planning_prompt` describes this format — change both together.
+**Newer plans are room rectangles** (`is_rect_layout`): `layout = {entry, rects: [{room, x, z, length, width}], notes}` in
+feet (x from the left, z from the street). `rect_entries` snaps edges within `RECT_SNAP_FT` and shifts the plan to
+start at 0,0; whatever of the bounding box no room covers is an open area (`uncovered_rects`); overlapping rooms are a
+`LayoutError`. `_walk_layout` dispatches, so everything that takes a tree takes rectangles. The prompt text is
+`RECT_LAYOUT_FORMAT` (all three prompts: plan, refine, fix); the refine prompt shows older tree plans as rectangles
+(`layout_as_rects`). On save a rectangle plan's room `dimensions` are set from the rectangles. The dashboard edits
+rectangles as a table (x, z, width, depth, add/remove) and trees with the split editor.
+**Floor-plan check** (`services/layout_check.py`, `layout_problems`): overlaps, slivers between rooms (< 3 ft, rooms on
+both sides), splits whose parts don't add up, rooms drawn at other sizes than their `dimensions`, rooms missing from the
+layout, rooms in front of the entry (between its front door and the street; the entry need not be at z = 0, so a garage
+may stick out toward the street beside it), doorways/open walls between rooms that don't share `DOOR_W + 2·DOOR_EDGE_MARGIN`. `_check_floor_plan` sends a plan
+with problems back through the chain once (`_build_fix_prompt`, structure only, within the planning budget) and keeps the
+version with fewer problems (a fix may send only the layout, or only the rooms it changes: `_merge_rooms` keeps the rest); the layout's own `notes` and what is still wrong go into `geometry.notes`.
+Measured on the 14-room example: Groq's rectangles overlapped (7 problems, its fix no better → grid); Claude at
+`medium` effort had none but took ~190 s.
+**Storeys and stairs**: a rectangle may carry `"level"` (0 ground, 1, 2…; `rect_level`, at most `MAX_LEVELS`).
+`build_geometry_from_rooms` is a dispatcher: one level → `_build_storey` (the whole single-floor pipeline); several →
+`_build_levels`, which splits the layout (`layout_levels`: every level keeps the house's `origin` so `rect_entries` doesn't
+re-shift it), builds each storey with `_build_storey(level=n, rise=…, holes=…, check=False)`, then `_lift`s it (y up by
+the storeys below, room/door/window ids renumbered) and merges. A storey with one above takes its tallest room's height
+for every room; ceilings are cut where a floor above covers them (`subtract_rects`, so a room has `ceilings`/`floors`
+lists, `ceiling`/`floor` = the first or null). Upper storeys get no front door, no doors to the yard (noted) and their
+entry is the room the stairs arrive in. A room whose name contains "stair" with a level above gets a straight flight
+(`vr_stairs.plan_stairs`: along its longer side, foot by its doorways, against the wall with fewer openings), drawn as a
+furniture piece (`stairs`), the floor above cut over it and railed (`railing`); `geometry.stairs` gives the headset the
+ramp (`axis`, `foot`, `head`, `rise`, `y`) and `geometry.levels` each floor's `y`. `layout_problems` checks each level
+alone (overlaps only on the same level); rooms carry `level`; `site_summary` lists `level` and only same-floor
+neighbours. Exterior: wall finish per storey, the roof over the top of every stack (`build_exterior(..., upper=)`), one
+yard. Headset: floors at their vertex y, `HouseGenerator.floorLevelAt(x, z, near)` picks the highest floor or stair ramp
+no more than `STEP_UP` above where the player stands (so floors overhead don't count), teleport aims at the current
+floor, room labels at their floor. Dashboard: a level switch in `FloorPlanView` (rooms, doors, furniture by level); the rectangle editor has a Floor
+select per room (`setFloor`, level 0 = no key) and "Add room" adds to the floor being shown.
+**Floor finishes** (`services/vr_floors.py`): a room's `floor_material` in words ("white oak hardwood", "gray 24 inch
+tile", "carpet") → `floor_finish` (planks / tiles / plain, colour words tint it) → one thin mesh per floor slab in
+`geometry.finishes` (`{meshes, pieces}` like the furniture's, drawn by a `MeshInstances` in `HouseGenerator`).
 If the tree is missing or malformed (`LayoutError`), it falls back to the old grid:
 `compute_packed_positions` packs rooms 3 per row in list order, rows share their max depth, and room 0
 is the entry. `geometry.metadata.layout` says which one ran (`"split"` / `"grid"`).
@@ -227,7 +273,13 @@ failed (Retry). `build_exterior` swaps a landscape item for a ready model when i
 `MeshInstances.buildModel` loads it from `SERVER_URL` + url. Deleting a model sends houses back to the
 drawn plant. The same table holds furniture models (`kind` = `plant` | `furniture`; routes
 `/api/v1/furniture/models`, dashboard page `/furniture`; both pages are `ModelLibraryView.vue`, and
-`ready_models(db, kind)` keeps the two apart).
+`ready_models(db, kind)` keeps the two apart). A model faces wherever its photo was taken from, so each has a
+`turn` (0/90/180/270°; `PATCH .../models/{id}`, the furniture page's "Turn 90°") that `vr_furniture` adds to its
+yaw, so its front matches the drawn piece's (an island's front is its seating side). Furniture models are placed at their real size: `ready_models` adds a cached `footprint` (x, z per metre of height, read from the `.glb`), which replaces the drawn piece's width/depth (swapped at 90/270°). Models also copy the photo's
+colours and light (white cabinets come out tan): `services/model_colors.py` lists a model's main surface colours
+(`GET .../models/{id}/colors`) and replaces one with another, shading kept (`POST .../recolor {from_color, to_color,
+tolerance}`, texture or vertex colours); each recolour writes a new file name (no stale headset cache) and stacks, the
+first keeps `original.glb` for `POST .../reset-colors`, and a remake drops it. Dashboard: "Recolour" on a model's card.
 
 **Furniture** (`services/vr_furniture.py`, column `floor_plans.furniture`): `{auto, rooms: {"<room name>":
 [items]}}`, sizes in feet. `furniture_spec` cleans what the AI sends (`find_piece` matches words against
@@ -242,7 +294,43 @@ nothing in front of a doorway (0.9 m kept clear; openings carry a `kind` — doo
 only its mattress, counters just under the sill), big pieces against the wall with the longest free run,
 then what goes with them (nightstands by the bed, coffee table before the sofa, chairs round a table as
 part of the table, stools at the island), then corners and rugs. `x`/`z` (feet from the room's front-left
-corner) place a piece exactly. Pieces are low-poly meshes **in metres** (base at y = 0, front toward +z,
+corner) place a piece exactly. An island honours `facing` (its stools' side) and `place`: its back goes on
+that side, an open one too (`_place_along`); `place` and `facing` both the open side put its stools in the next
+room. Kitchen runs: a stove with `corner` ("front-right", or "any" for "diagonal") is a square of counter with the range
+across the corner (`_place_corner_stove`, mesh `_corner_stove`), placed first; a counter with `between: [stove,
+refrigerator]` fills the wall between the two (`_place_between`), and the other counters come after; counters, fridge
+and stove stand flush (`_RUN`, `fits(flush=True)`); a listed stove drops the counter's range, one sink per room; a fridge
+that doesn't fit where asked goes to the far end of the corner stove's longer wall (`_run_end`); another wall piece with
+`corner` is pushed into it. Re-cleaning a spec must give the same spec (the stored one is cleaned again on every build). The refine prompt shows the spec through `shown_furniture`: rooms `auto` furnishes are listed with their
+`auto_items` and `auto` itself is left out (otherwise the AI changing one auto room returned only the changed piece, and
+`"auto": false`). A photo model also matches a longer name containing its own ("my office desk" → "Office desk").
+**Kitchen styles** (`services/kitchen_style_service.py`, table `kitchen_styles`, routes `/api/v1/kitchen-styles`, the
+"Kitchen styles" card on the furniture page, `components/furniture/KitchenStyles.vue`): a named, reusable kitchen look —
+cabinet colour, `door` flat|shaker|raised, `uppers` solid|glass, handle colour, crown, countertop colour + granite `fleck`,
+`backsplash` none|tile|mosaic + colour, and the photo models of its stove and fridge (`stove_model_id`/`fridge_model_id`).
+A kitchen piece with `"style": "<name>"` styles the whole room (`furnish_room`: the first piece naming one; `_styled` sets
+colours and the appliance `model_id`, `_style_options` adds the mesh options, which are also its cache key). Counters stay
+drawn and stretch; only appliances are photo models. A corner stove with a photo model is cut to the model's width
+(`_corner_size(range_w)`), draws only the cabinet round it plus a wall cabinet over the model's top, and the model stands on
+the diagonal (`corner_stove_spot`). `build_furniture(..., styles)` gets `ready_styles(db)` through `geometry_for_plan` /
+`build_geometry_from_rooms(kitchen_styles=)`; `site_summary` lists the names as `kitchen_styles`. The refine route runs the
+AI's furniture through `with_named_style`: it adds the style a request names when the AI left it out, and drops an `auto`
+the request didn't ask for (Groq sent `"auto": false` with a kitchen change). In a kitchen with a corner/between run, the
+island is placed after the runs. A `between` counter with a `width` sets the gap: `_run_end` stands the far piece (fridge) that far
+along the corner piece's wall, whatever wall the AI named for it. In such a kitchen another counter goes on along the run's
+walls first (the AI's wall or width for it are guesses: Groq said "front", 4 ft, for "cabinets on the other side of the
+fridge", where 3 ft fit), and `_place_counter` tries lengths in 0.1 m steps.
+**Changing pieces**: a counter takes `sink`/`range`/`uppers` true|false and an island `sink` (`_FEATURES`, over what
+`_counter_options` would choose); `seats` sets stools/chairs; a piece with `x`/`z` may have `rotation` (degrees, the
+geometry's yaw: 0 front toward +z/back, 90 left, 180 street, 270 right) and is placed by `_place_exact` at any angle.
+**Grab and move**: every piece built from a plan item has `ref: {room, item, width, depth, auto?}` (stools that come with
+an island don't). `FurnitureBuilder.kt` makes such a piece `Grabbable` (its first colour group is the handle, the rest
+`TransformParent`ed to it); `poll()` each frame notices one let go, stands it upright on its floor and reports it;
+`ImmersiveActivity` sends `PUT /projects/{id}/furniture/move {ref, x, z, yaw}` (world metres) →
+`floor_plan_service.move_furniture` → `vr_furniture.move_piece`: saved on the current version in place, in the room on
+the same floor it now stands in (an auto room's list is written out first, one of a `count` split off, `place`/`corner`/
+`between`/`facing` dropped, its size kept), 409 when the ref is stale; the headset then redraws only the furniture.
+Pieces are low-poly meshes **in metres** (base at y = 0, front toward +z,
 cached per kind/size/colors and shared), instanced with `scale` 1 in `geometry.furniture` (`meshes`,
 `pieces` with a plan `outline` for the dashboard, `models` for photo models); what didn't fit (unless it was
 only auto furniture) goes to `geometry.notes`. Headset side: `FurnitureBuilder.kt` (through
@@ -276,7 +364,10 @@ only auto furniture) goes to `geometry.notes`. Headset side: `FurnitureBuilder.k
   other apps), reached over HTTP by `services/pm_client.py` (a small JSON-RPC client; the `mcp` package needs a
   newer Starlette than this FastAPI). `start_all.sh` starts pm-mcp on :8765 (`PM_MCP_URL`, board file
   `~/.local/share/pm-mcp/pm.db`). A project gets its pm-mcp project on first use (`ensure_pm_project`, stored in
-  `projects.pm_project_id`, linked in pm-mcp as `vr-construction:<id>`); deleting a project archives it there.
+  `projects.pm_project_id`, linked in pm-mcp as `vr-construction:<id>`); deleting a project archives it there, and `DELETE /projects/{id}?purge=true`
+  (the dashboard's "Delete completely") deletes it with pm-mcp's `delete_project` instead, plus the images only that
+  project links and its documents' files (`_project_files`); a purge is refused (503) before anything is deleted while
+  pm-mcp is down.
   Each request loads the plan once (`load_plan` → `export_project`) into a `Plan`; phases are pm-mcp milestones,
   tasks pm-mcp tasks, the rest pm-mcp records (`budget_item` with `data.line` `phase_budget` or `expense`,
   `change_order`, `permit`, `inspection`). Errors: `PMError` (pm-mcp refused; 404/409) and `PMUnavailable` (503;
@@ -409,7 +500,8 @@ also exist; all geometry routes share `vr_geometry_service.py`.
 - `SERVER_URL` / `WS_URL` / `DASHBOARD_URL` (and `COLLAB_TOKEN`) are `BuildConfig` fields generated in
   `app/build.gradle.kts` from `serverHost` / `collabToken` in `construction-quest/gradle.properties`.
   Change `serverHost` (or pass `-PserverHost=…`) when the host IP changes; the dashboard's `.env`
-  (`VITE_API_BASE_URL`, `VITE_WS_URL`) holds the same IP and must be changed too.
+  (`VITE_API_BASE_URL`, `VITE_WS_URL`) and `.env.production` hold the same IP and must be changed too,
+  as must `deploy/apache/vr-construction.conf`'s paths if the repo moves.
 - Provider fallback hides failures: a plan that looks wrong may have come from Ollama or Gemini rather
   than Groq. Check the log line naming the planner before debugging prompt/schema issues.
 - The repo root holds many one-off `*.md` fix logs and `test_*.py` scratch scripts from past debugging

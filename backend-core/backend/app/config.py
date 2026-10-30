@@ -1,3 +1,4 @@
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings
 from typing import List, Optional
 
@@ -28,13 +29,25 @@ class Settings(BaseSettings):
     gemini_api_key: Optional[str] = None
     gemini_model: str = "gemini-2.5-flash"
 
-    # Total time the planner may spend across Groq → Ollama → Gemini for one plan.
+    # Total time the planner may spend across Claude → Groq → Ollama → Gemini for one plan.
     # Keep it below the headset's floor-plan request timeout (HouseGenerator.kt,
     # PLAN_CALL_TIMEOUT_S = 240) so the server gives up first and the headset
     # gets a real error instead of a dropped connection.
     planning_timeout_seconds: float = 200.0
 
-    # Groq cloud LLM (primary planner)
+    # Claude (primary planner). The key is read from ANTHROPIC_API_KEY or CLAUDE_API_KEY.
+    anthropic_api_key: Optional[str] = Field(
+        default=None, validation_alias=AliasChoices("anthropic_api_key", "claude_api_key")
+    )
+    # Sonnet: on the 14-room example ~2 min with one fix round, where Opus took ~3 min
+    # for one answer (and timed out at "high"). Opus 5.5 is "claude-opus-5-5".
+    anthropic_model: str = "claude-sonnet-5-5"
+    # low | medium | high | xhigh | max: how hard Claude thinks about a plan.
+    anthropic_effort: str = "medium"
+    # The most one Claude answer may take, so a stalled one still leaves Groq a turn.
+    anthropic_timeout_seconds: float = 170.0
+
+    # Groq cloud LLM (first fallback)
     groq_api_key: Optional[str] = None
     groq_model: str = "openai/gpt-oss-120b"
 

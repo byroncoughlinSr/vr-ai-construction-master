@@ -9,6 +9,7 @@ from app.services.ai_planning_service import AIPlanningService
 def _service() -> AIPlanningService:
     # Skip __init__: it builds API clients and probes Ollama.
     service = AIPlanningService.__new__(AIPlanningService)
+    service.claude_available = False
     service.groq_available = True
     service.gemini_available = True
     service._ollama_up = False
@@ -60,6 +61,49 @@ def test_unparseable_plan_falls_back_to_next_provider():
     result = asyncio.run(service.generate_construction_plan("a small cabin"))
     assert calls == ["groq", "gemini"]
     assert result["source"] == "gemini"
+
+
+def test_claude_is_tried_first_and_a_failure_falls_back_to_groq():
+    service = _service()
+    service.claude_available = True
+    calls = []
+
+    async def claude(prompt):
+        calls.append("claude")
+        raise Exception("Claude generation timed out")
+
+    async def groq(prompt):
+        calls.append("groq")
+        return {"success": True, "plan": {"phases": []}, "source": "groq"}
+
+    service._generate_with_claude = claude
+    service._generate_with_groq = groq
+
+    result = asyncio.run(service.generate_construction_plan("a small cabin"))
+    assert calls == ["claude", "groq"]
+    assert result["source"] == "groq"
+
+
+def test_a_change_goes_to_groq_first_and_claude_last():
+    service = _service()
+    service.claude_available = True
+    service.gemini_available = False
+    calls = []
+
+    async def claude(prompt):
+        calls.append("claude")
+        return {"success": True, "plan": {"project_structure": {"rooms": []}}, "source": "claude"}
+
+    async def groq(prompt):
+        calls.append("groq")
+        raise Exception("rate limited")
+
+    service._generate_with_claude = claude
+    service._generate_with_groq = groq
+    structure = {"layout": {"length": 20, "width": 10, "room": "Studio"}, "rooms": [{"name": "Studio"}]}
+    result = asyncio.run(service.refine_floor_plan(structure, "add a bathroom"))
+    assert calls == ["groq", "claude"]
+    assert result["source"] == "claude"
 
 
 def test_refine_sends_current_plan_and_change_through_the_chain():
@@ -189,6 +233,8 @@ def test_both_prompts_describe_furniture():
     assert 'CURRENT FURNITURE (JSON by room; null means none yet):\n{"rooms":{"Den":[{"type":"sofa"}]}}' in refine
     assert '{"scope": "furniture", "furniture":' in refine
     assert '"kitchen island"' in refine
+    assert '"between": [type, type]' in refine and 'sits diagonally across it' in refine
+    assert '"style": "kitchen style name"' in refine and 'kitchen_styles' in refine
 
 
 def test_plan_without_phases_gets_its_construction_planned():
@@ -229,3 +275,102 @@ def test_plan_with_phases_is_not_asked_again():
     service._generate_with_groq = groq
     asyncio.run(service.generate_construction_plan("shed"))
     assert len(calls) == 1
+
+
+def _rect_plan(rects, rooms=None):
+    names = rooms or [r["room"] for r in rects]
+    return {"success": True, "source": "groq", "plan": {"phases": [{"name": "Build"}], "project_structure": {
+        "layout": {"entry": rects[0]["room"], "rects": rects},
+        "rooms": [{"name": n} for n in names],
+    }}}
+
+
+def _r(room, x, z, length, width):
+    return {"room": room, "x": x, "z": z, "length": length, "width": width}
+
+
+def test_floor_plan_with_problems_is_sent_back_once_and_the_fix_kept():
+    service = _service()
+    prompts = []
+    overlapping = [_r("Office", 0, 0, 10, 12.5), _r("Hallway", 0, 11.5, 30, 4.5)]
+    fixed = [_r("Office", 0, 0, 10, 12.5), _r("Hallway", 0, 12.5, 30, 4.5)]
+
+    async def groq(prompt):
+        prompts.append(prompt)
+        return _rect_plan(overlapping if len(prompts) == 1 else fixed)
+
+    service._generate_with_groq = groq
+    result = asyncio.run(service.generate_construction_plan("an office and a hallway"))
+    assert len(prompts) == 2
+    assert "Office and Hallway overlap by 10.0 x 1.0 ft" in prompts[1]
+    assert "PROJECT DESCRIPTION: an office and a hallway" in prompts[1]
+    structure = result["plan"]["project_structure"]
+    assert structure["layout"]["rects"] == fixed
+    assert result["plan"]["phases"] == [{"name": "Build"}]  # the rest of the first answer stays
+
+
+def test_a_fix_that_is_no_better_is_dropped():
+    service = _service()
+    calls = []
+    overlapping = [_r("Office", 0, 0, 10, 12.5), _r("Hallway", 0, 11.5, 30, 4.5)]
+
+    async def groq(prompt):
+        calls.append(prompt)
+        # The "fix" leaves the overlap and loses a room on top.
+        return _rect_plan(overlapping, rooms=None if len(calls) == 1 else ["Office", "Hallway", "Den"])
+
+    service._generate_with_groq = groq
+    result = asyncio.run(service.generate_construction_plan("an office and a hallway"))
+    assert len(calls) == 2
+    assert result["plan"]["project_structure"]["rooms"] == [{"name": "Office"}, {"name": "Hallway"}]
+
+
+def test_a_fix_with_only_the_layout_keeps_the_room_list():
+    service = _service()
+    calls = []
+    overlapping = [_r("Office", 0, 0, 10, 12.5), _r("Hallway", 0, 11.5, 30, 4.5)]
+    fixed = [_r("Office", 0, 0, 10, 12.5), _r("Hallway", 0, 12.5, 30, 4.5)]
+
+    async def groq(prompt):
+        calls.append(prompt)
+        if len(calls) == 1:
+            plan = _rect_plan(overlapping)
+            plan["plan"]["project_structure"]["rooms"][0]["connects_to"] = ["Hallway"]
+            return plan
+        # No wrapper and no rooms: just the corrected layout.
+        return {"success": True, "source": "groq", "plan": {"layout": {"entry": "Office", "rects": fixed}}}
+
+    service._generate_with_groq = groq
+    result = asyncio.run(service.generate_construction_plan("an office and a hallway"))
+    structure = result["plan"]["project_structure"]
+    assert structure["layout"]["rects"] == fixed
+    assert structure["rooms"] == [{"name": "Office", "connects_to": ["Hallway"]}, {"name": "Hallway"}]
+
+
+def test_fixed_rooms_replace_the_old_ones_by_name():
+    old = [{"name": "Office", "height": 9}, {"name": "Hallway"}]
+    assert AIPlanningService._merge_rooms(old, [{"name": "office", "height": 10}]) == [
+        {"name": "office", "height": 10}, {"name": "Hallway"}]
+    assert AIPlanningService._merge_rooms(old, None) == old
+
+
+def test_a_good_floor_plan_is_not_sent_back():
+    service = _service()
+    calls = []
+
+    async def groq(prompt):
+        calls.append(prompt)
+        return _rect_plan([_r("Office", 0, 0, 10, 12.5), _r("Hallway", 0, 12.5, 30, 4.5)])
+
+    service._generate_with_groq = groq
+    asyncio.run(service.generate_construction_plan("an office and a hallway"))
+    assert len(calls) == 1
+
+
+def test_refine_prompt_shows_a_tree_plan_as_rectangles():
+    service = _service()
+    tree = {"length": 20, "width": 10, "entry": "Studio", "split": "x", "parts": [
+        {"size": 15, "room": "Studio"}, {"size": 5, "room": "Bath"}]}
+    prompt = service._build_refine_prompt({"layout": tree, "rooms": [{"name": "Studio"}, {"name": "Bath"}]}, "x")
+    assert '{"room":"Bath","x":15.0,"z":0.0,"length":5.0,"width":10.0}' in prompt
+    assert '"split"' not in prompt.split("CURRENT EXTERIOR")[0]

@@ -68,8 +68,9 @@ describe('ModelLibraryView', () => {
     vm.form.height = 8
     await vm.addModel()
     expect(post).toHaveBeenCalledTimes(1)
-    const [url, body] = post.mock.calls[0]
+    const [url, body, config] = post.mock.calls[0]
     expect(url).toBe('/plants/models')
+    expect(config.headers['Content-Type']).toBe('multipart/form-data')
     expect(body.get('name')).toBe('Lilac')
     expect(body.get('description')).toBe('a purple lilac bush')
     expect(body.get('height_ft')).toBe('8')
@@ -114,6 +115,34 @@ describe('ModelLibraryView', () => {
     expect(post.mock.calls[0][0]).toBe('/furniture/models')
     await vm.remove(chair)
     expect(del).toHaveBeenCalledWith('/furniture/models/3')
+    wrapper.unmount()
+  })
+  it('recolours a model with one of its own colours and can reset it', async () => {
+    const island = { ...rose, id: 2, kind: 'furniture', name: 'Kitchen island' }
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.endsWith('/colors')
+        ? { data: { colors: [{ color: '#b49b78', share: 0.4 }, { color: '#222222', share: 0.3 }] } }
+        : library([island])
+    ))
+    post.mockResolvedValueOnce({ data: { ...island, recolored: true, model_url: '/plant_models/2/model-2.glb', changed: 0.38 } })
+    const wrapper = mountView('furniture')
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.openRecolor(vm.models[0])
+    await flushPromises()
+    expect(get).toHaveBeenCalledWith('/furniture/models/2/colors')
+    expect(vm.recolor.colors).toHaveLength(2)
+    vm.recolor.from = '#b49b78'
+    vm.recolor.to = '#f4f4f0'
+    await vm.applyRecolor()
+    expect(post).toHaveBeenCalledWith('/furniture/models/2/recolor', { from_color: '#b49b78', to_color: '#f4f4f0', tolerance: 0.5 })
+    expect(vm.models[0].recolored).toBe(true)
+    expect(vm.recolor.message).toContain('38%')
+
+    post.mockResolvedValueOnce({ data: { ...island, recolored: false } })
+    await vm.resetColors()
+    expect(post).toHaveBeenLastCalledWith('/furniture/models/2/reset-colors')
+    expect(vm.models[0].recolored).toBe(false)
     wrapper.unmount()
   })
 })

@@ -28,7 +28,9 @@ data class RoomInfo(
     val centerZ: Float,
     val ceilingY: Float,
     val width: Float = 0f,
-    val depth: Float = 0f
+    val depth: Float = 0f,
+    /** The height of its floor: 0 downstairs, the storey's height upstairs. */
+    val floorY: Float = 0f
 )
 
 /**
@@ -50,6 +52,9 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
         private const val WALL_THICKNESS = 2 * WALL_HALF_THICKNESS_M * SCALE
         // The yard's surface, below the floors: vr_exterior.GROUND_TOP (metres).
         private const val GROUND_TOP_M = -0.10f
+        // How far up the floor under the player may be and still be stepped onto
+        // (a stair's next step, the landing at its head); higher floors are overhead.
+        private const val STEP_UP = 0.45f
         // Must outlast the backend's planning budget (settings.planning_timeout_seconds,
         // 200 s) so the server's error, not a client timeout, reaches the user.
         private const val PLAN_CALL_TIMEOUT_S = 240L
@@ -71,11 +76,15 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
     private val wallCeilingEntities = mutableListOf<Entity>()
     private val roomInfoList = mutableListOf<RoomInfo>()
     private val exterior = ExteriorBuilder(activity)
-    /** Where there is floor (x0, x1, z0, z1, world units): rooms and bay bump-outs. */
+    /** Where there is floor (x0, x1, z0, z1, y, world units): rooms, upper floors round their stair holes, bays. */
     private val floorAreas = mutableListOf<FloatArray>()
+    /** Stair flights (x0, x1, z0, z1, axis 0 = x / 1 = z, foot, head, y at the foot, rise): the floor slopes along them. */
+    private val ramps = mutableListOf<FloatArray>()
     /** The height of the ground outside: the yard when the plan has one, else the floor's. */
     private var groundY = 0f
     private val furniture = FurnitureBuilder(activity)
+    /** Floor finishes (planks, tiles, carpet) over the floor slabs: "finishes" (vr_floors.py). */
+    private val finishes = MeshInstances(activity, "finish", roughness = 0.6f)
     private var spawnPosition = Vector3(0f, 1.6f, -3.0f)
 
     /**
@@ -156,6 +165,47 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
      * floor-plan version; returns its geometry, or null on failure.
      * Must be called from an IO/background thread.
      */
+    /** Called (UI thread) when a piece of furniture is put down: (its ref, x, z, yaw). */
+    var onFurnitureMoved: ((JSONObject, Float, Float, Float) -> Unit)?
+        get() = furniture.onMoved
+        set(value) { furniture.onMoved = value }
+
+    /**
+     * Redraw only the furniture from [geometry] (after a move was saved: counters re-flow
+     * round it, and every piece's ref matches the plan again). UI thread only.
+     */
+    fun refreshFurniture(geometry: JSONObject) {
+        geometry.optJSONObject("furniture")?.let { furniture.build(it) } ?: furniture.clear()
+    }
+
+    /** Once a frame: notice furniture let go (see [FurnitureBuilder.poll]). */
+    fun pollFurniture() = furniture.poll()
+
+    /**
+     * Save where a piece of furniture was put down (world metres, the geometry's yaw) on
+     * project [projectId]'s floor plan. Returns the room it is now in, or null on failure.
+     * Must be called from an IO/background thread.
+     */
+    fun moveFurniture(projectId: Int, ref: JSONObject, x: Float, z: Float, yaw: Float): String? {
+        return try {
+            val body = JSONObject().put("ref", ref).put("x", x.toDouble()).put("z", z.toDouble()).put("yaw", yaw.toDouble())
+            val request = Request.Builder()
+                .url("$serverUrl/api/v1/projects/$projectId/furniture/move")
+                .put(body.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Log.e(TAG, "❌ Furniture move not saved: HTTP ${response.code} ${response.body?.string()}")
+                    return null
+                }
+                JSONObject(response.body?.string() ?: "{}").optString("room")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Furniture move not saved", e)
+            null
+        }
+    }
+
     fun refineFloorPlan(projectId: Int, instruction: String): JSONObject? {
         return try {
             Log.i(TAG, "✏️ Refining floor plan of project $projectId: '$instruction'")
@@ -201,6 +251,18 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
         for (i in 0 until rooms.length()) {
             generateRoom(rooms.getJSONObject(i))
         }
+        geometry.optJSONArray("stairs")?.let { stairs ->
+            for (i in 0 until stairs.length()) {
+                val s = stairs.getJSONObject(i)
+                ramps.add(floatArrayOf(
+                    s.optDouble("x0").toFloat() * SCALE, s.optDouble("x1").toFloat() * SCALE,
+                    s.optDouble("z0").toFloat() * SCALE, s.optDouble("z1").toFloat() * SCALE,
+                    if (s.optString("axis") == "z") 1f else 0f,
+                    s.optDouble("foot").toFloat() * SCALE, s.optDouble("head").toFloat() * SCALE,
+                    s.optDouble("y", 0.0).toFloat() * SCALE, s.optDouble("rise").toFloat() * SCALE,
+                ))
+            }
+        }
 
         // If no spawn_position from backend, place player in the master bedroom (or first room)
         if (spawnJson == null && roomInfoList.isNotEmpty()) {
@@ -216,7 +278,12 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
             exterior.build(it)
             groundY = GROUND_TOP_M * SCALE
         }
-        // Furniture in the rooms, when the plan has any.
+        // What the floors are finished with, then the furniture in the rooms.
+        geometry.optJSONObject("finishes")?.let { f ->
+            val meshes = f.optJSONObject("meshes") ?: JSONObject()
+            val pieces = f.optJSONArray("pieces")
+            for (i in 0 until (pieces?.length() ?: 0)) roomEntities += finishes.buildInstance(pieces!!.getJSONObject(i), meshes)
+        }
         geometry.optJSONObject("furniture")?.let { furniture.build(it) }
 
         val doors = geometry.optJSONArray("doors")
@@ -248,19 +315,26 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
         // Record room info for label beacons
         val centerX = position.optDouble("x", 0.0).toFloat() * SCALE
         val centerZ = position.optDouble("z", 0.0).toFloat() * SCALE
-        val ceilingY = dimensions.optDouble("height", 9.0).toFloat() * SCALE
+        val floorY = position.optDouble("y", 0.0).toFloat() * SCALE
+        val ceilingY = floorY + dimensions.optDouble("height", 9.0).toFloat() * SCALE
         // Backend sends metres: "length" runs along X, "width" along Z.
         val roomWidth = dimensions.optDouble("length", 0.0).toFloat() * SCALE
         val roomDepth = dimensions.optDouble("width", 0.0).toFloat() * SCALE
-        roomInfoList.add(RoomInfo(roomName, centerX, centerZ, ceilingY, roomWidth, roomDepth))
-        floorAreas.add(floatArrayOf(
-            centerX - roomWidth / 2, centerX + roomWidth / 2, centerZ - roomDepth / 2, centerZ + roomDepth / 2,
-        ))
+        roomInfoList.add(RoomInfo(roomName, centerX, centerZ, ceilingY, roomWidth, roomDepth, floorY))
 
-        // Generate floor
-        val floor = roomJson.optJSONObject("floor")
-        if (floor != null) {
-            generateFloor(floor, roomName)
+        // The floor, in pieces round a stair hole when the stairs from below come up here.
+        val floors = roomJson.optJSONArray("floors")
+        if (floors != null) {
+            for (i in 0 until floors.length()) {
+                val slab = floors.getJSONObject(i)
+                generateFloor(slab, roomName)
+                floorAreas.add(slabArea(slab))
+            }
+        } else {
+            roomJson.optJSONObject("floor")?.let { generateFloor(it, roomName) }
+            floorAreas.add(floatArrayOf(
+                centerX - roomWidth / 2, centerX + roomWidth / 2, centerZ - roomDepth / 2, centerZ + roomDepth / 2, floorY,
+            ))
         }
 
         // Generate walls
@@ -272,10 +346,12 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
             }
         }
 
-        // Generate ceiling
-        val ceiling = roomJson.optJSONObject("ceiling")
-        if (ceiling != null) {
-            generateCeiling(ceiling, roomName)
+        // The ceiling: none (or only part) where the floor above covers it.
+        val ceilings = roomJson.optJSONArray("ceilings")
+        if (ceilings != null) {
+            for (i in 0 until ceilings.length()) generateCeiling(ceilings.getJSONObject(i), roomName)
+        } else {
+            roomJson.optJSONObject("ceiling")?.let { generateCeiling(it, roomName) }
         }
 
         // A bay window's walls come with the room's; its bump-out has its own floor and ceiling.
@@ -284,7 +360,7 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
                 if (outline.length() > 0) {
                     val xs = (0 until outline.length()).map { outline.getJSONObject(it).optDouble("x").toFloat() * SCALE }
                     val zs = (0 until outline.length()).map { outline.getJSONObject(it).optDouble("z").toFloat() * SCALE }
-                    floorAreas.add(floatArrayOf(xs.min(), xs.max(), zs.min(), zs.max()))
+                    floorAreas.add(floatArrayOf(xs.min(), xs.max(), zs.min(), zs.max(), floorY))
                 }
             }
             bay.optJSONObject("floor")?.let { generateFloor(it, roomName) }
@@ -353,6 +429,7 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
         val v0 = vertices.getJSONObject(0)
         val v2 = vertices.getJSONObject(2)
 
+        val y = v0.optDouble("y", 0.0).toFloat() * SCALE
         val x1 = v0.optDouble("x", 0.0).toFloat() * SCALE
         val z1 = v0.optDouble("z", 0.0).toFloat() * SCALE
         val x2 = v2.optDouble("x", 0.0).toFloat() * SCALE
@@ -372,7 +449,7 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
             roughness = 0.7f
             unlit = false
         })
-        entity.setComponent(Transform(Pose(t = Vector3(centerX, 0f, centerZ))))
+        entity.setComponent(Transform(Pose(t = Vector3(centerX, y, centerZ))))
         entity.setComponent(SupportsLocomotion())
         entity.setComponent(Visible(true))
 
@@ -428,6 +505,7 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
         val rotationDeg = doorJson.optDouble("rotation", 0.0).toFloat()
 
         val x = position.optDouble("x", 0.0).toFloat() * SCALE
+        val y0 = position.optDouble("y", 0.0).toFloat() * SCALE  // the floor it stands on
         val z = position.optDouble("z", 0.0).toFloat() * SCALE
 
         // Along-wall direction, same convention as generateWall's atan2(dz, dx).
@@ -448,9 +526,9 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
         val depth = WALL_THICKNESS + 0.04f
         val jambOffset = width / 2 - trim / 2
         val parts = listOf(
-            Vector3(x - dirX * jambOffset, height / 2, z - dirZ * jambOffset) to Vector3(trim, height, depth),
-            Vector3(x + dirX * jambOffset, height / 2, z + dirZ * jambOffset) to Vector3(trim, height, depth),
-            Vector3(x, height - trim / 2, z) to Vector3(width, trim, depth),
+            Vector3(x - dirX * jambOffset, y0 + height / 2, z - dirZ * jambOffset) to Vector3(trim, height, depth),
+            Vector3(x + dirX * jambOffset, y0 + height / 2, z + dirZ * jambOffset) to Vector3(trim, height, depth),
+            Vector3(x, y0 + height - trim / 2, z) to Vector3(width, trim, depth),
         )
         for ((center, size) in parts) {
             val entity = Entity.create()
@@ -633,17 +711,49 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
         wallCeilingEntities.clear()  // entities already destroyed above
         roomInfoList.clear()
         floorAreas.clear()
+        ramps.clear()
         groundY = 0f
         exterior.clear()
         furniture.clear()
+        finishes.clear()
+    }
+
+    private fun slabArea(slab: JSONObject): FloatArray {
+        val v = slab.getJSONArray("vertices")
+        val a = v.getJSONObject(0)
+        val c = v.getJSONObject(2)
+        return floatArrayOf(
+            minOf(a.optDouble("x").toFloat(), c.optDouble("x").toFloat()) * SCALE,
+            maxOf(a.optDouble("x").toFloat(), c.optDouble("x").toFloat()) * SCALE,
+            minOf(a.optDouble("z").toFloat(), c.optDouble("z").toFloat()) * SCALE,
+            maxOf(a.optDouble("z").toFloat(), c.optDouble("z").toFloat()) * SCALE,
+            a.optDouble("y", 0.0).toFloat() * SCALE,
+        )
     }
 
     /**
-     * The height (world units) of what the player stands on at (x, z): a room's
-     * floor (0) inside the house, the yard's ground outside it.
+     * The height (world units) of what the player stands on at (x, z), coming from a
+     * floor at [near]: the highest floor or stair there that is no more than a step
+     * above it (so upstairs floors overhead don't count, and the stairs are climbed
+     * a step at a time), else the yard's ground.
      */
-    fun floorLevelAt(x: Float, z: Float): Float =
-        if (floorAreas.any { x >= it[0] && x <= it[1] && z >= it[2] && z <= it[3] }) 0f else groundY
+    fun floorLevelAt(x: Float, z: Float, near: Float = 0f): Float {
+        var best: Float? = null
+        fun consider(y: Float) {
+            if (y <= near + STEP_UP && (best == null || y > best!!)) best = y
+        }
+        for (a in floorAreas) {
+            if (x >= a[0] && x <= a[1] && z >= a[2] && z <= a[3]) consider(a[4])
+        }
+        for (r in ramps) {
+            if (x >= r[0] && x <= r[1] && z >= r[2] && z <= r[3]) {
+                val along = if (r[4] == 0f) x else z
+                val t = ((along - r[5]) / (r[6] - r[5])).coerceIn(0f, 1f)
+                consider(r[7] + t * r[8])
+            }
+        }
+        return best ?: groundY
+    }
 
     /**
      * Toggle x-ray vision — hides/shows walls and ceilings so floors remain visible.

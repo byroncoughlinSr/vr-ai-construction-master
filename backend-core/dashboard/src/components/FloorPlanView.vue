@@ -42,6 +42,11 @@
 
       <template v-else>
         <q-banner v-if="saveError" class="bg-negative text-white q-mb-sm" dense>{{ saveError }}</q-banner>
+        <q-btn-toggle
+          v-if="levels.length > 1" v-model="level" class="q-mb-sm" no-caps rounded unelevated toggle-color="primary"
+          :options="levels.map(n => ({ label: n === 0 ? 'Ground floor' : `Floor ${n + 1}`, value: n }))"
+          aria-label="Which floor to show"
+        />
 
         <div class="row q-col-gutter-md">
           <div :class="editing ? 'col-12 col-md-6' : 'col-12'">
@@ -254,22 +259,72 @@
           <div v-if="editing && draft" class="col-12 col-md-6 editor">
             <q-input v-model="draft.name" dense outlined label="House name" class="q-mb-sm" />
 
-            <div class="text-subtitle2 q-mt-sm">Footprint (ft)</div>
-            <div class="row q-gutter-sm q-mb-sm">
-              <q-input
-                v-model.number="draft.layout.length" type="number" dense outlined
-                class="col" label="Length (left to right)" min="8"
-              />
-              <q-input
-                v-model.number="draft.layout.width" type="number" dense outlined
-                class="col" label="Depth (front to back)" min="8"
-              />
-            </div>
+            <template v-if="!rectLayout">
+              <div class="text-subtitle2 q-mt-sm">Footprint (ft)</div>
+              <div class="row q-gutter-sm q-mb-sm">
+                <q-input
+                  v-model.number="draft.layout.length" type="number" dense outlined
+                  class="col" label="Length (left to right)" min="8"
+                />
+                <q-input
+                  v-model.number="draft.layout.width" type="number" dense outlined
+                  class="col" label="Depth (front to back)" min="8"
+                />
+              </div>
+            </template>
             <q-select
               v-model="draft.layout.entry" :options="draftRoomNames" dense outlined
               label="Front door opens into" class="q-mb-md"
             />
 
+            <template v-if="rectLayout">
+              <div class="text-subtitle2">Rooms (ft)</div>
+              <div class="text-caption text-grey-7 q-mb-xs">
+                Each room's left edge (x) and front edge (z, from the street), then its size.
+                Rooms must not overlap; space no room covers is outside.
+                Upstairs rooms use the same x and z as the ground floor; a room named "Stairs"
+                under them gets the flight up.
+              </div>
+              <div
+                v-for="(rect, i) in draft.layout.rects" :key="`rect${i}`"
+                class="row items-center no-wrap q-gutter-xs q-mb-xs"
+              >
+                <q-input
+                  :model-value="rect.room" dense borderless class="col"
+                  :aria-label="`Name of room ${i + 1}`"
+                  @update:model-value="name => renameRoom(rect, String(name ?? ''))"
+                />
+                <q-select
+                  :model-value="rect.level ?? 0" :options="FLOORS" emit-value map-options
+                  dense outlined style="width: 120px" :aria-label="`Floor of ${rect.room}`"
+                  @update:model-value="n => setFloor(rect, n)"
+                />
+                <q-input
+                  v-model.number="rect.x" type="number" dense outlined style="width: 76px"
+                  prefix="x" step="0.5" :aria-label="`Left edge of ${rect.room}`"
+                />
+                <q-input
+                  v-model.number="rect.z" type="number" dense outlined style="width: 76px"
+                  prefix="z" step="0.5" :aria-label="`Front edge of ${rect.room}`"
+                />
+                <q-input
+                  v-model.number="rect.length" type="number" dense outlined style="width: 92px"
+                  suffix="wide" min="1" step="0.5" :aria-label="`Width of ${rect.room}`"
+                />
+                <q-input
+                  v-model.number="rect.width" type="number" dense outlined style="width: 92px"
+                  suffix="deep" min="1" step="0.5" :aria-label="`Depth of ${rect.room}`"
+                />
+                <q-btn
+                  flat dense round size="sm" icon="delete"
+                  :disable="draft.rooms.length <= 1" @click="removeRect(rect)"
+                >
+                  <q-tooltip>Remove this room (its space becomes outside)</q-tooltip>
+                </q-btn>
+              </div>
+              <q-btn flat dense icon="add" label="Add room" class="q-mb-sm" @click="addRect" />
+            </template>
+            <template v-else>
             <div class="text-subtitle2">Room sizes (ft)</div>
             <div class="text-caption text-grey-7 q-mb-xs">
               Sizes within a group are scaled to fill it, so they don't have to add up exactly.
@@ -304,6 +359,7 @@
                 :suffix="row.axis === 'x' ? 'wide' : 'deep'" min="1"
               />
             </div>
+            </template>
 
             <div class="text-subtitle2 q-mt-md">Doorways</div>
             <div v-for="(room, i) in draft.rooms" :key="i" class="q-mb-xs">
@@ -441,7 +497,12 @@ interface Opening {
   style?: string
 }
 // The saved plan (sizes in feet), as GET /projects/{id}/floor-plan returns it.
+// A room's rectangle in a rectangle plan (feet; x from the left, z from the street).
+interface RectSpec { room: string; x: number; z: number; length: number; width: number; level?: number }
 interface LayoutNode {
+  // A rectangle plan lists its rooms here instead of splitting a footprint.
+  rects?: RectSpec[]
+  notes?: string[]
   size?: number
   room?: string
   // An outdoor part of the footprint (gives the house an L/U/T shape).
@@ -664,22 +725,39 @@ const errorMessage = (err: unknown, fallback: string) => {
   return typeof detail === 'string' ? detail : e.message || fallback
 }
 
+// A house of several storeys is drawn a floor at a time (rooms carry their "level").
+const loaded = ref<any>(null)
+const level = ref(0)
+const levels = computed<number[]>(() => (loaded.value?.levels ?? []).map((l: { level: number }) => l.level))
+
 const showGeometry = (geometry: any) => {
-  rooms.value = (geometry?.rooms ?? []).filter((r: PlanRoom) => r.bounds)
-  doors.value = geometry?.doors ?? []
+  loaded.value = geometry
+  if (!levels.value.includes(level.value)) level.value = 0
+  const onLevel = (geometry?.rooms ?? []).filter((r: PlanRoom & { level?: number }) => r.bounds && (r.level ?? 0) === level.value)
+  const ids = new Set(onLevel.map((r: { id: number }) => r.id))
+  const here = (id: number) => ids.has(id)
+  // Older geometry doesn't say which rooms a door joins: it is on the only floor.
+  const joins = (o: { rooms?: number[] }) => !o.rooms?.length || o.rooms.some(here)
+  const ground = level.value === 0
+  rooms.value = onLevel
+  doors.value = (geometry?.doors ?? []).filter(joins)
   notes.value = geometry?.notes ?? []
-  windows.value = geometry?.windows ?? []
-  openWalls.value = geometry?.open_walls ?? []
-  openAreas.value = (geometry?.open_areas ?? []).filter((a: { bounds?: Bounds }) => a.bounds)
+  windows.value = (geometry?.windows ?? []).filter((w: { room?: number }) => w.room === undefined || here(w.room))
+  openWalls.value = (geometry?.open_walls ?? []).filter(joins)
+  openAreas.value = ground ? (geometry?.open_areas ?? []).filter((a: { bounds?: Bounds }) => a.bounds) : []
   // Lowest first, so canopies cover their trunks and tiles their bed.
-  landscape.value = ((geometry?.exterior?.parts ?? []) as ExteriorPart[])
-    .filter(p => p.kind === 'landscape')
-    .sort((a, b) => a.center.y + a.size.y / 2 - (b.center.y + b.size.y / 2))
-  plants.value = geometry?.exterior?.plants ?? []
-  plantModels.value = geometry?.exterior?.models ?? []
+  landscape.value = ground
+    ? ((geometry?.exterior?.parts ?? []) as ExteriorPart[])
+      .filter(p => p.kind === 'landscape')
+      .sort((a, b) => a.center.y + a.size.y / 2 - (b.center.y + b.size.y / 2))
+    : []
+  plants.value = ground ? geometry?.exterior?.plants ?? [] : []
+  plantModels.value = ground ? geometry?.exterior?.models ?? [] : []
   exterior.value = geometry?.exterior?.spec ?? null
   furniture.value = [...(geometry?.furniture?.pieces ?? []), ...(geometry?.furniture?.models ?? [])]
+    .filter((p: { room: number }) => here(p.room))
 }
+watch(level, () => showGeometry(loaded.value))
 
 const load = async () => {
   if (!props.projectId) return
@@ -733,6 +811,8 @@ const cancelEditing = () => {
 }
 
 const draftRoomNames = computed(() => draft.value?.rooms.map(r => r.name) ?? [])
+// Rooms as rectangles (newer plans) rather than a split footprint.
+const rectLayout = computed(() => Array.isArray(draft.value?.layout.rects))
 
 // Every part of every split, in drawing order, indented by depth.
 const partRows = computed(() => {
@@ -753,8 +833,8 @@ const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLow
 // Room fields that hold other rooms' names (doorways, blocked doorways, open walls).
 const ROOM_REFS = ['connects_to', 'no_door_to', 'open_to'] as const
 
-/** Rename a room everywhere it is referenced: layout leaf, room list, doorways, entry. */
-const renameRoom = (part: LayoutNode, name: string) => {
+/** Rename a room everywhere it is referenced: layout leaf or rectangle, room list, doorways, entry. */
+const renameRoom = (part: { room?: string }, name: string) => {
   const d = draft.value
   const old = part.room
   if (!d || old === undefined) return
@@ -793,13 +873,8 @@ const setBaySide = (room: PlanRoomSpec, side: string) => {
   }
 }
 
-/** Turn a room into an outdoor part of the footprint, dropping it from the room list. */
-const makeOpen = (part: LayoutNode) => {
-  const d = draft.value
-  const name = part.room
-  if (!d || name === undefined) return
-  delete part.room
-  part.open = true
+/** Drop a room from the room list and every doorway to it. */
+const dropRoom = (d: Draft, name: string) => {
   d.rooms = d.rooms.filter(r => !same(r.name, name))
   for (const room of d.rooms) {
     room.connects_to = (room.connects_to ?? []).filter(n => !same(n, name))
@@ -808,6 +883,44 @@ const makeOpen = (part: LayoutNode) => {
     }
   }
   if (d.layout.entry && same(d.layout.entry, name)) d.layout.entry = d.rooms[0]?.name
+}
+
+/** Turn a room into an outdoor part of the footprint, dropping it from the room list. */
+const makeOpen = (part: LayoutNode) => {
+  const d = draft.value
+  const name = part.room
+  if (!d || name === undefined) return
+  delete part.room
+  part.open = true
+  dropRoom(d, name)
+}
+
+/** Remove a room from a rectangle plan; the space it covered becomes outside. */
+const removeRect = (rect: RectSpec) => {
+  const d = draft.value
+  if (!d?.layout.rects) return
+  d.layout.rects = d.layout.rects.filter(r => r !== rect)
+  dropRoom(d, rect.room)
+}
+
+// The storeys a room can be on (the backend's MAX_LEVELS); the ground floor has no "level".
+const FLOORS = [0, 1, 2, 3].map(n => ({ label: n === 0 ? 'Ground floor' : `Floor ${n + 1}`, value: n }))
+
+const setFloor = (rect: RectSpec, n: number) => {
+  if (n) rect.level = n
+  else delete rect.level
+}
+
+/** Add a 10 x 10 ft room on the floor being shown, to the right of that floor's rooms. */
+const addRect = () => {
+  const d = draft.value
+  if (!d?.layout.rects) return
+  let n = d.rooms.length + 1
+  while (d.rooms.some(r => same(r.name, `Room ${n}`))) n++
+  const onFloor = d.layout.rects.filter(r => (r.level ?? 0) === level.value)
+  const right = Math.max(0, ...onFloor.map(r => r.x + r.length))
+  d.layout.rects.push({ room: `Room ${n}`, x: right, z: 0, length: 10, width: 10, ...(level.value ? { level: level.value } : {}) })
+  d.rooms.push({ name: `Room ${n}`, dimensions: { height: 9 }, connects_to: [] })
 }
 
 /** Turn an outdoor part back into a (new, unconnected) room. */

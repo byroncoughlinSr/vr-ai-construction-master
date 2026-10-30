@@ -1215,11 +1215,15 @@ class ImmersiveActivity : AppSystemActivity() {
     private fun placeViewer(x: Float, z: Float, yaw: Float) {
         val head = scene.getViewerPose().t.y - scene.getViewOrigin().y
         val realHeight = if (head in 0.5f..2.3f) head else DEFAULT_HEAD_HEIGHT
+        val standingOn = currentFloor()
         eyeLift = EYE_HEIGHT_M * HouseGenerator.SCALE - realHeight
-        val floor = houseGenerator?.floorLevelAt(x, z) ?: 0f
+        val floor = houseGenerator?.floorLevelAt(x, z, standingOn) ?: 0f
         scene.setViewOrigin(x, floor + eyeLift, z, yaw)
         Log.i(TAG, "👁️ Eyes at ${"%.2f".format(EYE_HEIGHT_M)} m (head ${"%.2f".format(realHeight)} m, lift ${"%.2f".format(eyeLift)})")
     }
+
+    /** The floor under the player now (world units): the view origin less the eye lift. */
+    private fun currentFloor(): Float = if (eyeLift == 0f) 0f else scene.getViewOrigin().y - eyeLift
 
     /** A panel's height: [y] as it was with the tracking floor on the ground, raised with it. */
     private fun panelY(y: Float): Float =
@@ -1228,7 +1232,7 @@ class ImmersiveActivity : AppSystemActivity() {
     private fun handleTeleportation(pose: Pose) {
         val forward = pose.forward()
         if (forward.y >= 0f) return  // must aim downward toward floor
-        val t = -pose.t.y / forward.y  // parametric distance to y=0 plane
+        val t = -(pose.t.y - currentFloor()) / forward.y  // parametric distance to the floor the player is on
         if (t < 0.3f || t > TELEPORT_RANGE) return  // too close or too far
         val tx = pose.t.x + forward.x * t
         val tz = pose.t.z + forward.z * t
@@ -1278,8 +1282,8 @@ class ImmersiveActivity : AppSystemActivity() {
         val origin = scene.getViewOrigin()
         val x = origin.x + (fx * ahead - fz * side) * step
         val z = origin.z + (fz * ahead + fx * side) * step
-        // Up or down a step when walking between the floors and the yard.
-        val floor = houseGenerator?.floorLevelAt(x, z) ?: 0f
+        // Up or down a step when walking between the floors and the yard, and up the stairs.
+        val floor = houseGenerator?.floorLevelAt(x, z, origin.y - eyeLift) ?: 0f
         scene.setViewOrigin(x, floor + eyeLift, z, scene.getViewSceneRotation())
     }
 
@@ -1312,7 +1316,7 @@ class ImmersiveActivity : AppSystemActivity() {
                 entity.setComponent(Panel(R.layout.room_label))
                 entity.setComponent(Transform(Pose(
                     // At a 6 ft person's eye level, a little above.
-                    t = Vector3(room.centerX, (EYE_HEIGHT_M + 0.15f) * HouseGenerator.SCALE, labelZ),
+                    t = Vector3(room.centerX, room.floorY + (EYE_HEIGHT_M + 0.15f) * HouseGenerator.SCALE, labelZ),
                     q = com.meta.spatial.core.Quaternion(0f, 180f, 0f)
                 )))
                 entity.setComponent(Visible(true))
@@ -1598,7 +1602,22 @@ class ImmersiveActivity : AppSystemActivity() {
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
             
-            houseGenerator = HouseGenerator(SERVER_URL, this)
+            houseGenerator = HouseGenerator(SERVER_URL, this).also { generator ->
+                // Furniture put down in a saved house is saved where it was left.
+                generator.onFurnitureMoved = { ref, x, z, yaw ->
+                    currentProjectId?.let { projectId ->
+                        activityScope.launch(Dispatchers.IO) {
+                            val room = generator.moveFurniture(projectId, ref, x, z, yaw)
+                            Log.i(TAG, if (room != null) "🛋️ Saved in $room" else "⚠️ Furniture move not saved")
+                            // Redrawn from the plan either way: saved, it is where it was left
+                            // (the rest re-flowing round it); not saved, it goes back.
+                            generator.fetchVRGeometry(projectId)?.let { geometry ->
+                                runOnUiThread { if (currentProjectId == projectId) generator.refreshFurniture(geometry) }
+                            }
+                        }
+                    }
+                }
+            }
             
             // Connect to real-time collaboration room
             connectToRoom("tiny_house_room", "quest_user_${System.currentTimeMillis() % 1000}")
@@ -1796,6 +1815,7 @@ class ImmersiveActivity : AppSystemActivity() {
 
         override fun execute() {
             if (!isLibraryLoaded) return
+            houseGenerator?.pollFurniture()
             val frameNanos = System.nanoTime()
             // Capped so a hitch does not fling the player across the yard.
             frameSeconds = if (lastFrameNanos == 0L) 0f

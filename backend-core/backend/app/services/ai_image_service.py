@@ -6,7 +6,6 @@ from pathlib import Path
 import torch
 from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
 from compel import Compel
-from PIL import Image
 import io
 import base64
 import re

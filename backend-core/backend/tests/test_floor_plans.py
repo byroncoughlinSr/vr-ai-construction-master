@@ -341,6 +341,20 @@ def test_rename_rooms_renames_every_reference():
     assert structure["rooms"][0]["name"] == "Den"  # a copy
 
 
+def test_rename_rooms_renames_rectangles():
+    from app.services.floor_plan_service import rename_rooms
+
+    structure = {
+        "layout": {"entry": "Den", "rects": [
+            {"room": "Den", "x": 0, "z": 0, "length": 12, "width": 12},
+            {"room": "Kitchen", "x": 12, "z": 0, "length": 12, "width": 12}]},
+        "rooms": [{"name": "Den"}, {"name": "Kitchen"}],
+    }
+    out = rename_rooms(structure, {"Den": "Family Room"})
+    assert out["layout"]["entry"] == "Family Room"
+    assert [r["room"] for r in out["layout"]["rects"]] == ["Family Room", "Kitchen"]
+
+
 def test_rename_in_only_the_layout_keeps_the_room_settings():
     from app.services.floor_plan_service import validate_structure
 
@@ -430,7 +444,7 @@ def test_room_change_keeps_the_furniture_and_follows_renames(example_id, monkeyp
 
 
 def test_dashboard_edit_keeps_the_furniture_of_rooms_it_keeps(example_id, monkeypatch):
-    _refine(example_id, monkeypatch, {"scope": "furniture", "furniture": {"auto": True, **DINING}})
+    _refine(example_id, monkeypatch, {"scope": "furniture", "furniture": {"auto": True, **DINING}}, "furnish the house")
     rooms = [r for r in EXAMPLE_STRUCTURE["rooms"]]
     response = client.put(f"/api/v1/projects/{example_id}/floor-plan", json={
         "layout": EXAMPLE_STRUCTURE["layout"], "rooms": rooms,
@@ -451,3 +465,26 @@ def test_a_furnished_house_from_the_planner_is_saved_with_its_furniture(monkeypa
     assert body["geometry"]["furniture"]["pieces"]
     plan = client.get(f"/api/v1/projects/{body['project_id']}/floor-plan").json()
     assert plan["furniture"] == {"auto": True}
+
+
+def test_furniture_put_down_in_the_headset_is_saved_in_place(example_id, monkeypatch):
+    _refine(example_id, monkeypatch, {"scope": "furniture", "furniture": {"rooms": {
+        "Living Room": [{"type": "sofa"}, {"type": "armchair"}]}}}, "a sofa and an armchair in the living room")
+    geometry = client.get(f"/api/v1/projects/{example_id}/generate-vr").json()["geometry"]
+    version = geometry["floor_plan"]["version"]
+    chair = next(p for p in geometry["furniture"]["pieces"] if p["type"] == "armchair")
+    living = next(r for r in geometry["rooms"] if r["name"] == "Living Room")["bounds"]
+    x, z = living["x0"] + 1.0, living["z0"] + 1.2
+    response = client.put(f"/api/v1/projects/{example_id}/furniture/move",
+                          json={"ref": chair["ref"], "x": x, "z": z, "yaw": 45})
+    assert response.status_code == 200, response.text
+    assert response.json() == {"moved": True, "room": "Living Room", "version": version}
+    items = client.get(f"/api/v1/projects/{example_id}/floor-plan").json()["furniture"]["rooms"]["Living Room"]
+    assert items[1]["type"] == "armchair" and items[1]["rotation"] == 45.0
+    assert items[1]["x"] == pytest.approx(1.0 / 0.3048, abs=0.1) and items[1]["z"] == pytest.approx(1.2 / 0.3048, abs=0.1)
+    moved = next(p for p in client.get(f"/api/v1/projects/{example_id}/generate-vr").json()["geometry"]["furniture"]["pieces"]
+                 if p["type"] == "armchair")
+    assert moved["yaw"] == 45.0
+    stale = client.put(f"/api/v1/projects/{example_id}/furniture/move",
+                       json={"ref": {**chair["ref"], "item": 7}, "x": x, "z": z, "yaw": 0})
+    assert stale.status_code == 409
