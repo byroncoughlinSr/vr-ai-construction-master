@@ -84,7 +84,7 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
     private var groundY = 0f
     private val furniture = FurnitureBuilder(activity)
     /** Floor finishes (planks, tiles, carpet) over the floor slabs: "finishes" (vr_floors.py). */
-    private val finishes = MeshInstances(activity, "finish", roughness = 0.6f)
+    private val finishes = MeshInstances(activity, "finish", roughness = 0.6f, walkable = true)
     /** Paint on each room's side of its walls and on its ceiling: "paint" (vr_paint.py). */
     private val paint = MeshInstances(activity, "paint", roughness = 0.85f)
     private var spawnPosition = Vector3(0f, 1.6f, -3.0f)

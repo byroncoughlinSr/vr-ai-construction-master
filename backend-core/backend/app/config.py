@@ -86,6 +86,8 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        # .env may hold settings of other branches or tools; don't refuse to start over them.
+        extra = "ignore"
 
 
 # Global settings instance
