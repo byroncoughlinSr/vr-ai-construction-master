@@ -402,6 +402,44 @@ def test_site_summary_describes_each_wall():
 DINING = {"rooms": {"Dining Room": [{"type": "dining table", "seats": 6, "name": "oak farmhouse table"}]}}
 
 
+def test_paint_change_updates_the_current_version_in_place(example_id, monkeypatch):
+    response, _ = _refine(example_id, monkeypatch, {"scope": "paint", "paint": {
+        "Primary Bedroom": {"wall_color": "sage green", "accent_wall": {"side": "back", "color": "navy"}},
+        "Hallway": {"wall_color": "warm white"},
+    }}, "paint the primary bedroom sage with a navy wall behind the bed")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["updated_in_place"] is True
+    assert body["floor_plan"]["version"] == 1
+    rooms = {r["name"]: r for r in body["floor_plan"]["rooms"]}
+    assert rooms["Primary Bedroom"]["wall_color"] == "#a7b59a"
+    assert rooms["Primary Bedroom"]["accent_wall"] == {"side": "back", "color": "#24344d"}
+    painted = {r["name"] for r in body["geometry"]["rooms"] if r["paint"]}
+    assert painted == {"Primary Bedroom", "Hallway"}
+    assert len(body["geometry"]["paint"]["pieces"]) == 2
+
+    # Taking the paint off one room keeps the other's.
+    response, seen = _refine(example_id, monkeypatch, {"scope": "paint", "paint": {"Hallway": {"wall_color": None}}})
+    assert any(r.get("wall_color") for r in seen["structure"]["rooms"])
+    rooms = {r["name"]: r for r in response.json()["floor_plan"]["rooms"]}
+    assert "wall_color" not in rooms["Hallway"] and rooms["Primary Bedroom"]["wall_color"] == "#a7b59a"
+
+
+def test_paint_change_naming_no_room_is_rejected(example_id, monkeypatch):
+    response, _ = _refine(example_id, monkeypatch, {"scope": "paint", "paint": {"Attic": {"wall_color": "red"}}})
+    assert response.status_code == 422
+
+
+def test_paint_beside_a_room_change_is_saved_in_the_new_version(example_id, monkeypatch):
+    response, _ = _refine(example_id, monkeypatch, {
+        "scope": "floor_plan", "project_structure": copy.deepcopy(EXAMPLE_STRUCTURE),
+        "paint": {"Kitchen": {"wall_color": "pale yellow"}},
+    }, "bigger kitchen painted pale yellow")
+    body = response.json()
+    assert body["floor_plan"]["version"] == 2
+    assert {r["name"]: r for r in body["floor_plan"]["rooms"]}["Kitchen"]["wall_color"] == "#f3e7a9"
+
+
 def test_furniture_change_updates_the_current_version_in_place(example_id, monkeypatch):
     response, seen = _refine(
         example_id, monkeypatch, {"scope": "furniture", "furniture": DINING},

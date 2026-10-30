@@ -209,9 +209,9 @@ class AIPlanningService:
 
         ``structure`` is a ``project_structure`` (``layout`` + ``rooms`` + ``exterior``,
         feet); ``site`` is ``floor_plan_service.site_summary``. Returns the provider
-        result; on success ``plan["scope"]`` says what changed: ``"exterior"`` or
-        ``"furniture"`` (only ``plan["exterior"]`` / ``plan["furniture"]``, the rooms
-        that change), else ``plan["project_structure"]`` is the whole revised plan.
+        result; on success ``plan["scope"]`` says what changed: ``"exterior"``,
+        ``"furniture"`` or ``"paint"`` (only ``plan["exterior"]`` / ``plan["furniture"]`` /
+        ``plan["paint"]``, the rooms that change), else ``plan["project_structure"]`` is the whole revised plan.
         """
         started = time.monotonic()
         prompt = self._build_refine_prompt(structure, instruction, site)
@@ -221,13 +221,13 @@ class AIPlanningService:
         plan = result.get("plan") or {}
         revised = plan.get("project_structure")
         if (
-            str(plan.get("scope") or "").strip().lower() not in ("exterior", "furniture")
+            str(plan.get("scope") or "").strip().lower() not in ("exterior", "furniture", "paint")
             and isinstance(revised, dict) and revised.get("layout") is not None
             and not isinstance(revised.get("rooms"), list)
         ):
             logger.warning("Refined floor plan came back without its room list — asking again")
             result = await self._run_provider_chain(prompt, "Floor plan refinement", edit=True)
-        if str((result.get("plan") or {}).get("scope") or "").strip().lower() not in ("exterior", "furniture"):
+        if str((result.get("plan") or {}).get("scope") or "").strip().lower() not in ("exterior", "furniture", "paint"):
             result = await self._check_floor_plan(
                 result,
                 f"REQUESTED CHANGE (already applied below): {instruction}\n",
@@ -751,6 +751,7 @@ FLOOR PLAN DESIGN (all sizes in feet):
 - WALLS FOR COUNTERS AND FURNITURE: windows and doors are placed automatically. A room may list "solid_walls": ["back", ...] (sides "front"|"back"|"left"|"right") that must stay free of any window, door or doorway; a kitchen keeps one long wall for counters, stove and cabinets, so give the kitchen one solid wall that doesn't face its entry or the dining area.
 - BAY WINDOWS: only when the description asks for one, give that room "bay_window": {"side": "front"|"back"|"left"|"right", "width": 8, "depth": 2.5, "style": "angled"|"box"} (feet; "angled" is the classic three-sided bay). The side must be one where the room has an outside wall: the edge of the footprint or of an open area. Leave the key out of every other room.
 - OUTSIDE DOORS: the front door is automatic (on the "entry" room). Only when the description asks for another door to the outside (a back door, a sliding glass door or French doors to the yard, patio or deck), give that room "outside_doors": [{"side": "front"|"back"|"left"|"right", "style": "sliding_glass"|"french"|"hinged", "width": 6}] (feet; a double sliding door is about 6-8 ft, French doors 5-6 ft, a single door 3 ft). The side must be one where the room has an outside wall. Leave the key out of every other room.
+- PAINT: only when the description gives a room's wall or ceiling colour, give that room "wall_color": "sage green" (words or "#rrggbb"), "accent_wall": {"side": "front"|"back"|"left"|"right", "color": "navy"} for one wall in another colour, and/or "ceiling_color". Leave the keys out of every other room (unpainted walls are white). Rooms side by side may have different colours.
 - Use descriptive room names (e.g. "Entry Foyer", "Primary Bedroom", "Hall Bathroom").
 - OUTSIDE OF THE HOUSE: only when the description mentions the roof, the outside walls, colors, or the yard (trees, plants, paths, driveway, patio, fence, pool), add "exterior" inside "project_structure":
 """ + EXTERIOR_FORMAT + """
@@ -839,6 +840,7 @@ REQUESTED CHANGE: {instruction}
 
 First decide what the change is about:
 - "exterior": only the outside — roof, outside wall finish or colors, trim, the ground, or the yard (trees, palms, shrubs, flowers, lawn, paths, driveway, patio, deck, fence, hedge, pool, rocks).
+- "paint": only the colours of rooms' inside walls or ceilings ("paint the bedroom sage green", "a navy accent wall behind the bed", "white ceilings").
 - "furniture": only what is in the rooms — sofas, chairs, beds, tables, desks, dressers, shelves, TVs, kitchen counters, islands and appliances, toilets, tubs, showers, vanities, rugs, lamps, indoor plants.
 - "floor_plan": the rooms — sizes, adding or removing rooms, doorways, the house's shape, bay windows, and doors to the outside (back door, sliding glass door, French doors), even when they lead to the yard, a patio or a deck.
 - "both": it asks for the rooms and the outside.
@@ -849,7 +851,7 @@ FLOOR PLAN format (for "floor_plan" or "both"):
 - "layout" (always in this format):
 {RECT_LAYOUT_FORMAT}
 - To make a room bigger or smaller, change its rectangle and move the rooms beside it so nothing overlaps and no gap opens up; keep every room the change doesn't need to move where it is. "notes" lists only what this change had to adjust.
-- "rooms" lists every room in the layout with the same names, its "dimensions" (its rectangle's length and width, height 8-10), "floor_material", "wall_material" and "connects_to" (names of rooms it opens into through a doorway; only rooms that share a wall). Keep the plan livable — every room reachable from the entry, bedrooms never only reachable through another bedroom.
+- "rooms" lists every room in the layout with the same names, its "dimensions" (its rectangle's length and width, height 8-10), "floor_material", "wall_material" and "connects_to" (names of rooms it opens into through a doorway; only rooms that share a wall), keeping each room's "wall_color", "accent_wall" and "ceiling_color". Keep the plan livable — every room reachable from the entry, bedrooms never only reachable through another bedroom.
 - To remove a doorway (or make a wall solid), drop each room from the other's "connects_to" AND add it to the room's "no_door_to" list (e.g. "no_door_to": ["Hallway"]); a doorway in SITE "doorways" that no "connects_to" lists was added automatically and only "no_door_to" removes it. If that leaves rooms unreachable, connect them another way through "connects_to" (e.g. the hallway to a room beside it). Keep existing "no_door_to" entries unless the change asks for that doorway back; to add a doorway, remove the pair from "no_door_to".
 - WALLS: to make a wall clean (no window, door or doorway in it, e.g. for kitchen counters or a bed), add its side to the room's "solid_walls" list (["back", "left"]; "front" is the street side, left/right along the layout's length; SITE rooms' "walls" show which side has what). A solid wall overrides doors, doorways and windows on it; if a doorway in it is the only way into a room, connect that room another way through "connects_to". To allow openings in it again, remove the side from "solid_walls".
 - WINDOWS are placed automatically, one per room (none in hallways and closets): "window": false removes the room's window, "window": {{"side": "left"}} puts it on that side. To remove a room's windows, ALWAYS set "window": false — also when its window is a bay window (then leave "bay_window" out too); without it the ordinary window comes back. To move or remove only one particular opening, "solid_walls" on its side is usually what is meant.
@@ -861,15 +863,18 @@ FLOOR PLAN format (for "floor_plan" or "both"):
 EXTERIOR format (for "exterior" or "both"; return the WHOLE exterior: the current one with the change applied, keeping every item the change does not affect):
 {EXTERIOR_FORMAT}
 
+PAINT format (for "paint", or beside any other scope when the change also paints): return only the rooms whose paint changes, by their exact names: {{"Room Name": {{"wall_color": "sage green", "accent_wall": {{"side": "front"|"back"|"left"|"right", "color": "navy"}}, "ceiling_color": "white"}}}} (words or "#rrggbb"; front is the street side, left/right along the layout's length, the SITE's "walls" say what is on each side, e.g. which wall a bed stands against). Give only the fields that change; null removes one (walls back to white, no accent wall). Each room is painted on its own side of a shared wall, so rooms next to each other can have different colours. "the whole house" means every room.
+
 FURNITURE format (for "furniture", or beside any other scope when the change also moves furniture): return only the rooms whose furniture changes, each with its whole new list (its current items with the change applied); rooms left out keep theirs. Give "auto" only when the change asks to furnish (true) or clear (false) the whole house. When a room is renamed or removed, its furniture follows automatically.
 {FURNITURE_FORMAT}
 
 Reply with ONLY a JSON object (no markdown, no explanation):
 - for "exterior": {{"scope": "exterior", "exterior": {{...}}}}
 - for "furniture": {{"scope": "furniture", "furniture": {{"rooms": {{"Room Name": [...]}}}}}}
+- for "paint": {{"scope": "paint", "paint": {{"Room Name": {{...}}}}}}
 - for "floor_plan": {{"scope": "floor_plan", "project_structure": {{"layout": {{...}}, "rooms": [...]}}}} (plus "renames" when a room is renamed)
 - for "both": {{"scope": "both", "project_structure": {{"layout": {{...}}, "rooms": [...]}}, "exterior": {{...}}}}
-Add "furniture": {{...}} beside "exterior" or "project_structure" when the change is about furniture too."""
+Add "furniture": {{...}} beside "exterior" or "project_structure" when the change is about furniture too, and "paint": {{...}} when it also paints rooms."""
 
     def _clean_json_string(self, json_str: str) -> str:
         """Fix common LLM JSON formatting issues before parsing."""

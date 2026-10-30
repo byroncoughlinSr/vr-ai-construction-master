@@ -1611,13 +1611,18 @@ def build_geometry_from_rooms(rooms_ft: list[dict], layout: dict | None = None, 
     height, the upper floor's slab replaces the ceilings under it, stair rooms climb to
     it, and the outside (wall finish per storey, the roof over the top of each stack, one
     yard) is built over the whole house."""
+    from .vr_paint import build_paint
+
     levels = layout_levels(layout) if isinstance(layout, dict) else {0: layout}
     if len(levels) == 1:
         geometry = _build_storey(rooms_ft, layout=layout, **kwargs)
         geometry.pop("_storey")
         geometry["levels"] = [{"level": 0, "y": 0.0, "rooms": [r["id"] for r in geometry["rooms"]]}]
-        return geometry
-    return _build_levels(rooms_ft, layout, levels, **kwargs)
+    else:
+        geometry = _build_levels(rooms_ft, layout, levels, **kwargs)
+    # Painted walls and ceilings, from the finished rooms (lifted, ceilings cut under the floors above).
+    geometry["paint"] = build_paint(geometry["rooms"], rooms_ft or [], WALL_T)
+    return geometry
 
 
 def _lift(geometry: dict, dy: float, room_off: int, door_off: int, window_off: int):

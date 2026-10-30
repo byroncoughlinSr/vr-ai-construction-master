@@ -30,6 +30,7 @@ from .vr_geometry_service import (
     is_rect_layout,
     layout_rects_from_tree,
 )
+from .vr_paint import apply_paint, clean_paint
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,8 @@ def validate_structure(structure: Any) -> dict:
     rooms = structure.get("rooms")
     if not isinstance(rooms, list):
         raise FloorPlanError("floor plan has no room list")
-    rooms = [copy.deepcopy(r) for r in rooms if isinstance(r, dict) and str(r.get("name") or "").strip()]
+    # Paint is kept as hex (the dashboard's colour pickers need it), whatever words the AI used.
+    rooms = [clean_paint(copy.deepcopy(r)) for r in rooms if isinstance(r, dict) and str(r.get("name") or "").strip()]
     layout = structure.get("layout")
     if layout is not None:
         try:
@@ -250,6 +252,23 @@ def update_furniture(db: Session, plan: FloorPlan, furniture: Any, source: str |
     logger.info(
         f"🛋️  Furniture of project {plan.project_id} floor plan v{plan.version} updated in place"
         f" ({', '.join(change.get('rooms') or {}) or 'auto'})" + (f" ({source})" if source else "")
+    )
+    return plan
+
+
+def update_paint(db: Session, plan: FloorPlan, paint: Any, source: str | None = None) -> FloorPlan:
+    """Paint rooms of ``plan`` itself, without a new version (not committed): ``paint``
+    is ``{"Room name": {wall_color, accent_wall, ceiling_color}}``. Raises
+    FloorPlanError when it changes no room."""
+    rooms, changed = apply_paint(plan.rooms, paint)
+    if not changed:
+        raise FloorPlanError("the paint change names no room of this house, or no colour")
+    plan.rooms = rooms
+    db.add(plan)
+    db.flush()
+    logger.info(
+        f"🎨 Paint of project {plan.project_id} floor plan v{plan.version} updated in place ({', '.join(changed)})"
+        + (f" ({source})" if source else "")
     )
     return plan
 

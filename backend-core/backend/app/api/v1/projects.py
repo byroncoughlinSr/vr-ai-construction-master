@@ -17,6 +17,7 @@ from ...schemas.project import (
 from ...services import get_image_service
 from ...services import floor_plan_service, kitchen_style_service, plant_model_service
 from ...services.vr_furniture import furniture_spec, merge_furniture, with_named_style
+from ...services.vr_paint import apply_paint
 from ...services.floor_plan_service import FloorPlanError
 from ...services.pm_client import ACTOR, PMClient, PMError, PMUnavailable, get_pm
 from .image_jobs import start_image_generation
@@ -468,8 +469,8 @@ async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db:
     """Change the house in words; used by the headset's voice refinement and the dashboard.
 
     A change to the rooms is saved as a new floor-plan version. A change to only
-    the outside (roof, walls, yard) or the furniture updates the current version
-    in place; ``updated_in_place`` says which happened.
+    the outside (roof, walls, yard), the furniture or the paint updates the current
+    version in place; ``updated_in_place`` says which happened.
     """
     from .ai_planning import planning_service  # one shared planner (and its Ollama probe state)
 
@@ -493,28 +494,32 @@ async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db:
     structure = revised.get("project_structure") or {}
     exterior = revised.get("exterior", structure.get("exterior"))
     furniture = revised.get("furniture", structure.get("furniture"))
+    paint = revised.get("paint")
     if furniture is not None:
         furniture = with_named_style(furniture, refine.instruction, [s.name for s in kitchen_style_service.list_styles(db)])
     scope = str(revised.get("scope") or "").strip().lower()
-    if scope not in ("exterior", "furniture", "floor_plan", "both"):
+    if scope not in ("exterior", "furniture", "paint", "floor_plan", "both"):
         scope = (
             "floor_plan" if structure.get("rooms")
             else "exterior" if exterior is not None
             else "furniture" if furniture is not None
+            else "paint" if paint is not None
             else "floor_plan"
         )
-    in_place = scope in ("exterior", "furniture")
+    in_place = scope in ("exterior", "furniture", "paint")
     logger.info(f"✏️  Change scope: {scope}")
 
     try:
         if in_place:
-            if exterior is None and furniture is None:
+            if exterior is None and furniture is None and paint is None:
                 raise FloorPlanError(f"the AI returned no {scope}")
             plan = current
             if exterior is not None:
                 plan = floor_plan_service.update_exterior(db, plan, exterior, source=result.get("source"))
             if furniture is not None:
                 plan = floor_plan_service.update_furniture(db, plan, furniture, source=result.get("source"))
+            if paint is not None:
+                plan = floor_plan_service.update_paint(db, plan, paint, source=result.get("source"))
         else:
             # The furniture the AI returns is only the rooms that change: start from
             # the current furniture (renamed with its rooms) and apply that.
@@ -525,6 +530,8 @@ async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db:
                 structure["furniture"] = merge_furniture(structure["furniture"], furniture_spec(furniture))
             if exterior is not None:
                 structure = {**structure, "exterior": exterior}
+            if paint is not None:
+                structure = {**structure, "rooms": apply_paint(structure.get("rooms"), paint)[0]}
             plan = floor_plan_service.add_floor_plan_version(
                 db, project_id, current.name, structure,
                 change_type="refined", change_note=refine.instruction, source=result.get("source"),
