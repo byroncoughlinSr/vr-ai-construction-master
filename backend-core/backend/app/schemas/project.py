@@ -3,7 +3,7 @@ Pydantic schemas for project-related API operations.
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 from .common import TimestampModel

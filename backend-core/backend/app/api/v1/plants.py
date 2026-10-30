@@ -7,10 +7,11 @@ the same way: a piece named "Grandma's armchair" is drawn with its model.
 """
 
 import logging
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ...database import get_db
@@ -19,6 +20,18 @@ from ...services import plant_model_service
 from ...services.plant_model_service import PlantModelError
 
 logger = logging.getLogger(__name__)
+
+
+class ModelUpdate(BaseModel):
+    turn: Optional[Literal[0, 90, 180, 270]] = None
+
+
+class Recolor(BaseModel):
+    from_color: str = Field(..., description="#rrggbb (one of GET .../colors) or a colour name")
+    to_color: str = Field(..., description="#rrggbb or a colour name")
+    tolerance: float = Field(0.5, ge=0, le=1, description="How far from from_color still counts (0 exact, 1 loose)")
+
+
 def make_router(kind: str) -> APIRouter:
     """The routes of one library (``kind`` "plant" or "furniture")."""
     router = APIRouter()
@@ -63,7 +76,8 @@ def make_router(kind: str) -> APIRouter:
         return plant_model_service.serialize(_get(db, model_id))
 
     @router.post("/models/{model_id}/retry", status_code=202)
-    def retry_model(model_id: int, db: Session = Depends(get_db)):
+    async def retry_model(model_id: int, db: Session = Depends(get_db)):
+        # async so start() runs on the event loop: a sync route runs in a worker thread with none
         """Make the model again (after a failure, or for a better one)."""
         model = _get(db, model_id)
         if plant_model_service.is_running(model.id):
@@ -73,6 +87,46 @@ def make_router(kind: str) -> APIRouter:
         db.commit()
         plant_model_service.start(model.id)
         return JSONResponse(status_code=202, content=plant_model_service.serialize(model))
+
+    @router.patch("/models/{model_id}")
+    def update_model(model_id: int, body: ModelUpdate, db: Session = Depends(get_db)):
+        """Turn it (0/90/180/270°) so its front is where furniture's is: an island's
+        seating side, a sofa's seat. Houses pick it up the next time they load."""
+        model = _get(db, model_id)
+        if body.turn is not None:
+            model.turn = body.turn % 360
+        db.commit()
+        return plant_model_service.serialize(model)
+
+    def _colors_job(model: PlantModel, action):
+        if plant_model_service.is_running(model.id):
+            raise HTTPException(status_code=409, detail="This model is being made; wait until it is ready")
+        try:
+            return action()
+        except PlantModelError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+
+    @router.get("/models/{model_id}/colors")
+    def model_colors(model_id: int, db: Session = Depends(get_db)):
+        """The colours its surface is mostly made of, largest share first."""
+        model = _get(db, model_id)
+        return {"colors": _colors_job(model, lambda: plant_model_service.colors(model))}
+
+    @router.post("/models/{model_id}/recolor")
+    def recolor_model(model_id: int, body: Recolor, db: Session = Depends(get_db)):
+        """Turn one of its colours (and the shades near it) another, shading kept.
+        Recolours stack; houses pick it up the next time they load."""
+        model = _get(db, model_id)
+        share = _colors_job(model, lambda: plant_model_service.recolor(
+            db, model, body.from_color, body.to_color, body.tolerance))
+        return {**plant_model_service.serialize(model), "changed": round(share, 3)}
+
+    @router.post("/models/{model_id}/reset-colors")
+    def reset_model_colors(model_id: int, db: Session = Depends(get_db)):
+        """Back to the colours it was made with."""
+        model = _get(db, model_id)
+        _colors_job(model, lambda: plant_model_service.reset_colors(db, model))
+        return plant_model_service.serialize(model)
 
     @router.delete("/models/{model_id}")
     def delete_model(model_id: int, db: Session = Depends(get_db)):

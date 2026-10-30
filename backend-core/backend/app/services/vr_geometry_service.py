@@ -80,7 +80,8 @@ def compute_packed_positions(rooms: list, max_cols: int = 3) -> list:
 
 # Smallest a room may be along a split, metres. Proportional scaling can otherwise
 # squeeze a closet or hallway into a sliver when the AI's numbers don't add up.
-MIN_PART = 1.2
+# Just under 3 ft: a toilet room or a closet is 3 ft wide (1.2 m rejected them).
+MIN_PART = 0.9
 
 
 class LayoutError(ValueError):
@@ -137,6 +138,8 @@ def _is_open(node: dict) -> bool:
 def _walk_layout(layout: dict) -> tuple[list[tuple[str, dict]], list[dict]]:
     if not isinstance(layout, dict):
         raise LayoutError("layout is not an object")
+    if is_rect_layout(layout):
+        return _rect_layout(layout)
     try:
         length = float(layout.get("length")) * FT_TO_M
         width = float(layout.get("width")) * FT_TO_M
@@ -187,6 +190,217 @@ def _walk_layout(layout: dict) -> tuple[list[tuple[str, dict]], list[dict]]:
     return out, open_out
 
 
+# Room edges closer than this (feet) are taken to be the same line: the AI writes
+# 15.4 beside 15.5, which would otherwise leave a 3 cm slit and no shared wall.
+RECT_SNAP_FT = 0.35
+
+
+def is_rect_layout(layout: Any) -> bool:
+    """A floor plan given as room rectangles, ``{"entry": name, "rects": [{"room",
+    "x", "z", "length", "width"}, ...]}`` in feet (x left to right, z from the street),
+    rather than as a nested-split tree.
+
+    NOTE: the planning prompts (`RECT_LAYOUT_FORMAT` in ai_planning_service.py)
+    describe this format to the AI. Change both together.
+    """
+    return isinstance(layout, dict) and isinstance(layout.get("rects"), list)
+
+
+def _snap(values: list[float]) -> dict[float, float]:
+    """Map each value to the first of a run of values each within RECT_SNAP_FT of the run's start."""
+    out: dict[float, float] = {}
+    anchor = None
+    for v in sorted(set(values)):
+        if anchor is None or v - anchor > RECT_SNAP_FT:
+            anchor = v
+        out[v] = anchor
+    return out
+
+
+def rect_entries(layout: dict) -> list[dict]:
+    """The rooms of a rectangle layout in feet, ``[{"room", "x0", "x1", "z0", "z1"}]``:
+    edges snapped together and shifted so the plan starts at x = 0 and z = 0 (the
+    street). Raises LayoutError for entries that aren't rooms with a usable size."""
+    raw = []
+    for item in layout.get("rects") or []:
+        if not isinstance(item, dict):
+            raise LayoutError("a layout rectangle is not an object")
+        name = _clean_name(item.get("room") or item.get("name"))
+        if not name:
+            raise LayoutError("a layout rectangle has no room name")
+        try:
+            x, z = float(item.get("x") or 0), float(item.get("z") or 0)
+            length, width = float(item.get("length")), float(item.get("width"))
+        except (TypeError, ValueError):
+            raise LayoutError(f"{name}'s rectangle needs numbers for x, z, length and width")
+        if length <= 0 or width <= 0:
+            raise LayoutError(f"{name}'s rectangle must have a positive length and width")
+        raw.append((name, x, x + length, z, z + width, rect_level(item)))
+    if not raw:
+        raise LayoutError("layout has no rooms")
+    xs = _snap([v for _, x0, x1, _, _, _ in raw for v in (x0, x1)])
+    zs = _snap([v for _, _, _, z0, z1, _ in raw for v in (z0, z1)])
+    left, front = min(xs.values()), min(zs.values())
+    origin = layout.get("origin")
+    if isinstance(origin, (list, tuple)) and len(origin) == 2:
+        left, front = origin  # one level of a house: the whole house's corner, so the levels line up
+    out = []
+    for name, x0, x1, z0, z1, level in raw:
+        entry = {"room": name, "x0": xs[x0] - left, "x1": xs[x1] - left,
+                 "z0": zs[z0] - front, "z1": zs[z1] - front}
+        if level:
+            entry["level"] = level
+        if entry["x1"] - entry["x0"] < 1 or entry["z1"] - entry["z0"] < 1:
+            raise LayoutError(f"{name}'s rectangle is under 1 ft across")
+        out.append(entry)
+    names = [_normalize(e["room"]) for e in out]
+    if len(set(names)) != len(names):
+        raise LayoutError("a room appears more than once in the layout")
+    return out
+
+
+MAX_LEVELS = 4
+
+
+def rect_level(item: Any) -> int:
+    """The level (storey) of a layout rectangle: 0 is the ground floor."""
+    try:
+        return min(MAX_LEVELS - 1, max(0, int(float((item or {}).get("level") or 0))))
+    except (TypeError, ValueError, AttributeError):
+        return 0
+
+
+def layout_levels(layout: Any) -> dict[int, dict]:
+    """A rectangle layout split into one layout per level (0, 1, ... with no gaps),
+    each keeping the whole house's front-left corner as its ``origin`` so the levels
+    stack. The ground floor keeps the ``entry`` and ``notes``. A layout with one level
+    (or a tree) comes back as ``{0: layout}``."""
+    if not is_rect_layout(layout):
+        return {0: layout}
+    items = [i for i in layout["rects"] if isinstance(i, dict)]
+    found = sorted({rect_level(i) for i in items})
+    if len(found) <= 1:
+        return {0: layout}
+    try:
+        left = min(float(i.get("x") or 0) for i in items)
+        front = min(float(i.get("z") or 0) for i in items)
+    except (TypeError, ValueError):
+        return {0: layout}
+    out: dict[int, dict] = {}
+    for n, level in enumerate(found):
+        lay: dict[str, Any] = {"rects": [i for i in items if rect_level(i) == level], "origin": [left, front]}
+        if n == 0:
+            lay.update({k: layout[k] for k in ("entry", "notes") if k in layout})
+        out[n] = lay
+    return out
+
+
+def subtract_rects(rect: dict, holes: list[dict]) -> list[dict]:
+    """``rect`` less every rectangle in ``holes`` (same units), as rectangles."""
+    pieces = [dict(rect)]
+    for h in holes:
+        out = []
+        for p in pieces:
+            if h["x1"] <= p["x0"] + _EPS or h["x0"] >= p["x1"] - _EPS or h["z1"] <= p["z0"] + _EPS or h["z0"] >= p["z1"] - _EPS:
+                out.append(p)
+                continue
+            if h["z0"] > p["z0"] + _EPS:
+                out.append({**p, "z1": h["z0"]})
+            if h["z1"] < p["z1"] - _EPS:
+                out.append({**p, "z0": h["z1"]})
+            z0, z1 = max(p["z0"], h["z0"]), min(p["z1"], h["z1"])
+            if h["x0"] > p["x0"] + _EPS:
+                out.append({**p, "x1": h["x0"], "z0": z0, "z1": z1})
+            if h["x1"] < p["x1"] - _EPS:
+                out.append({**p, "x0": h["x1"], "z0": z0, "z1": z1})
+        pieces = out
+    return [p for p in pieces if p["x1"] - p["x0"] > 0.01 and p["z1"] - p["z0"] > 0.01]
+
+
+def rect_overlaps(entries: list[dict]) -> list[tuple[str, str, float, float]]:
+    """Rooms on the same level whose rectangles overlap: ``(room, room, overlap along x,
+    along z)`` in feet."""
+    out = []
+    for i, a in enumerate(entries):
+        for b in entries[i + 1:]:
+            if a.get("level", 0) != b.get("level", 0):
+                continue
+            dx = min(a["x1"], b["x1"]) - max(a["x0"], b["x0"])
+            dz = min(a["z1"], b["z1"]) - max(a["z0"], b["z0"])
+            if dx > 0.05 and dz > 0.05:
+                out.append((a["room"], b["room"], dx, dz))
+    return out
+
+
+def uncovered_rects(rects: list[dict]) -> list[dict]:
+    """The parts of the rooms' bounding box no room covers, as rectangles (same units)."""
+    if not rects:
+        return []
+    xs = sorted({v for r in rects for v in (r["x0"], r["x1"])})
+    zs = sorted({v for r in rects for v in (r["z0"], r["z1"])})
+
+    def covered(x: float, z: float) -> bool:
+        return any(r["x0"] < x < r["x1"] and r["z0"] < z < r["z1"] for r in rects)
+
+    merged: list[dict] = []
+    for za, zb in zip(zs, zs[1:]):
+        # Runs of uncovered cells along this band, then each run joined onto the
+        # rectangle right in front of it when that has the same width.
+        runs, run = [], None
+        for xa, xb in zip(xs, xs[1:]):
+            if covered((xa + xb) / 2, (za + zb) / 2):
+                if run:
+                    runs.append(run)
+                run = None
+            else:
+                run = (run[0], xb) if run else (xa, xb)
+        if run:
+            runs.append(run)
+        for xa, xb in runs:
+            above = next((m for m in merged if m["x0"] == xa and m["x1"] == xb and m["z1"] == za), None)
+            if above:
+                above["z1"] = zb
+            else:
+                merged.append({"x0": xa, "x1": xb, "z0": za, "z1": zb})
+    return merged
+
+
+def _rect_layout(layout: dict) -> tuple[list[tuple[str, dict]], list[dict]]:
+    """Rooms and open areas (metres) of a rectangle layout: whatever of the bounding
+    box no room covers is outdoors (an L/U shape, a courtyard, an inset porch)."""
+    entries = rect_entries(layout)
+    overlaps = rect_overlaps(entries)
+    if overlaps:
+        a, b, dx, dz = overlaps[0]
+        raise LayoutError(f"{a} and {b} overlap by {dx:.1f} x {dz:.1f} ft")
+
+    def metres(r: dict) -> dict:
+        return {k: r[k] * FT_TO_M for k in ("x0", "x1", "z0", "z1")}
+
+    placed = [(e["room"], metres(e)) for e in entries]
+    return placed, [metres(r) for r in uncovered_rects([e for e in entries if not e.get("level")])]
+
+
+def layout_as_rects(layout: dict) -> dict:
+    """``layout`` as a rectangle layout in feet (a tree's rooms where it draws them),
+    for prompts and editors that work on rectangles. Keeps ``entry`` and ``notes``.
+    Raises LayoutError like ``layout_rects_from_tree``."""
+    if is_rect_layout(layout):
+        boxes = [(e["room"], e) for e in rect_entries(layout)]
+    else:
+        boxes = [(name, {k: v / FT_TO_M for k, v in r.items()}) for name, r in _walk_layout(layout)[0]]
+    rects = []
+    for name, r in boxes:
+        # Round the edges, not the sizes, so neighbours still meet exactly.
+        x0, x1, z0, z1 = (round(r[k], 1) for k in ("x0", "x1", "z0", "z1"))
+        rects.append({"room": name, "x": x0, "z": z0, "length": round(x1 - x0, 1), "width": round(z1 - z0, 1),
+                      **({"level": r["level"]} if r.get("level") else {})})
+    out: dict[str, Any] = {"entry": layout.get("entry"), "rects": rects}
+    if layout.get("notes"):
+        out["notes"] = layout["notes"]
+    return out
+
+
 # Opening sizes, metres. A door or window is only placed where the wall leaves at
 # least EDGE_MARGIN of solid wall on each side, so openings never eat into corners.
 DOOR_W = round(3.0 * FT_TO_M, 3)
@@ -196,6 +410,9 @@ SMALL_WINDOW_W = round(2.0 * FT_TO_M, 3)
 WINDOW_H = round(4.0 * FT_TO_M, 3)
 WINDOW_SILL = round(3.0 * FT_TO_M, 3)
 EDGE_MARGIN = 0.25
+# An interior doorway sits centred on the wall two rooms share and only needs a
+# jamb's width beside it, so a door fits at the end of a 4-4.5 ft hallway.
+DOOR_EDGE_MARGIN = 0.12
 _EPS = 1e-3
 
 # Bay windows: a walk-in bump-out of a room's outside wall, glazed on every face.
@@ -251,8 +468,8 @@ def find_shared_walls(rects: list[dict]) -> dict:
     return shared
 
 
-def _fits(lo: float, hi: float, opening_w: float) -> bool:
-    return hi - lo >= opening_w + 2 * EDGE_MARGIN
+def _fits(lo: float, hi: float, opening_w: float, margin: float = EDGE_MARGIN) -> bool:
+    return hi - lo >= opening_w + 2 * margin
 
 
 def _normalize(name: str) -> str:
@@ -352,7 +569,7 @@ def plan_connections(
                 )
                 continue
             wall = shared.get(pair)
-            if wall is None or not _fits(wall[2], wall[3], DOOR_W):
+            if wall is None or not _fits(wall[2], wall[3], DOOR_W, DOOR_EDGE_MARGIN):
                 logger.info(
                     f"  ↪ '{rooms[pair[0]].get('name')}' ↔ '{rooms[pair[1]].get('name')}' "
                     f"requested but not adjacent — skipped"
@@ -378,7 +595,7 @@ def plan_connections(
     while len(seen) < len(rooms):
         candidates = []
         for (a, b), (_, _, lo, hi) in shared.items():
-            if (a in seen) == (b in seen) or not _fits(lo, hi, DOOR_W):
+            if (a in seen) == (b in seen) or not _fits(lo, hi, DOOR_W, DOOR_EDGE_MARGIN):
                 continue
             inside = a if a in seen else b
             is_circulation = any(k in names[inside] for k in _CIRCULATION_KEYWORDS)
@@ -869,6 +1086,10 @@ def _clean_name(name: Any) -> str:
     return str(name or "").strip().rstrip(",;:.").strip()
 
 
+def _overlap_area(a: dict, b: dict) -> float:
+    return max(0.0, min(a["x1"], b["x1"]) - max(a["x0"], b["x0"])) * max(0.0, min(a["z1"], b["z1"]) - max(a["z0"], b["z0"]))
+
+
 def _rooms_and_rects(
     rooms_ft: list[dict], layout: dict | None
 ) -> tuple[list[dict], list[dict], list[dict], str]:
@@ -902,10 +1123,12 @@ def _rooms_and_rects(
                 logger.warning(f"⚠️  Rooms listed but not in the layout (dropped): {sorted(missing)}")
             entry = _pick_entry(rooms, rects, (layout or {}).get("entry"))
             order = [entry] + [i for i in range(len(rooms)) if i != entry]
-            logger.info(f"📐 Using nested-split layout: {len(rooms)} rooms, entry '{rooms[entry]['name']}'")
-            return [rooms[i] for i in order], [rects[i] for i in order], open_rects, "split"
+            kind = "rects" if is_rect_layout(layout) else "split"
+            logger.info(f"📐 Using {'rectangle' if kind == 'rects' else 'nested-split'} layout: "
+                        f"{len(rooms)} rooms, entry '{rooms[entry]['name']}'")
+            return [rooms[i] for i in order], [rects[i] for i in order], open_rects, kind
         except LayoutError as e:
-            logger.warning(f"⚠️  Layout tree rejected ({e}) — falling back to grid layout")
+            logger.warning(f"⚠️  Layout rejected ({e}) — falling back to grid layout")
 
     rooms = [{**r, "dimensions": ft_to_m_dims(r.get("dimensions") or {})} for r in rooms_ft]
     rects = []
@@ -953,7 +1176,7 @@ def _pick_entry(rooms: list[dict], rects: list[dict], named: str | None) -> int:
     return front[0]
 
 
-def build_geometry_from_rooms(
+def _build_storey(
     rooms_ft: list[dict],
     materials: list[dict] | None = None,
     project_id: int | None = None,
@@ -965,8 +1188,19 @@ def build_geometry_from_rooms(
     plant_models: list[dict] | None = None,
     furniture: dict | None = None,
     furniture_models: list[dict] | None = None,
+    kitchen_styles: list[dict] | None = None,
+    level: int = 0,
+    rise: float | None = None,
+    holes: list[dict] | None = None,
+    check: bool = True,
 ) -> dict:
-    """Build a VR geometry payload from a list of rooms.
+    """One storey of the house (``build_geometry_from_rooms`` stacks them).
+
+    ``level`` > 0 is an upper floor: no front door or doors to the yard, and the
+    floor-plan check is left to the caller. ``rise`` (metres) is the height to the
+    floor above, which stair rooms climb; ``holes`` are where the stairs from below
+    come up through this floor (metres), cut out of it and railed round. The result
+    keeps what the storeys are stacked with under ``_storey``.
 
     Args:
         rooms_ft: Rooms with dimensions in FEET. Each dict may include:
@@ -1003,8 +1237,15 @@ def build_geometry_from_rooms(
     """
     rooms_m, rects, open_rects, layout_source = _rooms_and_rects(rooms_ft, layout)
     shared = find_shared_walls(rects)
+    holes = holes or []
     # Requested features that could not be built, in words for the headset/dashboard.
     notes: list[str] = []
+    if isinstance(layout, dict) and check:
+        from .layout_check import layout_problems  # it imports this module
+
+        # What the planner changed to make the description fit, then what is still wrong.
+        notes += [str(n) for n in _name_list(layout.get("notes"))][:4]
+        notes += layout_problems({"layout": layout, "rooms": rooms_ft})[:4]
     open_pairs = plan_open_walls(rooms_m, rects, shared, notes)
     connections = plan_connections(rooms_m, shared, notes, rects=rects, open_pairs=open_pairs)
     solid = [_side_set(r.get("solid_walls")) for r in rooms_m]
@@ -1055,7 +1296,7 @@ def build_geometry_from_rooms(
     # Front door: on the entry's (room 0's) outside wall, street side first.
     # Spawn the player a few metres outside it.
     spawn = None
-    if rects:
+    if rects and level == 0:
         front, east, back, west = _room_sides(rects[0])
         # Each side with the direction pointing out of the house, street side first;
         # walls kept solid only when there is no other way in.
@@ -1090,6 +1331,9 @@ def build_geometry_from_rooms(
     for idx, (room, rect) in enumerate(zip(rooms_m, rects)):
         for spec in outside_door_specs(room):
             label = spec["style"].replace("_", " ")
+            if level > 0:
+                notes.append(f"{room.get('name')} is upstairs, so its {label} door to the yard was left out")
+                continue
             if spec["side"] in solid[idx]:
                 notes.append(f"{room.get('name')}'s {spec['side']} wall is kept solid, so the {label} door was left out")
                 continue
@@ -1187,6 +1431,21 @@ def build_geometry_from_rooms(
             "room": idx + 1,
         })
 
+    # Stairs up to the next floor, in rooms that hold them.
+    stairs: list[dict] = []
+    if rise:
+        from .vr_stairs import is_stair_room, plan_stairs
+
+        for idx, (room, rect) in enumerate(zip(rooms_m, rects)):
+            if not is_stair_room(room.get("name")):
+                continue
+            at = [d["position"] for d in doors if idx + 1 in d["rooms"]]
+            st = plan_stairs(rect, rise, at, openings)
+            st["room"] = idx + 1
+            stairs.append(st)
+            if st["short"]:
+                notes.append(f"{room.get('name')} is short for a full flight of stairs, so its steps are steep")
+
     rooms_out: list[dict] = []
     for idx, room in enumerate(rooms_m):
         room_id = idx + 1
@@ -1201,8 +1460,9 @@ def build_geometry_from_rooms(
         room_name = room.get("name", f"Room {room_id}")
         logger.info(
             f"  Room {room_id}: '{room_name}' "
-            f"{geom_dims['length']:.2f}x{geom_dims['width']:.2f}x{geom_dims['height']}m "
-            f"@ ({x_offset:.2f}, 0, {z_offset:.2f}) → doors to {connected_ids[idx]}"
+            f"{geom_dims['length'] / FT_TO_M:.1f}x{geom_dims['width'] / FT_TO_M:.1f}"
+            f"x{geom_dims['height'] / FT_TO_M:.1f} ft "
+            f"@ ({x_offset / FT_TO_M:.1f}, 0, {z_offset / FT_TO_M:.1f}) ft → doors to {connected_ids[idx]}"
         )
         bay = bays.get(idx)
         rooms_out.append({
@@ -1227,6 +1487,15 @@ def build_geometry_from_rooms(
                 geom_dims, x_offset, z_offset, room.get("wall_material", "drywall")
             ),
         })
+        # The floor in pieces round a stair hole from below; the ceilings the levels above leave.
+        floor = rooms_out[-1]["floor"]
+        v = floor["vertices"]
+        whole = {"x0": v[0]["x"], "x1": v[2]["x"], "z0": v[0]["z"], "z1": v[2]["z"]}
+        rooms_out[-1]["floors"] = [
+            _slab(r["x0"], r["x1"], r["z0"], r["z1"], 0, floor["material"])
+            for r in subtract_rects(whole, [h["footprint"] for h in holes])
+        ]
+        rooms_out[-1]["ceilings"] = [rooms_out[-1]["ceiling"]]
 
     material_map: dict[str, dict[str, Any]] = {}
     if materials:
@@ -1261,14 +1530,38 @@ def build_geometry_from_rooms(
         open_rects, openings, shared, bays, plant_models,
     )
 
+    from .vr_floors import build_finishes
     from .vr_furniture import build_furniture, furniture_spec
 
     furniture_out, furniture_notes = build_furniture(
         furniture_spec(furniture),
         [{"id": r["id"], "name": r["name"], "bounds": r["bounds"]} for r in rooms_out],
-        openings, furniture_models,
+        openings, furniture_models, kitchen_styles,
+        blocked=[st["footprint"] for st in stairs + holes],
     )
     notes += furniture_notes
+    if stairs or holes:
+        from .vr_stairs import railing_mesh, stair_mesh
+
+        furniture_out = furniture_out or {"meshes": {}, "pieces": [], "models": []}
+        flights = [(st, st["room"], "stairs", stair_mesh) for st in stairs]
+        for hole in holes:
+            over = next((r["id"] for r in rooms_out if _overlap_area(r["bounds"], hole["footprint"]) > 0), None)
+            if over is not None:
+                flights.append((hole, over, "railing", railing_mesh))
+        for st, room_id, kind, make in flights:
+            mesh, (cx, cz) = make(st)
+            key = f"{kind}-L{level}-{room_id}-{len(furniture_out['meshes'])}"
+            furniture_out["meshes"][key] = mesh.out()
+            fp = st["footprint"]
+            furniture_out["pieces"].append({
+                "room": room_id, "type": kind,
+                "position": {"x": round(cx, 3), "y": 0.025, "z": round(cz, 3)}, "yaw": 0.0,
+                "outline": [[round(fp["x0"], 3), round(fp["z0"], 3)], [round(fp["x1"], 3), round(fp["z0"], 3)],
+                            [round(fp["x1"], 3), round(fp["z1"], 3)], [round(fp["x0"], 3), round(fp["z1"], 3)]],
+                "color": get_material_color("wood") if kind == "stairs" else {"r": 0.23, "g": 0.18, "b": 0.15},
+                "mesh": key, "scale": {"x": 1, "y": 1, "z": 1},
+            })
 
     return {
         "project_id": project_id,
@@ -1285,6 +1578,8 @@ def build_geometry_from_rooms(
         "exterior": exterior_out,
         # Pieces placed in the rooms, their shared meshes and photo models, or null (vr_furniture.py).
         "furniture": furniture_out,
+        # What each floor is finished with (planks, tiles, carpet), drawn over its slabs (vr_floors.py).
+        "finishes": build_finishes(rooms_out),
         # Outside the front door (or in front of the entry if it had no room for one).
         "spawn_position": spawn or {
             "x": rooms_out[0]["position"]["x"] if rooms_out else 0.0,
@@ -1294,6 +1589,10 @@ def build_geometry_from_rooms(
         # Requested doors and bay windows that did not fit, e.g.
         # "Hallway has no back outside wall for a sliding glass door".
         "notes": notes,
+        # Stair flights the player walks up: where, and how the height runs along them.
+        "stairs": [{**st["footprint"], **st["ramp"], "room": st["room"]} for st in stairs],
+        "_storey": {"rects": rects, "heights": [r["dimensions"]["height"] for r in rooms_m], "open_rects": open_rects,
+                    "openings": openings, "shared": shared, "bays": bays, "flights": stairs},
         "metadata": {
             "total_rooms": len(rooms_out),
             "total_doors": len(doors),
@@ -1303,3 +1602,162 @@ def build_geometry_from_rooms(
             "optimized": optimize_for_vr,
         },
     }
+
+
+def build_geometry_from_rooms(rooms_ft: list[dict], layout: dict | None = None, **kwargs: Any) -> dict:
+    """Build a VR geometry payload from a list of rooms (see ``_build_storey`` for the
+    arguments). A rectangle layout whose rooms have a ``level`` is built a storey at a
+    time and stacked: every room on a floor with another above it takes that floor's
+    height, the upper floor's slab replaces the ceilings under it, stair rooms climb to
+    it, and the outside (wall finish per storey, the roof over the top of each stack, one
+    yard) is built over the whole house."""
+    levels = layout_levels(layout) if isinstance(layout, dict) else {0: layout}
+    if len(levels) == 1:
+        geometry = _build_storey(rooms_ft, layout=layout, **kwargs)
+        geometry.pop("_storey")
+        geometry["levels"] = [{"level": 0, "y": 0.0, "rooms": [r["id"] for r in geometry["rooms"]]}]
+        return geometry
+    return _build_levels(rooms_ft, layout, levels, **kwargs)
+
+
+def _lift(geometry: dict, dy: float, room_off: int, door_off: int, window_off: int):
+    """Move a storey's geometry up ``dy`` metres and renumber its rooms, doors and
+    windows after the storeys below (in place)."""
+    def up(point: dict):
+        point["y"] = round(point.get("y", 0) + dy, 4)
+
+    rid = lambda i: i + room_off  # noqa: E731
+    for room in geometry["rooms"]:
+        room["id"] = rid(room["id"])
+        room["connects_to"] = [rid(i) for i in room["connects_to"]]
+        room["open_to"] = [rid(i) for i in room["open_to"]]
+        up(room["position"])
+        for wall in room["walls"]:
+            up(wall["start"])
+            up(wall["end"])
+        for slab in [room["floor"], room["ceiling"], *room["floors"], *room["ceilings"]] + (
+                [room["bay_window"].get("floor"), room["bay_window"].get("ceiling")] if room.get("bay_window") else []):
+            for v in (slab or {}).get("vertices", []):
+                up(v)
+    for n, door in enumerate(geometry["doors"]):
+        door["id"] = 100 + door_off + n + 1
+        door["rooms"] = [rid(i) for i in door["rooms"]]
+        up(door["position"])
+    for n, window in enumerate(geometry["windows"]):
+        window["id"] = 200 + window_off + n + 1
+        window["room"] = rid(window["room"])
+        up(window["position"])
+    for wall in geometry["open_walls"]:
+        wall["rooms"] = [rid(i) for i in wall["rooms"]]
+        up(wall["start"])
+        up(wall["end"])
+    for st in geometry["stairs"]:
+        st["room"] = rid(st["room"])
+        st["y"] = round(dy, 4)
+    furniture, finishes = geometry.get("furniture"), geometry.get("finishes")
+    for piece in ((furniture["pieces"] + furniture["models"]) if furniture else []) + (
+            finishes["pieces"] if finishes else []):
+        piece["room"] = rid(piece["room"])
+        up(piece["position"])
+
+
+def _build_levels(rooms_ft: list[dict], layout: dict, levels: dict[int, dict], **kwargs: Any) -> dict:
+    """``build_geometry_from_rooms`` for a house of several storeys."""
+    from .layout_check import layout_problems  # it imports this module
+    from .vr_exterior import build_exterior, exterior_spec  # imports this module
+    from .vr_stairs import is_stair_room
+
+    exterior = kwargs.pop("exterior", None)
+    plant_models = kwargs.pop("plant_models", None)
+    rooms = [r for r in rooms_ft if isinstance(r, dict) and r.get("name")]
+    by_name = {_normalize(r["name"]): r for r in rooms}
+    names = {n: [_clean_name(i.get("room") or i.get("name")) for i in lay["rects"]] for n, lay in levels.items()}
+
+    def height_ft(name: str) -> float:
+        return _feet(((by_name.get(_normalize(name)) or {}).get("dimensions") or {}).get("height"), 9.0)
+
+    # A storey with another above it is as tall as its tallest room, every room of it.
+    level_h = {n: max(height_ft(name) for name in names[n]) for n in levels}
+    top = max(levels)
+    notes: list[str] = [str(n) for n in _name_list(layout.get("notes"))][:4]
+    notes += layout_problems({"layout": layout, "rooms": rooms})[:6]
+
+    storeys, base, below = [], 0.0, []
+    for n in sorted(levels):
+        on = {_normalize(x) for x in names[n]}
+        level_rooms = [
+            {**r, "dimensions": {**(r.get("dimensions") or {}), "height": level_h[n]}} if n < top else r
+            for r in rooms if _normalize(r["name"]) in on
+        ]
+        lay = dict(levels[n])
+        if n > 0:
+            # The way in upstairs: the room the stairs arrive in.
+            up_rects = {_normalize(e["room"]): e for e in rect_entries(lay)}
+            arrive = next((name for name, e in up_rects.items() for h in below
+                           if _overlap_area({k: e[k] * FT_TO_M for k in ("x0", "x1", "z0", "z1")}, h["footprint"]) > 0), None)
+            if arrive:
+                lay["entry"] = arrive
+            elif not below:
+                notes.append(f"Nothing leads up to floor {n + 1}: add a room named Stairs under it")
+        rise = (level_h[n] * FT_TO_M) if n < top else None
+        g = _build_storey(level_rooms, layout=lay, level=n, rise=rise, holes=below, check=False, **kwargs)
+        if n < top and not g["_storey"]["flights"]:
+            if not any(is_stair_room(x) for x in names[n]):
+                notes.append(f"Floor {n + 1} has no stairs up: add a room named Stairs with a room above it")
+        storeys.append((n, base, g))
+        below = g["_storey"]["flights"]
+        base += level_h[n] * FT_TO_M
+
+    # Stack them: lift, renumber, and take each ceiling out where a floor above covers it.
+    out = storeys[0][2]
+    room_off = door_off = window_off = 0
+    all_rooms, doors, windows, open_walls, stairs, levels_out = [], [], [], [], [], []
+    meshes, pieces, models, floor_meshes, floor_pieces = {}, [], [], {}, []
+    for i, (n, y, g) in enumerate(storeys):
+        _lift(g, y, room_off, door_off, window_off)
+        above = [{"x0": r["x0"] - WALL_T, "x1": r["x1"] + WALL_T, "z0": r["z0"] - WALL_T, "z1": r["z1"] + WALL_T}
+                 for _, _, ga in storeys[i + 1:] for r in ga["_storey"]["rects"]]
+        for room in g["rooms"]:
+            room["level"] = n
+            c = room["ceiling"]
+            v = c["vertices"]
+            whole = {"x0": v[0]["x"], "x1": v[2]["x"], "z0": v[0]["z"], "z1": v[2]["z"]}
+            room["ceilings"] = [_slab(r["x0"], r["x1"], r["z0"], r["z1"], v[0]["y"], c["material"])
+                                for r in subtract_rects(whole, above)]
+            room["ceiling"] = room["ceilings"][0] if room["ceilings"] else None
+            room["floor"] = room["floors"][0] if room["floors"] else None
+        all_rooms += g["rooms"]
+        doors += g["doors"]
+        windows += g["windows"]
+        open_walls += g["open_walls"]
+        stairs += g["stairs"]
+        levels_out.append({"level": n, "y": round(y, 4), "rooms": [r["id"] for r in g["rooms"]]})
+        if g.get("finishes"):
+            floor_meshes.update({f"L{n}-{k}": v for k, v in g["finishes"]["meshes"].items()})
+            floor_pieces += [{**p, "mesh": f"L{n}-{p['mesh']}"} for p in g["finishes"]["pieces"]]
+        if g.get("furniture"):
+            meshes.update(g["furniture"]["meshes"])
+            pieces += g["furniture"]["pieces"]
+            models += g["furniture"]["models"]
+        if i > 0:
+            notes += g["notes"]
+        room_off += len(g["rooms"])
+        door_off += len(g["doors"])
+        window_off += len(g["windows"])
+    notes = notes + [x for x in out["notes"] if x not in notes]
+
+    ground = storeys[0][2]["_storey"]
+    upper = [{**g["_storey"], "base": y} for _, y, g in storeys[1:]]
+    out.update({
+        "rooms": all_rooms, "doors": doors, "windows": windows, "open_walls": open_walls, "stairs": stairs,
+        "levels": levels_out, "notes": notes,
+        "furniture": {"meshes": meshes, "pieces": pieces, "models": models} if meshes or models else None,
+        "finishes": {"meshes": floor_meshes, "pieces": floor_pieces} if floor_pieces else None,
+        "exterior": build_exterior(exterior_spec(exterior), ground["rects"], ground["heights"], ground["open_rects"],
+                                   ground["openings"], ground["shared"], ground["bays"], plant_models, upper=upper),
+    })
+    out["metadata"].update({"total_rooms": len(all_rooms), "total_doors": len(doors), "total_windows": len(windows),
+                            "levels": len(storeys)})
+    for _, _, g in storeys:
+        g.pop("_storey", None)
+    return out

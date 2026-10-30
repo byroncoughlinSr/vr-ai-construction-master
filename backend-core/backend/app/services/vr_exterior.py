@@ -30,7 +30,7 @@ from .vr_geometry_service import (
     FT_TO_M,
     WALL_T,
     _EPS,
-    _feet,
+    subtract_rects,
     _opening_on,
     _room_sides,
     exterior_intervals,
@@ -298,13 +298,6 @@ def _box(center: tuple[float, float, float], size: tuple[float, float, float], c
     }
     if walkable:
         part["walkable"] = True
-    return part
-
-
-def _sphere(center: tuple[float, float, float], size: tuple[float, float, float], color: str,
-            yaw: float = 0.0) -> dict:
-    part = _box(center, size, color, yaw)
-    part["shape"] = "sphere"
     return part
 
 
@@ -728,12 +721,16 @@ def build_exterior(
     shared: dict,
     bays: dict[int, dict],
     plant_models: list[dict] | None = None,
+    upper: list[dict] | None = None,
 ) -> dict | None:
     """Geometry for the outside of the house, metres (the headset scales it).
 
     ``rects``/``heights`` are the rooms as built, ``openings`` every door, window
     and bay cut in the walls, ``bays`` the built bay windows by room index,
     ``plant_models`` the finished photo models (``plant_model_service.ready_models``).
+    ``upper`` are the storeys above the ground floor (``{rects, heights, openings,
+    shared, bays, base}``, ``base`` their floor's height): each gets its own wall finish,
+    and the roof goes over the top of every stack (a one-storey wing keeps its own).
     Returns ``{"roof": [meshes], "parts": [boxes], "plant_meshes", "plants",
     "models", "trim_color", ...}`` or None when the plan has no exterior.
     """
@@ -745,26 +742,43 @@ def build_exterior(
     wall_color = walls["color"] if walls else "#f2f2f2"
 
     roof = spec.get("roof")
-    sections = roof_sections(rects, heights) if roof else []
-    # With a roof, each room's outside finish runs up to its section's eave.
+    storeys = [{"rects": rects, "heights": heights, "openings": openings, "shared": shared, "bays": bays,
+                "base": 0.0}] + (upper or [])
+    # The roof covers what no storey above covers, at that room's top.
+    roof_rects, roof_heights = [], []
+    for i, st in enumerate(storeys):
+        above = [r for higher in storeys[i + 1:] for r in higher["rects"]]
+        for rect, height in zip(st["rects"], st["heights"]):
+            for piece in subtract_rects(rect, above):
+                roof_rects.append(piece)
+                roof_heights.append(st["base"] + height)
+    sections = roof_sections(roof_rects, roof_heights) if roof else []
+    # With a roof over one storey, each room's outside finish runs up to its section's eave.
     finish_heights = list(heights)
-    for _, eave, members in sections:
-        for idx in members:
-            finish_heights[idx] = eave
+    if not upper:
+        for _, eave, members in sections:
+            for idx in members:
+                finish_heights[idx] = eave
 
     if walls:
-        for idx, (rect, height) in enumerate(zip(rects, finish_heights)):
-            parts += wall_skins(rect, height, openings, shared, wall_color)
-            bay = bays.get(idx)
-            if bay:
-                parts += bay_skins(bay["walls"], rect, wall_color)
+        for st, tops in zip(storeys, [finish_heights] + [h["heights"] for h in upper or []]):
+            skins = []
+            for idx, (rect, height) in enumerate(zip(st["rects"], tops)):
+                skins += wall_skins(rect, height, st["openings"], st["shared"], wall_color)
+                bay = st["bays"].get(idx)
+                if bay:
+                    skins += bay_skins(bay["walls"], rect, wall_color)
+            for part in skins:
+                part["center"]["y"] = round(part["center"]["y"] + st["base"], 4)
+            parts += skins
 
     if roof:
         roof_mesh, gable_mesh = _Mesh(), _Mesh()
         for rect, eave, _ in sections:
             _roof_section(rect, eave, roof, roof_mesh, gable_mesh, parts)
-        for idx, bay in bays.items():
-            _bay_roof(bay["info"], heights[idx], roof, roof_mesh)
+        for st in storeys:
+            for idx, bay in st["bays"].items():
+                _bay_roof(bay["info"], st["base"] + st["heights"][idx], roof, roof_mesh)
         roof_meshes = [m for m in (roof_mesh.out(roof["color"]), gable_mesh.out(wall_color)) if m]
         logger.info(f"  🏠 {roof['style']} {roof['material']} roof over {len(sections)} section(s)")
 

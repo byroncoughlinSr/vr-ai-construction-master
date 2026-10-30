@@ -7,7 +7,6 @@ import os
 import traceback
 import threading
 import wave
-import struct
 from pathlib import Path
 
 router = APIRouter()

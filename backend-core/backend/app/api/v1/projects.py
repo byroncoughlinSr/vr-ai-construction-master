@@ -5,16 +5,18 @@ from sqlalchemy.orm import Session
 from typing import Any, Optional
 from sqlalchemy import or_, func
 import logging
+from pathlib import Path
 
 from ...database import get_db
-from ...models import Project, FloorPlan
+from ...config import settings
+from ...models import AIGeneration, FloorPlan, Project
 from ...schemas.project import (
     ProjectCreate, ProjectUpdate, ProjectResponse,
     ProjectListResponse, ProjectStats
 )
 from ...services import get_image_service
-from ...services import floor_plan_service, plant_model_service
-from ...services.vr_furniture import furniture_spec, merge_furniture
+from ...services import floor_plan_service, kitchen_style_service, plant_model_service
+from ...services.vr_furniture import furniture_spec, merge_furniture, with_named_style
 from ...services.floor_plan_service import FloorPlanError
 from ...services.pm_client import ACTOR, PMClient, PMError, PMUnavailable, get_pm
 from .image_jobs import start_image_generation
@@ -171,34 +173,87 @@ def update_project(
         )
 
 
+def _project_files(db: Session, project: Project) -> list[Path]:
+    """Files on disk that belong to ``project`` alone: its rendered images (in
+    ``generated_images``) and its documents (in ``uploads``). An image another
+    project also links is left alone."""
+    def inside(path: Path, directory: str) -> bool:
+        return path.resolve().is_relative_to(Path(directory).resolve())
+
+    urls = {plan.image_url for plan in project.floor_plans} | {g.result_url for g in project.ai_generations}
+    files: list[Path] = []
+    for url in sorted(u for u in urls if u and u.startswith("/generated_images/")):
+        shared = (
+            db.query(FloorPlan.id).filter(FloorPlan.image_url == url, FloorPlan.project_id != project.id).first()
+            or db.query(AIGeneration.id).filter(
+                AIGeneration.result_url == url, AIGeneration.project_id != project.id
+            ).first()
+        )
+        path = Path(settings.generated_images_dir) / Path(url).name
+        if not shared and inside(path, settings.generated_images_dir):
+            files.append(path)
+    for document in project.documents:
+        path = Path(document.file_path or "")
+        if document.file_path and inside(path, settings.uploads_dir):
+            files.append(path)
+    return files
+
+
 @router.delete("/{project_id}")
 def delete_project(
     project_id: int,
+    purge: bool = Query(False, description="Also delete the pm-mcp plan and the project's files"),
     db: Session = Depends(get_db),
     pm: PMClient = Depends(get_pm),
 ):
     """Delete a project. Its construction plan in pm-mcp is archived, not
-    deleted (other apps or agents may still refer to it)."""
+    deleted (other apps or agents may still refer to it) — unless ``purge``: then
+    the pm-mcp project goes too, with the project's images and documents on disk.
+    A purge is refused (503) while pm-mcp is down, before anything is deleted."""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     pm_project_id = project.pm_project_id
+    files = _project_files(db, project) if purge else []
+    if purge and pm_project_id:
+        try:
+            pm.call("delete_project", project_id=pm_project_id, actor=ACTOR)
+        except PMUnavailable as e:
+            raise HTTPException(
+                status_code=503,
+                detail=f"pm-mcp is not reachable ({e}), so the construction plan can't be deleted. "
+                       "Start it and try again, or delete without removing everything (the plan is then archived).",
+            )
+        except PMError as e:
+            if "not found" not in str(e).lower():
+                raise HTTPException(status_code=409, detail=f"pm-mcp refused to delete the plan: {e}")
     try:
         db.delete(project)
         db.commit()
-        if pm_project_id:
-            try:
-                pm.call("update_project", project_id=pm_project_id, status="archived", actor=ACTOR)
-            except (PMError, PMUnavailable) as e:
-                logger.warning(f"⚠️  pm-mcp project {pm_project_id} not archived: {e}")
-        return {"message": "Project deleted successfully"}
     except Exception as e:
         db.rollback()
         raise HTTPException(
             status_code=400,
             detail=f"Failed to delete project: {str(e)}"
         )
+    if pm_project_id and not purge:
+        try:
+            pm.call("update_project", project_id=pm_project_id, status="archived", actor=ACTOR)
+        except (PMError, PMUnavailable) as e:
+            logger.warning(f"⚠️  pm-mcp project {pm_project_id} not archived: {e}")
+    removed = 0
+    for path in files:
+        try:
+            path.unlink()
+            removed += 1
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            logger.warning(f"⚠️  Could not delete {path}: {e}")
+    if purge:
+        logger.info(f"🗑️  Project {project_id} deleted completely (pm-mcp {pm_project_id}, {removed} file(s))")
+    return {"message": "Project deleted successfully", "purged": purge, "files_deleted": removed}
 
 
 @router.post("/{project_id}/load-to-vr")
@@ -387,6 +442,27 @@ def update_floor_plan(project_id: int, update: FloorPlanUpdate, db: Session = De
     return _new_version_response(db, plan)
 
 
+class FurnitureMove(BaseModel):
+    ref: dict = Field(..., description="The piece's ref from the geometry: {room, item, width, depth, auto}")
+    x: float = Field(..., description="Where its centre was left, world metres")
+    z: float
+    yaw: float = Field(0.0, description="Degrees, the geometry's convention")
+
+
+@router.put("/{project_id}/furniture/move")
+def move_furniture(project_id: int, move: FurnitureMove, db: Session = Depends(get_db)):
+    """A piece of furniture grabbed and put down in the headset: saved on the current
+    floor plan in place (the house keeps its version)."""
+    plan = floor_plan_service.current_floor_plan(db, project_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="This project has no floor plan")
+    try:
+        room = floor_plan_service.move_furniture(db, plan, move.ref, move.x, move.z, move.yaw)
+    except FloorPlanError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {"moved": True, "room": room, "version": plan.version}
+
+
 @router.post("/{project_id}/floor-plan/refine")
 async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db: Session = Depends(get_db)):
     """Change the house in words; used by the headset's voice refinement and the dashboard.
@@ -406,6 +482,7 @@ async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db:
                 current,
                 plant_models=[m["name"] for m in plant_model_service.ready_models(db, "plant")],
                 furniture_models=[m["name"] for m in plant_model_service.ready_models(db, "furniture")],
+                kitchen_styles=[s.name for s in kitchen_style_service.list_styles(db)],
             ),
         )
     except Exception as e:
@@ -416,6 +493,8 @@ async def refine_floor_plan(project_id: int, refine: FloorPlanRefineRequest, db:
     structure = revised.get("project_structure") or {}
     exterior = revised.get("exterior", structure.get("exterior"))
     furniture = revised.get("furniture", structure.get("furniture"))
+    if furniture is not None:
+        furniture = with_named_style(furniture, refine.instruction, [s.name for s in kitchen_style_service.list_styles(db)])
     scope = str(revised.get("scope") or "").strip().lower()
     if scope not in ("exterior", "furniture", "floor_plan", "both"):
         scope = (

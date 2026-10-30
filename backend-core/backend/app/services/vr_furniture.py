@@ -274,6 +274,30 @@ def _side(value: Any, options=_SIDES) -> str | None:
     return None
 
 
+_CORNERS = tuple(f"{a}-{b}" for a in ("front", "back") for b in ("left", "right"))
+_DIAGONAL = re.compile(r"\b(diagonal\w*|angled?|45)\b")
+
+
+def _corner(value: Any) -> str | None:
+    """"front-right" from words naming both walls of a corner ("the back left corner")."""
+    words = [_SIDE_ALIASES.get(w, w) for w in name_key(value).split()]
+    fb = next((w for w in words if w in ("front", "back")), None)
+    lr = next((w for w in words if w in ("left", "right")), None)
+    return f"{fb}-{lr}" if fb and lr else None
+
+
+def _between(raw: dict, room: str) -> list[str] | None:
+    """The two pieces a counter runs between: ``between`` (a list or "stove and fridge"),
+    or ``from`` / ``to``."""
+    value = raw.get("between")
+    if isinstance(value, str):
+        value = re.split(r"\band\b|\bto\b|,|&", value)
+    if not isinstance(value, list):
+        value = [raw.get("from"), raw.get("to")]
+    kinds = [find_piece(v, room) for v in value if v]
+    return kinds if len(kinds) == 2 and all(kinds) and kinds[0] != kinds[1] else None
+
+
 def _clean_item(raw: Any, room: str) -> dict | None:
     if isinstance(raw, str):
         raw = {"type": raw}
@@ -307,6 +331,31 @@ def _clean_item(raw: Any, room: str) -> dict | None:
     place = _side(raw.get("place") or raw.get("wall") or raw.get("position"), _PLACES)
     if place:
         item["place"] = place
+    where = " ".join(str(raw.get(k) or "") for k in ("corner", "place", "position", "wall"))
+    corner = _corner(where)
+    if PIECES[kind].builder == "stove":
+        # A stove across a corner: a corner named, or "diagonal" / "corner" asked for.
+        diagonal = raw.get("diagonal") is True or bool(_DIAGONAL.search(f"{name_key(words)} {name_key(where)}"))
+        if corner or diagonal or place == "corner" or raw.get("corner") == "any":
+            item["corner"] = corner or "any"
+            item.pop("place", None)
+    elif corner and PIECES[kind].builder in _WALL_BUILDERS:
+        item["corner"] = corner  # against one of its walls, pushed into it
+    style = " ".join(str(raw.get("style") or "").split())[:80]
+    if style and PIECES[kind].builder in _KITCHEN:
+        item["style"] = style
+    # What a counter run or an island has, when the plan says: "no sink", "add wall cabinets".
+    for key in _FEATURES.get(PIECES[kind].builder, ()):
+        flag = _flag(raw.get(key) if key in raw else raw.get({"uppers": "upper"}.get(key, "")))
+        if flag is not None:
+            item[key] = flag
+    rotation = _num(raw.get("rotation"), -720, 720)
+    if rotation is not None and "x" in item:
+        item["rotation"] = round(rotation % 360, 1)
+    if PIECES[kind].builder == "counter":
+        between = _between(raw, room)
+        if between:
+            item["between"] = between
     if raw.get("color"):
         color = color_hex(raw.get("color"), "") or WOODS.get(name_key(raw.get("color")), "")
         if color:
@@ -331,6 +380,17 @@ def _clean_item(raw: Any, room: str) -> dict | None:
     if isinstance(model_id, (int, float, str)) and str(model_id).strip().isdigit():
         item["model_id"] = int(str(model_id).strip())
     return item
+
+
+_FEATURES = {"counter": ("sink", "range", "uppers"), "island": ("sink",)}
+
+
+def _flag(value: Any) -> bool | None:
+    """True/False from a boolean or a yes/no word; None when it says neither."""
+    if isinstance(value, bool):
+        return value
+    text = str(value or "").strip().lower()
+    return True if text in ("true", "yes", "1", "on") else False if text in ("false", "no", "0", "off", "none") else None
 
 
 def _key(value: Any) -> str:
@@ -386,6 +446,109 @@ def merge_furniture(current: dict | None, change: dict | None) -> dict | None:
     if rooms:
         out["rooms"] = rooms
     return out or None
+
+
+class MoveError(ValueError):
+    """A piece that can't be moved (it no longer matches the plan)."""
+
+
+def move_piece(spec: dict | None, ref: dict, target: str, x_ft: float, z_ft: float, rotation: float,
+               sizes: dict[str, tuple[float, float]]) -> dict:
+    """``spec`` with the piece ``ref`` names (``{"room", "item", "width", "depth", "auto"}``,
+    as ``build_furniture`` gave it) standing at ``x_ft``/``z_ft`` (feet from ``target``'s
+    front-left corner, its centre) turned ``rotation`` degrees: as it was left after
+    being grabbed. A room furnished automatically gets its list written out first;
+    one of several (``count``) is split off; it keeps the size it had and loses
+    where it was told to go (``place``, ``corner``, ``between``, ``facing``).
+    ``sizes`` are the rooms' sizes in metres (length, width)."""
+    spec = {**(spec or {}), "rooms": {k: [dict(i) for i in v] for k, v in ((spec or {}).get("rooms") or {}).items()}}
+    rooms = spec["rooms"]
+
+    def items_of(name: str) -> list[dict]:
+        key = next((k for k in rooms if k.strip().lower() == name.strip().lower()), None)
+        if key is not None:
+            return rooms[key]
+        listed = []
+        if spec.get("auto") and name in sizes:
+            listed = [i for i in (_clean_item(r, room_kind(name)) for r in auto_items(name, *sizes[name])) if i]
+        rooms[name] = listed
+        return listed
+
+    if ref.get("room") not in sizes or target not in sizes:
+        raise MoveError("that room is not in the house")
+    items = items_of(ref["room"])
+    n = ref.get("item")
+    if not isinstance(n, int) or not 0 <= n < len(items):
+        raise MoveError("that piece is no longer in the plan; reload the house")
+    item = items[n]
+    if item.get("count", 1) > 1:
+        item["count"] -= 1
+        if item["count"] == 1:
+            item.pop("count")
+        moved = {k: v for k, v in item.items() if k != "count"}
+        at = None
+    else:
+        moved = items.pop(n)
+        at = n
+    moved = {k: v for k, v in moved.items() if k not in ("place", "corner", "between", "facing", "auto")}
+    for key in ("width", "depth"):
+        if ref.get(key):
+            moved[key] = ref[key]
+    moved.update({"x": round(x_ft, 1), "z": round(z_ft, 1), "rotation": round(rotation % 360, 1)})
+    dest = items_of(target)
+    if dest is items and at is not None:
+        dest.insert(at, moved)  # same room: same place in the list, so other refs still hold
+    else:
+        dest.append(moved)
+    return spec
+
+
+def shown_furniture(spec: dict | None, rooms: list[dict] | None) -> dict | None:
+    """``spec`` as the refine prompt shows it: rooms ``auto`` furnishes are listed with
+    what they get, so a change to one of them keeps the rest of its pieces. ``auto`` is
+    left out: with every room listed the AI took it for moot and sent ``false``."""
+    if not spec or not spec.get("auto") or not rooms:
+        return spec
+    listed = dict(spec.get("rooms") or {})
+    lower = {k.strip().lower() for k in listed}
+    for room in rooms:
+        name = str(room.get("name") or "")
+        dims = room.get("dimensions") or {}
+        if not name or name.strip().lower() in lower:
+            continue
+        try:
+            length, width = _m(float(dims["length"])), _m(float(dims["width"]))
+        except (KeyError, TypeError, ValueError):
+            continue
+        items = auto_items(name, length, width)
+        if items:
+            listed[name] = items
+    return {**{k: v for k, v in spec.items() if k != "auto"}, "rooms": listed}
+
+
+_WHOLE_HOUSE = re.compile(r"\b(furnish\w*|furniture|empty|unfurnish\w*|clear)\b", re.I)
+
+
+def with_named_style(raw: Any, instruction: str, style_names: list[str]) -> dict | None:
+    """The AI's furniture change for ``instruction``, cleaned: the kitchen style the
+    request names is put on the kitchen pieces of rooms where the AI left it out ("in
+    Farmhouse kitchen style": Groq returned the kitchen without it), and an ``auto`` the
+    request didn't ask for is dropped (Groq sent ``false`` with a kitchen change, which
+    would have emptied every automatically furnished room)."""
+    spec = furniture_spec(raw)
+    if spec and "auto" in spec and not _WHOLE_HOUSE.search(str(instruction or "")):
+        spec.pop("auto")
+    words = f" {name_key(instruction)} "
+    named = next((n for n in sorted(style_names, key=len, reverse=True)
+                  if name_key(n) and f" {name_key(n)} " in words), None)
+    if not spec or not named:
+        return spec
+    for items in (spec.get("rooms") or {}).values():
+        kitchen = [i for i in items if PIECES[i["type"]].builder in _KITCHEN]
+        if kitchen and not any(i.get("style") for i in kitchen):
+            for i in kitchen:
+                i["style"] = named
+    return spec
 
 
 def rename_furniture_rooms(spec: dict | None, mapping: dict[str, str]) -> dict | None:
@@ -746,9 +909,109 @@ def _piano(m, W, D, H, c, o):
     box(m, _shade(body, 1.3), -W * 0.3, W * 0.3, 0.9, 1.15, D / 2 - 0.26, D / 2 - 0.25)
 
 
+GLASS = "#8fa3a8"  # a glass cabinet door, the dishes behind it
+
+
+def _put(m, part: PlantMesh, fn):
+    """Copy ``part`` into ``m`` with every point moved by ``fn`` (a turn: winding kept)."""
+    for color, pts in part.groups.items():
+        m.groups.setdefault(color, []).extend(fn(*p) for p in pts)
+
+
+def _front(m, color: str, x0: float, x1: float, y0: float, y1: float, z: float, o: dict, glass: bool = False):
+    """A cabinet door or drawer front on the +z plane at ``z``, in the kitchen style's
+    door look (``o["door"]``): flat, shaker (a frame round a recessed panel), raised
+    (a raised panel in the frame), or glass panes with muntins."""
+    door = o.get("door") or "flat"
+    if door == "flat" and not glass:
+        box(m, color, x0, x1, y0, y1, z - 0.02, z)
+        return
+    rail = min(0.06, (y1 - y0) / 4, (x1 - x0) / 4)
+    for rx0, rx1, ry0, ry1 in ((x0, x0 + rail, y0, y1), (x1 - rail, x1, y0, y1),
+                               (x0 + rail, x1 - rail, y0, y0 + rail), (x0 + rail, x1 - rail, y1 - rail, y1)):
+        box(m, color, rx0, rx1, ry0, ry1, z - 0.02, z)
+    ix0, ix1, iy0, iy1 = x0 + rail, x1 - rail, y0 + rail, y1 - rail
+    if glass:
+        box(m, GLASS, ix0, ix1, iy0, iy1, z - 0.016, z - 0.012)
+        bar = 0.012
+        mx = (ix0 + ix1) / 2
+        box(m, color, mx - bar / 2, mx + bar / 2, iy0, iy1, z - 0.012, z - 0.004)
+        rows = max(2, round((iy1 - iy0) / 0.16))
+        for k in range(1, rows):
+            y = iy0 + (iy1 - iy0) * k / rows
+            box(m, color, ix0, ix1, y - bar / 2, y + bar / 2, z - 0.012, z - 0.004)
+        return
+    box(m, _shade(color, 0.93), ix0, ix1, iy0, iy1, z - 0.02, z - 0.008)
+    if door == "raised" and min(ix1 - ix0, iy1 - iy0) > 0.06:
+        box(m, _shade(color, 1.02), ix0 + 0.02, ix1 - 0.02, iy0 + 0.02, iy1 - 0.02, z - 0.008, z - 0.002)
+
+
+def _fleck(m, color: str, x0: float, x1: float, z0: float, z1: float, y: float, inside=None):
+    """Specks of a granite countertop on its top at ``y`` (``inside(x, z)`` limits them
+    to a shape)."""
+    rng = random.Random(f"fleck/{x0:.2f}/{x1:.2f}/{z0:.2f}/{z1:.2f}")
+    light = _shade(color, 1.35)
+    for _ in range(int((x1 - x0) * (z1 - z0) * 140)):
+        x, z, r = rng.uniform(x0, x1), rng.uniform(z0, z1), rng.uniform(0.003, 0.007)
+        if inside and not inside(x, z):
+            continue
+        a, b, c_, d = (x - r, y, z - r), (x + r, y, z - r), (x + r, y, z + r), (x - r, y, z + r)
+        m.quad(color if rng.random() < 0.7 else light, a, d, c_, b)
+
+
+def _backsplash(m, o: dict, x0: float, x1: float, y0: float, y1: float, z: float):
+    """The wall between the countertop and the wall cabinets, facing +z from ``z``:
+    plain tile with grout lines, or a mosaic of short strips in shades of its colour."""
+    kind, color = o.get("splash"), o.get("splash_color") or "#d9d6cf"
+    if not kind or y1 - y0 < 0.03:
+        return
+    if kind == "tile":
+        box(m, color, x0, x1, y0, y1, z, z + 0.008)
+        grout = _shade(color, 1.2)
+        y = y0 + 0.075
+        while y < y1 - 0.01:
+            m.quad(grout, (x0, y, z + 0.009), (x1, y, z + 0.009), (x1, y + 0.003, z + 0.009), (x0, y + 0.003, z + 0.009))
+            y += 0.075
+        return
+    box(m, _shade(color, 0.55), x0, x1, y0, y1, z, z + 0.006)  # the grout
+    palette = [color, color, _shade(color, 0.75), _shade(color, 1.3), _shade(color, 1.7), "#b9bcbf"]
+    rng = random.Random(f"mosaic/{x1 - x0:.2f}/{y1 - y0:.2f}")
+    row, gap, zf = 0.03, 0.004, z + 0.008
+    y = y0 + gap
+    while y + row <= y1:
+        x = x0 + rng.uniform(0, 0.08)
+        while x < x1 - 0.02:
+            w = min(rng.uniform(0.06, 0.22), x1 - x)
+            m.quad(rng.choice(palette), (x, y, zf), (x + w, y, zf), (x + w, y + row, zf), (x, y + row, zf))
+            x += w + gap
+        y += row + gap
+
+
+def _uppers(m, x0: float, x1: float, D: float, cab: str, o: dict, y0: float = 1.38, y1: float = 2.12,
+            ud: float = 0.33, glass: bool | None = None):
+    """Wall cabinets over ``x0``..``x1`` against the wall at -D/2, with the style's crown."""
+    box(m, _shade(cab, 0.9), x0, x1, y0, y1, -D / 2, -D / 2 + ud - 0.02)
+    run = x1 - x0
+    n = max(1, round(run / 0.5))
+    fw = run / n
+    glass = o.get("glass") if glass is None else glass
+    hc = o.get("handle") or STEEL
+    for k in range(n):
+        fx0 = x0 + k * fw + 0.006
+        fx1 = fx0 + fw - 0.012
+        _front(m, cab, fx0, fx1, y0 + 0.01, y1 - 0.01, -D / 2 + ud, o, glass=bool(glass))
+        hx = fx1 - 0.045 if k % 2 == 0 else fx0 + 0.03
+        box(m, hc, hx, hx + 0.015, y0 + 0.06, y0 + 0.16, -D / 2 + ud, -D / 2 + ud + 0.02)
+    if o.get("crown"):
+        box(m, cab, x0 - 0.01, x1 + 0.01, y1, y1 + 0.05, -D / 2, -D / 2 + ud + 0.03)
+        box(m, _shade(cab, 1.03), x0 - 0.02, x1 + 0.02, y1 + 0.05, y1 + 0.09, -D / 2, -D / 2 + ud + 0.06)
+
+
 def _counter(m, W, D, H, c, o):
-    """Base cabinets with a countertop; the auto kitchen adds a fridge, a range and a sink."""
+    """Base cabinets with a countertop; the auto kitchen adds a fridge, a range and a sink.
+    A kitchen style (``o``) gives the doors, handles, granite, backsplash and crown."""
     cab, top = c["main"], c.get("top", "#e6e1d8")
+    hc = o.get("handle") or STEEL
     fridge_w = 0.9 if o.get("fridge") else 0.0
     x0 = -W / 2 + fridge_w
     if fridge_w:
@@ -756,6 +1019,8 @@ def _counter(m, W, D, H, c, o):
     box(m, "#3a3a3a", x0, W / 2, 0, 0.1, -D / 2, D / 2 - 0.07)
     box(m, _shade(cab, 0.9), x0, W / 2, 0.1, H - 0.04, -D / 2, D / 2 - 0.02)
     box(m, top, x0 - 0.01, W / 2 + 0.01, H - 0.04, H, -D / 2, D / 2 + 0.02)
+    if o.get("fleck"):
+        _fleck(m, o["fleck"], x0, W / 2, -D / 2, D / 2 + 0.02, H + 0.001)
     run = W / 2 - x0
     range_x = None
     if o.get("range") and run >= 2.0:
@@ -777,19 +1042,18 @@ def _counter(m, W, D, H, c, o):
         for k in range(n):
             fx0 = a + k * fw + 0.006
             fx1 = fx0 + fw - 0.012
-            box(m, cab, fx0, fx1, 0.12, H - 0.22, D / 2 - 0.02, D / 2)
-            box(m, cab, fx0, fx1, H - 0.2, H - 0.06, D / 2 - 0.02, D / 2)
-            box(m, STEEL, (fx0 + fx1) / 2 - 0.06, (fx0 + fx1) / 2 + 0.06, H - 0.14, H - 0.12, D / 2, D / 2 + 0.02)
-    if o.get("upper"):
-        y0, y1, ud = 1.38, 2.12, 0.33
-        box(m, _shade(cab, 0.9), x0, W / 2, y0, y1, -D / 2, -D / 2 + ud - 0.02)
-        n = max(1, round(run / 0.5))
-        fw = run / n
-        for k in range(n):
-            fx0 = x0 + k * fw + 0.006
-            box(m, cab, fx0, fx0 + fw - 0.012, y0 + 0.01, y1 - 0.01, -D / 2 + ud - 0.02, -D / 2 + ud)
+            _front(m, cab, fx0, fx1, 0.12, H - 0.22, D / 2, o)
+            _front(m, cab, fx0, fx1, H - 0.2, H - 0.06, D / 2, o)
+            box(m, hc, (fx0 + fx1) / 2 - 0.06, (fx0 + fx1) / 2 + 0.06, H - 0.14, H - 0.12, D / 2, D / 2 + 0.02)
+            if o.get("door"):  # a pull on the door too, by its opening edge
+                hx = fx1 - 0.05 if k % 2 == 0 else fx0 + 0.035
+                box(m, hc, hx, hx + 0.015, H - 0.42, H - 0.3, D / 2, D / 2 + 0.02)
+    upper = bool(o.get("upper"))
+    _backsplash(m, o, x0, W / 2, H, 1.38 if upper else H + 0.1, -D / 2)
+    if upper:
+        _uppers(m, x0, W / 2, D, cab, o)
         if range_x is not None:
-            box(m, STEEL, range_x - 0.38, range_x + 0.38, y0 - 0.1, y0 + 0.05, -D / 2, -D / 2 + 0.45)
+            box(m, STEEL, range_x - 0.38, range_x + 0.38, 1.28, 1.43, -D / 2, -D / 2 + 0.45)
 
 
 def _fridge_at(m, x0: float, x1: float, D: float, H: float):
@@ -817,12 +1081,24 @@ def _island(m, W, D, H, c, o):
     box(m, "#3a3a3a", -W / 2 + 0.05, W / 2 - 0.05, 0, 0.1, -D / 2 + 0.07, D / 2 - over - 0.05)
     box(m, _shade(cab, 0.9), -W / 2, W / 2, 0.1, H - 0.04, -D / 2, D / 2 - over)
     box(m, top, -W / 2 - 0.02, W / 2 + 0.02, H - 0.04, H, -D / 2 - 0.02, D / 2)
+    if o.get("fleck"):
+        _fleck(m, o["fleck"], -W / 2 - 0.02, W / 2 + 0.02, -D / 2 - 0.02, D / 2, H + 0.001)
+    if o.get("sink"):
+        sx, sz = 0.0, (-D / 2 + D / 2 - over) / 2
+        box(m, "#9aa0a6", sx - 0.38, sx + 0.38, H, H + 0.004, sz - 0.22, sz + 0.22)
+        box(m, "#5f6368", sx - 0.35, sx + 0.35, H + 0.004, H + 0.006, sz - 0.19, sz + 0.19)
+        tube(m, STEEL, (sx, H, -D / 2 + 0.06), (sx, H + 0.3, -D / 2 + 0.06), 0.015, 0.015, 6)
+        tube(m, STEEL, (sx, H + 0.3, -D / 2 + 0.06), (sx, H + 0.28, sz - 0.05), 0.013, 0.012, 6)
+    # The fronts face the kitchen (-z): drawn facing +z, then turned round.
+    part = PlantMesh()
+    hc = o.get("handle") or STEEL
     n = max(1, round(W / 0.6))
     fw = W / n
     for k in range(n):
         fx0 = -W / 2 + k * fw + 0.006
-        box(m, cab, fx0, fx0 + fw - 0.012, 0.12, H - 0.06, -D / 2 - 0.02, -D / 2)
-        box(m, STEEL, fx0 + fw / 2 - 0.06, fx0 + fw / 2 + 0.06, H - 0.14, H - 0.12, -D / 2 - 0.04, -D / 2 - 0.02)
+        _front(part, cab, fx0, fx0 + fw - 0.012, 0.12, H - 0.06, D / 2 + 0.02, o)
+        box(part, hc, fx0 + fw / 2 - 0.06, fx0 + fw / 2 + 0.06, H - 0.14, H - 0.12, D / 2 + 0.02, D / 2 + 0.04)
+    _put(m, part, lambda x, y, z: (-x, y, -z))
 
 
 def _fridge(m, W, D, H, c, o):
@@ -830,7 +1106,121 @@ def _fridge(m, W, D, H, c, o):
 
 
 def _stove(m, W, D, H, c, o):
-    _range_at(m, 0.0, D, H)
+    if o.get("corner"):
+        _corner_stove(m, W, H, o.get("cabinet") or WHITE, c.get("top", "#e6e1d8"), o)
+    else:
+        _range_at(m, 0.0, D, H)
+
+
+RANGE_W = 0.76  # what _range_at draws
+
+
+def _corner_size(range_w: float = RANGE_W) -> float:
+    """The side of a corner stove's square: counters' depth along each wall, then the
+    range (``range_w`` wide: a photo model's own width) across the corner between them."""
+    return _m(PIECES["counter"].depth) + range_w / math.sqrt(2)
+
+
+def _ear_clip(poly: list[tuple[float, float]]) -> list[tuple[int, int, int]]:
+    """Triangles of a simple counter-clockwise polygon."""
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    idx, tris = list(range(len(poly))), []
+    while len(idx) > 3:
+        for k in range(len(idx)):
+            i, j, l = idx[k - 1], idx[k], idx[(k + 1) % len(idx)]
+            a, b, c = poly[i], poly[j], poly[l]
+            if cross(a, b, c) <= 1e-9:
+                continue
+            if any(cross(a, b, poly[q]) >= 0 and cross(b, c, poly[q]) >= 0 and cross(c, a, poly[q]) >= 0
+                   for q in idx if q not in (i, j, l)):
+                continue
+            tris.append((i, j, l))
+            idx.pop(k)
+            break
+        else:
+            break
+    if len(idx) == 3:
+        tris.append(tuple(idx))
+    return tris
+
+
+def _prism(m, color: str, poly: list[tuple[float, float]], y0: float, y1: float):
+    """An upright prism over a polygon of (x, z) points, its top and sides."""
+    # Clockwise in (x, z), as box() winds its top (normal up) and outward sides.
+    if sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(poly, poly[1:] + poly[:1])) > 0:  # counter-clockwise
+        poly = poly[::-1]
+    for i, j, k in _ear_clip([(x, -z) for x, z in poly]):
+        m.tri(color, *((poly[n][0], y1, poly[n][1]) for n in (i, j, k)))
+    for (ax, az), (bx, bz) in zip(poly, poly[1:] + poly[:1]):
+        m.quad(color, (ax, y0, az), (bx, y0, bz), (bx, y1, bz), (ax, y1, az))
+
+
+def _inside(poly: list[tuple[float, float]], x: float, z: float) -> bool:
+    """Whether (x, z) is inside a polygon (even-odd rule)."""
+    hit = False
+    for (ax, az), (bx, bz) in zip(poly, poly[1:] + poly[:1]):
+        if (az > z) != (bz > z) and x < ax + (z - az) * (bx - ax) / (bz - az):
+            hit = not hit
+    return hit
+
+
+def _corner_stove(m, L, H, cab, top, o: dict | None = None):
+    """A range set across a corner: the corner (back-left, local -x and -z) filled
+    with a cabinet and countertop, the range's front on the diagonal between the
+    two counter runs, a hood and a wall cabinet above it. With ``o["model"]`` the
+    range is a photo model placed beside the mesh (``corner_stove_spot``): only the
+    cabinet and countertop round it are drawn, and a wall cabinet over the model's
+    top (``o["upper_from"]``) when there is room."""
+    o = o or {}
+    d = _m(PIECES["counter"].depth)
+    sd = _m(PIECES["stove"].depth)
+    rw = float(o.get("range_w") or RANGE_W)
+    r2 = math.sqrt(2) / 2
+    mid = (L + d) / 2  # the middle of the diagonal, from the corner along each wall
+    c = mid - sd / 2 * r2  # the range's centre
+
+    def at(u, v):  # corner-relative to local
+        return u - L / 2, v - L / 2
+
+    back = mid - sd * r2
+    stove_back = [(back + rw / 2 * r2, back - rw / 2 * r2), (back - rw / 2 * r2, back + rw / 2 * r2)]
+    around = [(0, 0), (L, 0), (L, d), *stove_back, (d, L), (0, L)]  # the corner less the range
+    base = [at(u, v) for u, v in around]
+    _prism(m, "#3a3a3a", base, 0, 0.1)
+    _prism(m, _shade(cab, 0.9), base, 0.1, H - 0.04)
+    _prism(m, top, base, H - 0.04, H)
+    if o.get("fleck"):
+        _fleck(m, o["fleck"], -L / 2, L / 2, -L / 2, L / 2, H + 0.001, inside=lambda x, z: _inside(base, x, z))
+    # The backsplash on both walls: the back one faces +z, the left one turned to face +x.
+    _backsplash(m, o, -L / 2, L / 2, H, 1.38, -L / 2)
+    side = PlantMesh()
+    _backsplash(side, o, -L / 2, L / 2, H, 1.38, -L / 2)
+    _put(m, side, lambda x, y, z: (z, y, -x))
+    # The range, its hood and the cabinet over it, drawn facing +z and turned 45° to face
+    # out of the corner.
+    part = PlantMesh()
+    if o.get("model"):
+        y0 = max(1.38, float(o.get("upper_from") or 0) + 0.03)
+    else:
+        _range_at(part, 0.0, sd, H)
+        box(part, STEEL, -0.38, 0.38, 1.4, 1.55, -sd / 2, -sd / 2 + 0.45)
+        y0 = 1.55
+    if 2.12 - y0 >= 0.2:
+        _uppers(part, -rw / 2, rw / 2, sd, cab, o, y0=y0, glass=False)
+    cx, cz = at(c, c)
+    _put(m, part, lambda x, y, z: (cx + x * r2 + z * r2, y, cz - x * r2 + z * r2))
+
+
+def corner_stove_spot(L: float, depth: float) -> tuple[float, float, tuple[float, float]]:
+    """Where a photo model of a range goes in a corner stove's square (``L``): its centre
+    (local x, z), its back on the cut's back line, and its front's direction (local)."""
+    d = _m(PIECES["counter"].depth)
+    sd = _m(PIECES["stove"].depth)
+    r2 = math.sqrt(2) / 2
+    u = (L + d) / 2 - sd * r2 + depth / 2 * r2
+    return u - L / 2, u - L / 2, (r2, r2)
 
 
 def _toilet(m, W, D, H, c, o):
@@ -1000,6 +1390,9 @@ def piece_mesh(builder: str, W: float, D: float, H: float, colors: tuple, option
 
 _INWARD = {"front": (0.0, 1.0), "back": (0.0, -1.0), "left": (1.0, 0.0), "right": (-1.0, 0.0)}
 _OPPOSITE = {"front": "back", "back": "front", "left": "right", "right": "left"}
+# A kitchen run: these stand flush against each other, without room to walk between.
+_RUN = {"counter", "fridge", "stove"}
+_KITCHEN = {"counter", "island", "fridge", "stove"}  # what a kitchen style draws
 # Pieces that go against a wall even when the plan says where (they need one behind them).
 _WALL_BUILDERS = {"sofa", "sectional", "bed", "crib", "dresser", "wardrobe", "bookshelf", "tv_stand", "cabinet",
                   "piano", "counter", "fridge", "stove", "toilet", "vanity", "bathtub", "washer", "console", "desk"}
@@ -1051,6 +1444,8 @@ class Placed:
     yaw: float
     side: str | None = None  # the wall it stands against
     parts: tuple = ()  # chairs and stools that came with it
+    options: tuple = ()  # what its mesh was drawn with (a counter's sink)
+    corner: str | None = None  # the corner it stands in ("front-right")
 
 
 class RoomSpace:
@@ -1068,6 +1463,7 @@ class RoomSpace:
         self.placed: list[Placed] = []
         # (x0, x1, z0, z1, allowed height below it)
         self.keep_clear: list[tuple[float, float, float, float, float]] = []
+        self.open_clear: dict[str, list[tuple]] = {}  # the keep_clear zones of opened-up walls, by side
         for side, (axis, line) in self._side_lines().items():
             for o in openings:
                 if o["axis"] != axis or abs(o["line"] - line) > _EPS:
@@ -1086,6 +1482,8 @@ class RoomSpace:
                 else:  # a window: only what is taller than the sill is in the way
                     depth, below, pad = 0.5, o["bottom"] - 0.02, 0.05
                 self.keep_clear.append(self._zone(side, a - pad, b + pad, depth) + (below,))
+                if kind == "open":
+                    self.open_clear.setdefault(side, []).append(self.keep_clear[-1])
 
     def _side_lines(self) -> dict[str, tuple[str, float]]:
         r = self.rect
@@ -1107,11 +1505,12 @@ class RoomSpace:
     def side_span(self, side: str) -> tuple[float, float]:
         return (self.x0, self.x1) if side in ("front", "back") else (self.z0, self.z1)
 
-    def fits(self, box_: tuple, height: float, ignore: tuple = ()) -> bool:
+    def fits(self, box_: tuple, height: float, ignore: tuple = (), flush: bool = False) -> bool:
         """Whether a piece this tall with these plan bounds is inside the room, clear
         of doorways (and of windows unless it is lower than the sill) and of the
         other pieces. ``height`` is what stands against the wall: a bed's headboard
-        may run up in front of a window, its mattress may not."""
+        may run up in front of a window, its mattress may not. ``flush``: a piece of
+        a kitchen run may touch the run's other pieces."""
         x0, x1, z0, z1 = box_
         if x0 < self.x0 - _EPS or x1 > self.x1 + _EPS or z0 < self.z0 - _EPS or z1 > self.z1 + _EPS:
             return False
@@ -1122,7 +1521,7 @@ class RoomSpace:
             if p.piece.builder == "rug":
                 continue
             # A piece set beside another (a nightstand by the bed) only has to miss it.
-            if _overlap(box_, raw_box(p) if p in ignore else p_box(p)):
+            if _overlap(box_, raw_box(p) if p in ignore or (flush and p.piece.builder in _RUN) else p_box(p)):
                 return False
         return True
 
@@ -1138,14 +1537,14 @@ class RoomSpace:
             return self.x0 + gap + D / 2, t, yaw_facing(fx, fz)
         return self.x1 - gap - D / 2, t, yaw_facing(fx, fz)
 
-    def wall_spots(self, side: str, W: float, D: float, H: float, extra=None) -> list[float]:
+    def wall_spots(self, side: str, W: float, D: float, H: float, extra=None, flush: bool = False) -> list[float]:
         """Every position along ``side`` (5 cm apart) where the piece fits."""
         lo, hi = self.side_span(side)
         spots = []
         t = lo + W / 2 + 0.02
         while t <= hi - W / 2 - 0.02 + _EPS:
             cx, cz, yaw = self.against(side, t, W, D)
-            if self.fits(_aabb(cx, cz, W, D, yaw), H) and (extra is None or extra(cx, cz, yaw)):
+            if self.fits(_aabb(cx, cz, W, D, yaw), H, flush=flush) and (extra is None or extra(cx, cz, yaw)):
                 spots.append(t)
             t += 0.05
         return spots
@@ -1217,6 +1616,8 @@ def _colors(item: dict, piece: Piece) -> tuple:
         # A wooden piece's color is its wood (a "white dresser" is painted white).
         wood = item.get("color") or named or item.get("wood") or piece.color
     colors = {"main": main, "wood": wood}
+    if item.get("top"):
+        colors["top"] = item["top"]
     if piece.builder == "vanity":
         colors["wood_cab"] = item.get("color") or named or item.get("wood") or "#f0ede6"
     return tuple(sorted(colors.items()))
@@ -1228,11 +1629,13 @@ class Furnishing:
     """Collects the furniture of a house: shared meshes with their instances, the
     photo models, and notes about what did not fit."""
 
-    def __init__(self, models: list[dict] | None):
+    def __init__(self, models: list[dict] | None, styles: list[dict] | None = None):
         self.meshes: dict[str, dict] = {}
         self.pieces: list[dict] = []
         self.models: list[dict] = []
         self.photo_models = models or []
+        self.styles = styles or []
+        self.room_name = ""  # the room being furnished, for each piece's ``ref``
         self.notes: list[str] = []
         self.triangles = 0
 
@@ -1253,10 +1656,25 @@ class Furnishing:
         if "model_id" in item:
             return next((m for m in self.photo_models if m["id"] == item["model_id"]), None)
         key = name_key(item.get("name"))
-        return next((m for m in self.photo_models if key and name_key(m["name"]) == key), None)
+        if not key:
+            return None
+        # "my office desk" is the "Office desk" model; the longest name that fits wins.
+        return next((m for m in self.photo_models if name_key(m["name"]) == key), None) or max(
+            (m for m in self.photo_models if name_key(m["name"]) and re.search(rf"\b{re.escape(name_key(m['name']))}\b", key)),
+            key=lambda m: len(name_key(m["name"])), default=None)
+
+    def kitchen_style(self, name: Any) -> dict | None:
+        """The saved kitchen style ``name`` calls for ("farmhouse" is "Farmhouse kitchen")."""
+        key = name_key(name)
+        if not key or not self.styles:
+            return None
+        return next((s for s in self.styles if name_key(s["name"]) == key), None) or max(
+            (s for s in self.styles if name_key(s["name"]) and (
+                re.search(rf"\b{re.escape(name_key(s['name']))}\b", key) or re.search(rf"\b{re.escape(key)}\b", name_key(s["name"])))),
+            key=lambda s: len(name_key(s["name"])), default=None)
 
     def add(self, room_id: int, item: dict, piece: Piece, W: float, D: float, H: float,
-            cx: float, cz: float, yaw: float, options: tuple = ()):
+            cx: float, cz: float, yaw: float, options: tuple = (), photo: bool = True):
         colors = _colors(item, piece)
         out = {
             "room": room_id,
@@ -1269,9 +1687,15 @@ class Furnishing:
         }
         if item.get("name"):
             out["name"] = item["name"]
-        model = self._photo_model(item)
+        if "_i" in item:
+            # Which item of the plan this is, so the headset can move it (PUT .../furniture/move).
+            out["ref"] = {"room": self.room_name, "item": item["_i"], "width": round(W / FT_TO_M, 1),
+                          "depth": round(D / FT_TO_M, 1), **({"auto": True} if item.get("auto") else {})}
+        model = self._photo_model(item) if photo else None
         if model:
             out.update({"model_id": model["id"], "url": model["url"], "scale": round(H, 3)})
+            if model.get("turn"):  # the way the photo was taken is not the piece's front
+                out["yaw"] = round((yaw + model["turn"]) % 360, 1)
             if not item.get("height") and model.get("height_ft"):
                 out["scale"] = round(_m(model["height_ft"]), 3)
             out["name"] = model["name"]
@@ -1356,7 +1780,7 @@ def _place_wall(space: RoomSpace, item: dict, piece: Piece, W: float, D: float, 
     for rank, side in enumerate(sides):
         if side == avoid:
             continue
-        spots = space.wall_spots(side, W, D, _wall_height(piece, H))
+        spots = space.wall_spots(side, W, D, _wall_height(piece, H), flush=piece.builder in _RUN)
         if not spots:
             continue
         lo, hi = space.side_span(side)
@@ -1378,29 +1802,80 @@ def _place_wall(space: RoomSpace, item: dict, piece: Piece, W: float, D: float, 
     return placed
 
 
+def _seated(item: dict, piece: Piece, W: float, D: float, H: float, cx: float, cz: float, yaw: float,
+            seats: list[tuple[float, float, float]], chair: tuple[float, float, float],
+            side: str | None = None) -> Placed:
+    cw, cd, ch = chair
+    parts = []
+    for lx, lz, lyaw in seats:
+        dx, dz = _turn(yaw, lx, lz)
+        parts.append((cx + dx, cz + dz, cw, cd, yaw + lyaw))
+    return Placed(item, piece, W, D, H, cx, cz, yaw, side, tuple(parts))
+
+
 def _place_center(space: RoomSpace, item: dict, piece: Piece, W: float, D: float, H: float,
                   seats: list[tuple[float, float, float]], chair: tuple[float, float, float]) -> Placed | None:
     """In the middle of the room (or the free spot nearest it), long side along the
-    room's long side, with its chairs."""
+    room's long side, with its chairs; its front toward ``facing`` if the plan gives one."""
     room_w, room_d = space.size
     yaws = [0.0, 90.0] if room_w >= room_d else [90.0, 0.0]
     if W < D:
         yaws.reverse()
+    if item.get("facing"):
+        yaws = [yaw_facing(*_FACING[item["facing"]])]
     cx0, cz0 = (space.x0 + space.x1) / 2, (space.z0 + space.z1) / 2
     step = 0.1
     ni, nj = int(room_w / 2 / step) + 1, int(room_d / 2 / step) + 1
     candidates = [(cx0 + i * step, cz0 + j * step) for i in range(-ni, ni + 1) for j in range(-nj, nj + 1)]
     candidates.sort(key=lambda p: (p[0] - cx0) ** 2 + (p[1] - cz0) ** 2)
-    cw, cd, ch = chair
     for yaw in yaws:
         for cx, cz in candidates:
-            parts = []
-            for lx, lz, lyaw in seats:
-                dx, dz = _turn(yaw, lx, lz)
-                parts.append((cx + dx, cz + dz, cw, cd, yaw + lyaw))
-            placed = Placed(item, piece, W, D, H, cx, cz, yaw, None, tuple(parts))
+            placed = _seated(item, piece, W, D, H, cx, cz, yaw, seats, chair)
             if _try_place(space, placed):
                 return placed
+    return None
+
+
+def _span(zone: tuple, side: str) -> tuple[float, float]:
+    """How far a keep-clear zone on ``side`` runs along that side."""
+    return (zone[0], zone[1]) if side in ("front", "back") else (zone[2], zone[3])
+
+
+def _place_along(space: RoomSpace, item: dict, piece: Piece, W: float, D: float, H: float, side: str,
+                 seats: list[tuple[float, float, float]], chair: tuple[float, float, float]) -> Placed | None:
+    """With its back on ``side`` (an island backing onto a wall, or onto the open edge
+    of the next room), its chairs in front, as near the middle of that side as fits.
+    An opened-up wall on that side is not kept clear: the rest of it is the way through.
+    ``facing`` the same open side turns it round: its front at the edge and its chairs
+    out in the next room (stools on the family-room side of a kitchen island)."""
+    lo, hi = space.side_span(side)
+    mid, step = (lo + hi) / 2, 0.05
+    n = int((hi - lo) / 2 / step) + 1
+    open_zones = space.open_clear.get(side, [])
+    outward = item.get("facing") == side and bool(open_zones)
+    saved = space.keep_clear
+    space.keep_clear = [k for k in saved if k not in open_zones]
+    try:
+        for t in sorted((mid + i * step for i in range(-n, n + 1)), key=lambda t: abs(t - mid)):
+            if t - W / 2 < lo - _EPS or t + W / 2 > hi + _EPS:
+                continue
+            cx, cz, yaw = space.against(side, t, W, D)
+            if not outward:
+                placed = _seated(item, piece, W, D, H, cx, cz, yaw, seats, chair, side)
+                if _try_place(space, placed):
+                    return placed
+                continue
+            # The chairs go through the opening, so all of it must be open; only
+            # the island itself has to fit in this room.
+            if not any(_span(z, side)[0] <= t - W / 2 + _EPS and t + W / 2 <= _span(z, side)[1] + _EPS
+                       for z in open_zones):
+                continue
+            yaw = (yaw + 180) % 360
+            if _try_place(space, Placed(item, piece, W, D, H, cx, cz, yaw, side)):
+                space.placed[-1] = _seated(item, piece, W, D, H, cx, cz, yaw, seats, chair, side)
+                return space.placed[-1]
+    finally:
+        space.keep_clear = saved
     return None
 
 
@@ -1432,26 +1907,42 @@ def _place_corner(space: RoomSpace, item: dict, piece: Piece, W: float, D: float
     return None
 
 
+_FACING = {"front": (0, -1), "back": (0, 1), "left": (-1, 0), "right": (1, 0)}
+
+
 def _place_exact(space: RoomSpace, item: dict, piece: Piece, W: float, D: float, H: float) -> Placed:
     """Where the plan says (feet from the room's front-left corner), kept inside the room."""
     r = space.rect
-    cx = min(max(r["x0"] + _m(item["x"]), space.x0 + W / 2), space.x1 - W / 2)
-    cz = min(max(r["z0"] + _m(item["z"]), space.z0 + D / 2), space.z1 - D / 2)
+    cx, cz = r["x0"] + _m(item["x"]), r["z0"] + _m(item["z"])
+    if "rotation" in item:
+        # Turned any way (as it was left after being grabbed and moved).
+        x0, x1, z0, z1 = _aabb(cx, cz, W, D, item["rotation"])
+        cx += max(0.0, space.x0 - x0) - max(0.0, x1 - space.x1)
+        cz += max(0.0, space.z0 - z0) - max(0.0, z1 - space.z1)
+        placed = Placed(item, piece, W, D, H, cx, cz, item["rotation"])
+        space.placed.append(placed)
+        return placed
     facing = item.get("facing")
     if facing:
-        fx, fz = {"front": (0, -1), "back": (0, 1), "left": (-1, 0), "right": (1, 0)}[facing]
+        fx, fz = _FACING[facing]
     else:
         # Toward the middle of the room, along whichever axis is further off.
         mx, mz = (space.x0 + space.x1) / 2 - cx, (space.z0 + space.z1) / 2 - cz
         fx, fz = ((1 if mx > 0 else -1), 0) if abs(mx) > abs(mz) else (0, (1 if mz > 0 else -1))
+    # Facing left or right the piece lies across: its width runs along z.
+    ex, ez = (D, W) if fx else (W, D)
+    cx = min(max(cx, space.x0 + ex / 2), space.x1 - ex / 2)
+    cz = min(max(cz, space.z0 + ez / 2), space.z1 - ez / 2)
     placed = Placed(item, piece, W, D, H, cx, cz, yaw_facing(fx, fz))
     space.placed.append(placed)
     return placed
 
 
-def _counter_options(space: RoomSpace, side: str, cx: float, cz: float, W: float, item: dict) -> tuple:
-    """A kitchen run: a sink always, a range on a long run, the fridge when it was
-    furnished automatically, wall cabinets where no window is in the way."""
+def _counter_options(space: RoomSpace, side: str, cx: float, cz: float, W: float, item: dict,
+                     items: list[dict] = ()) -> tuple:
+    """A kitchen run: a sink (one per room), a range on a long run unless the room has
+    a stove of its own, the fridge when it was furnished automatically, wall cabinets
+    where no window is in the way."""
     along_x = side in ("front", "back")
     lo, hi = (cx - W / 2, cx + W / 2) if along_x else (cz - W / 2, cz + W / 2)
     on_wall = {
@@ -1465,24 +1956,80 @@ def _counter_options(space: RoomSpace, side: str, cx: float, cz: float, W: float
         for kx0, kx1, kz0, kz1, below in space.keep_clear
     )
     fridge = bool(item.get("auto")) and W >= 3.2
-    return (("fridge", fridge), ("range", W - (0.9 if fridge else 0) >= 2.0), ("sink", True), ("upper", not window))
+    run = W - (0.9 if fridge else 0)
+    stove = any(PIECES[it["type"]].builder == "stove" for it in items)
+    sink = not any(p.piece.builder in ("counter", "island") and dict(p.options).get("sink") for p in space.placed)
+    # What the plan says wins over what a kitchen usually has.
+    return (("fridge", fridge), ("range", item.get("range", run >= 2.0 and not stove) and run >= 1.0),
+            ("sink", item.get("sink", sink) and run >= 1.0), ("upper", item.get("uppers", not window)))
+
+
+def _styled(item: dict, style: dict | None) -> dict:
+    """A kitchen piece in a saved kitchen style: its cabinet and countertop colours (a
+    colour of its own wins), and a stove or fridge with nothing named is the style's
+    photo model."""
+    builder = PIECES[item["type"]].builder
+    if not style or builder not in _KITCHEN:
+        return item
+    out = {**item, "kitchen": style}
+    if builder in ("counter", "island"):
+        out.setdefault("color", style["cabinet"])
+    out.setdefault("top", style["top"])
+    model_id = style.get(f"{builder}_model_id")
+    # A name that only says what it is ("stove": the AI names pieces so) is no name of a model.
+    generic = name_key(item.get("name")) in ("", name_key(item["type"]), name_key(PIECES[item["type"]].label))
+    if builder in ("stove", "fridge") and model_id and generic and "model_id" not in item:
+        out["model_id"] = model_id
+    return out
+
+
+def _style_options(item: dict) -> tuple:
+    """What a kitchen style changes in a piece's mesh (also its cache key)."""
+    st = item.get("kitchen")
+    if not st:
+        return ()
+    return (("door", st["door"]), ("glass", st["uppers"] == "glass"), ("handle", st["handle"]),
+            ("crown", bool(st["crown"])), ("fleck", st.get("fleck") or ""),
+            ("splash", st["backsplash"] if st["backsplash"] != "none" else ""),
+            ("splash_color", st["backsplash_color"] if st["backsplash"] != "none" else ""))
+
+
+def _model_size(model: dict, item: dict, H: float) -> tuple[float, float, float]:
+    """A photo model's real width, depth and height (metres), turned as it is placed."""
+    h = _m(item["height"]) if "height" in item else _m(model["height_ft"]) if model.get("height_ft") else H
+    mx, mz = (v * h for v in model["footprint"])
+    return (mz, mx, h) if model.get("turn") in (90, 270) else (mx, mz, h)
 
 
 def furnish_room(f: Furnishing, room_id: int, space: RoomSpace, items: list[dict]):
     """Place ``items`` in ``space`` and add them to ``f``."""
+    # One kitchen style for the room: the first piece that names one.
+    style = next((st for st in (f.kitchen_style(it.get("style")) for it in items if it.get("style")) if st), None)
+    items = [_styled(it, style) for it in items]
     expanded: list[dict] = []
     for item in items:
         for _ in range(item.get("count", 1) if PIECES[item["type"]].builder not in ("stool",) else 1):
             expanded.append(item)
+    run_built = any("corner" in it or "between" in it for it in expanded)
     order = sorted(
         range(len(expanded)),
-        key=lambda i: (0 if "x" in expanded[i] else 1, _ORDER.get(PIECES[expanded[i]["type"]].place, 0)
-                       if not expanded[i].get("place") else 0, i),
+        key=lambda i: (0 if "x" in expanded[i] else 1,
+                       # Pieces in a corner first (the runs butt against them), then counters between two
+                       # pieces, then (in such a kitchen) the other counters, which take what is left, and
+                       # the island in the floor the runs leave.
+                       0 if "corner" in expanded[i] else 2 if "between" in expanded[i]
+                       else 3 if run_built and PIECES[expanded[i]["type"]].builder == "counter"
+                       else 4 if run_built and PIECES[expanded[i]["type"]].builder == "island" else 1,
+                       _ORDER.get(PIECES[expanded[i]["type"]].place, 0) if not expanded[i].get("place") else 0, i),
     )
     for i in order:
         item = expanded[i]
         piece = PIECES[item["type"]]
         W, D, H = _size(item, piece, space)
+        model = f._photo_model(item)
+        if model and model.get("footprint") and "width" not in item and "depth" not in item:
+            # A photo model takes the space it really fills, not the drawn piece's.
+            W, D, _ = _model_size(model, item, H)
         label = _label(item, piece)
         place = item.get("place") or piece.place
         if place == "center" and piece.builder in _WALL_BUILDERS:
@@ -1490,10 +2037,40 @@ def furnish_room(f: Furnishing, room_id: int, space: RoomSpace, items: list[dict
         sofa = _find(space, "sofa", "sectional")
         placed: Placed | None = None
         options: tuple = ()
+        drawn = False  # a corner stove's cabinet, drawn round its photo model
         seats = item.get("seats", piece.seats)
 
         if piece.builder == "counter" and "x" not in item:
-            placed = _place_counter(space, item, piece, D, H, item.get("place") if item.get("place") in _SIDES else None)
+            if item.get("between"):
+                placed = _place_between(space, item, piece, D, H)
+                if placed is None:
+                    a, b = (PIECES[k].label or k for k in item["between"])
+                    f.notes.append(f"No room for a counter between the {a} and the {b} in {space.name}")
+                    continue
+            else:
+                prefer = item.get("place") if item.get("place") in _SIDES else None
+                placed = _place_counter(space, item, piece, D, H, prefer) if prefer or not run_built else None
+                if placed is None and run_built:
+                    # "Cabinets on the other side of the fridge": on along the walls the run stands on,
+                    # then (none named) any wall.
+                    # The AI's guess at a length gives way to what is there.
+                    loose = {k: v for k, v in item.items() if k != "width"}
+                    for side in dict.fromkeys(p.side for p in space.placed if p.piece.builder in _RUN and p.side):
+                        if side != prefer and (placed := _place_counter(space, item, piece, D, H, side)
+                                               or _place_counter(space, loose, piece, D, H, side)):
+                            break
+                    if placed is None and not prefer:
+                        placed = _place_counter(space, item, piece, D, H)
+                if placed is None and prefer and any(
+                        p.piece.builder == "counter" and p.side == prefer for p in space.placed):
+                    continue  # that wall has its counter already (one between two pieces)
+        elif piece.builder == "stove" and item.get("corner") and "x" not in item:
+            # A photo model of the range: the corner is cut to its width.
+            range_w = min(1.0, max(0.6, _model_size(model, item, H)[0])) if model and model.get("footprint") else RANGE_W
+            placed = _place_corner_stove(space, item, piece, H, range_w)
+            if placed is None:
+                f.notes.append(f"No free corner for the stove in {space.name}")
+                continue
         elif piece.builder in ("table", "round_table", "island"):
             W0, D0 = W, D
             round_ = piece.builder == "round_table"
@@ -1518,6 +2095,8 @@ def furnish_room(f: Furnishing, room_id: int, space: RoomSpace, items: list[dict
                         dx, dz = _turn(placed.yaw, lx, lz)
                         parts.append((placed.cx + dx, placed.cz + dz, cw, cd, placed.yaw + lyaw))
                     placed.parts = tuple(parts)
+                elif piece.builder == "island" and place in _SIDES:
+                    placed = _place_along(space, item, piece, W, D, H, place, layout, (cw, cd, ch))
                 else:
                     placed = _place_center(space, item, piece, W, D, H, layout, (cw, cd, ch))
                 if placed:
@@ -1532,6 +2111,10 @@ def furnish_room(f: Furnishing, room_id: int, space: RoomSpace, items: list[dict
                     f.add(room_id, chair_item, chair_piece, cw, cd, ch, cx, cz, cyaw)
         elif "x" in item:
             placed = _place_exact(space, item, piece, W, D, H)
+        elif run_built and (not item.get("place") or any(
+                "width" in it and item["type"] in (it.get("between") or []) for it in items)) and (
+                placed := _run_end(space, item, piece, W, D, H, items)):
+            pass  # an end of a counter run (where a "between" counter with a width puts it)
         elif piece.builder == "bed" and "width" not in item:
             # The size asked for, else the next one down that fits.
             want = item.get("size") or ("queen" if W > 1.2 else "twin")
@@ -1544,6 +2127,13 @@ def furnish_room(f: Furnishing, room_id: int, space: RoomSpace, items: list[dict
                     if size != want and not item.get("auto"):
                         f.notes.append(f"A {want} bed doesn't fit in {space.name}, so it has a {size}")
                     break
+        elif item.get("corner") in _CORNERS:
+            sides = item["corner"].split("-")
+            point = (space.x0 if "left" in sides else space.x1, space.z0 if "front" in sides else space.z1)
+            prefer = [place] + [s_ for s_ in sides if s_ != place] if place in sides else sides
+            placed = _place_wall(space, item, piece, W, D, H, prefer=prefer, near=point)
+            if placed:
+                placed.corner = item["corner"]
         elif place in _SIDES:
             placed = _place_wall(space, item, piece, W, D, H, prefer=[place])
         elif place == "center":
@@ -1617,6 +2207,8 @@ def furnish_room(f: Furnishing, room_id: int, space: RoomSpace, items: list[dict
             placed = Placed(item, piece, W, D, H, cx, cz, yaw)
             space.placed.append(placed)
 
+        if placed is None and run_built and piece.builder in _RUN:
+            placed = _run_end(space, item, piece, W, D, H, items)  # the wall asked for is full
         if placed is None and piece.builder not in ("counter", "table", "round_table", "island", "rug"):
             # Whatever it was meant to go with is missing or in the way: any free wall.
             placed = _place_wall(space, item, piece, W, D, H)
@@ -1632,11 +2224,28 @@ def furnish_room(f: Furnishing, room_id: int, space: RoomSpace, items: list[dict
                 f.notes.append(f"No room for the {label} in {space.name}")
             continue
         if piece.builder == "counter":
-            options = _counter_options(space, placed.side or "back", placed.cx, placed.cz, placed.W, item)
+            options = _counter_options(space, placed.side or "back", placed.cx, placed.cz, placed.W, item, items)
+        elif piece.builder == "stove" and item.get("corner"):
+            counter = next((it for it in items if PIECES[it["type"]].builder == "counter"), {"type": "counter"})
+            options = (("corner", True), ("cabinet", item.get("color") or dict(_colors(counter, PIECES["counter"]))["main"]))
+            if model and model.get("footprint"):
+                mw, md, mh = _model_size(model, item, H)
+                lx, lz, (fx, fz) = corner_stove_spot(placed.W, md)
+                dx, dz = _turn(placed.yaw, lx, lz)
+                f.add(room_id, item, piece, mw, md, mh, placed.cx + dx, placed.cz + dz,
+                      yaw_facing(*_turn(placed.yaw, fx, fz)))
+                options += (("range_w", f"{range_w:.2f}"), ("model", True), ("upper_from", f"{mh:.2f}"))
+                drawn = True
         elif piece.builder == "potted_plant":
             species = find_species(item.get("name"))
             options = (("species", species),) if species else ()
-        f.add(room_id, item, piece, placed.W, placed.D, placed.H, placed.cx, placed.cz, placed.yaw, options)
+        if piece.builder == "island" and item.get("sink"):
+            options = (("sink", True),)
+        if piece.builder in ("counter", "island", "stove"):
+            options += _style_options(item)
+        placed.options = options
+        f.add(room_id, item, piece, placed.W, placed.D, placed.H, placed.cx, placed.cz, placed.yaw, options,
+              photo=not drawn)
 
 
 def chair_piece_name(piece: Piece) -> str:
@@ -1651,10 +2260,10 @@ def _place_counter(space: RoomSpace, item: dict, piece: Piece, D: float, H: floa
     best = None
     for side in ([prefer] if prefer else ["back", "left", "right", "front"]):
         lo, hi = space.side_span(side)
-        for W in ([want] if want else [hi - lo - 0.04 - k * 0.3 for k in range(20)]):
+        for W in ([want] if want else [hi - lo - 0.04 - k * 0.1 for k in range(60)]):
             if W is None or W < 0.9:
                 break
-            spots = space.wall_spots(side, W, D, _wall_height(piece, H))
+            spots = space.wall_spots(side, W, D, _wall_height(piece, H), flush=True)
             if spots:
                 if best is None or W > best[0]:
                     lo_, hi_ = space.side_span(side)
@@ -1665,7 +2274,7 @@ def _place_counter(space: RoomSpace, item: dict, piece: Piece, D: float, H: floa
         return None
     W, side, t = best
     W = min(W, 4.9) if not want else W
-    spots = space.wall_spots(side, W, D, _wall_height(piece, H))
+    spots = space.wall_spots(side, W, D, _wall_height(piece, H), flush=True)
     if not spots:
         return None
     lo, hi = space.side_span(side)
@@ -1676,23 +2285,137 @@ def _place_counter(space: RoomSpace, item: dict, piece: Piece, D: float, H: floa
     return placed
 
 
+def _place_corner_stove(space: RoomSpace, item: dict, piece: Piece, H: float,
+                        range_w: float = RANGE_W) -> Placed | None:
+    """A range across a corner (``item["corner"]``, or the first free one), in a
+    square of counter that the runs on both walls butt against."""
+    L = _corner_size(range_w)
+    corners = {"front-left": (space.x0, space.z0), "front-right": (space.x1, space.z0),
+               "back-left": (space.x0, space.z1), "back-right": (space.x1, space.z1)}
+    names = [item["corner"]] if item.get("corner") in corners else list(corners)
+    for name in names:
+        x, z = corners[name]
+        sx, sz = (1 if x == space.x0 else -1), (1 if z == space.z0 else -1)
+        cx, cz = x + sx * (L / 2 + 0.02), z + sz * (L / 2 + 0.02)
+        if not space.fits(_aabb(cx, cz, L, L, 0), _wall_height(PIECES["counter"], H), flush=True):
+            continue
+        # The mesh has the corner at its back-left: back on one wall, left on the other.
+        for fx, fz in ((0, sz), (sx, 0)):
+            yaw = yaw_facing(fx, fz)
+            lx, lz = _turn(yaw, -1, 0)
+            if (round(lx), round(lz)) in ((-sx, 0), (0, -sz)):
+                side = {(0, 1): "front", (0, -1): "back", (1, 0): "left", (-1, 0): "right"}[(fx, fz)]
+                placed = Placed(item, piece, L, L, H, cx, cz, yaw, side, corner=name)
+                space.placed.append(placed)
+                return placed
+    return None
+
+
+def _run_end(space: RoomSpace, item: dict, piece: Piece, W: float, D: float, H: float,
+              items: list[dict]) -> Placed | None:
+    """A piece a counter runs to ("between") from a piece in a corner: at the far
+    end of one of that corner's walls, the longer first, so the counter fills the wall.
+    A counter with a ``width`` sets the gap instead: the piece stands that far along the
+    wall from the corner piece, leaving the rest of the wall for other cabinets."""
+    for it in items:
+        ends = it.get("between") or []
+        if item["type"] not in ends:
+            continue
+        other = PIECES[ends[1] if ends[0] == item["type"] else ends[0]].builder
+        anchor = next((p for p in space.placed if p.piece.builder == other and p.corner), None)
+        if not anchor:
+            continue
+        corner = anchor.corner
+        fb, lr = corner.split("-")
+        if "width" in it:
+            gap = _m(it["width"])
+            box_ = raw_box(anchor)
+            for side in sorted((fb, lr), key=lambda w: -(space.side_span(w)[1] - space.side_span(w)[0])):
+                a0, a1 = _along(box_, side)
+                # Away from the corner: on from the anchor's far edge (left/front corners
+                # run toward +x/+z along the wall, the others back).
+                ahead = (lr == "left") if side in ("front", "back") else (fb == "front")
+                t = a1 + gap + W / 2 + 0.002 if ahead else a0 - gap - W / 2 - 0.002
+                cx, cz, yaw = space.against(side, t, W, D)
+                if space.fits(_aabb(cx, cz, W, D, yaw), _wall_height(piece, H), flush=True):
+                    placed = Placed(item, piece, W, D, H, cx, cz, yaw, side)
+                    space.placed.append(placed)
+                    return placed
+        far = {"front": space.z1, "back": space.z0, "left": space.x1, "right": space.x0}
+        walls = sorted([(fb, (far[lr], space.z0 if fb == "front" else space.z1)),
+                        (lr, (space.x0 if lr == "left" else space.x1, far[fb]))],
+                       key=lambda w: -(space.side_span(w[0])[1] - space.side_span(w[0])[0]))
+        for side, point in walls:
+            placed = _place_wall(space, item, piece, W, D, H, prefer=[side], near=point)
+            if placed:
+                return placed
+    return None
+
+
+def _along(box_: tuple, side: str) -> tuple[float, float]:
+    return (box_[0], box_[1]) if side in ("front", "back") else (box_[2], box_[3])
+
+
+def _touches(space: RoomSpace, box_: tuple, side: str) -> bool:
+    x0, x1, z0, z1 = box_
+    return {"front": z0 <= space.z0 + 0.1, "back": z1 >= space.z1 - 0.1,
+            "left": x0 <= space.x0 + 0.1, "right": x1 >= space.x1 - 0.1}[side]
+
+
+def _place_between(space: RoomSpace, item: dict, piece: Piece, D: float, H: float) -> Placed | None:
+    """A counter filling the wall between two pieces already placed (``between``:
+    "from the stove to the refrigerator"), on the wall both stand against."""
+    ends = []
+    for kind in item["between"]:
+        builder = PIECES[kind].builder
+        found = [p for p in space.placed if p.piece.builder == builder]
+        if not found:
+            return None
+        ends.append(found)
+    best = None
+    for side in ([item["place"]] if item.get("place") in _SIDES else list(_SIDES)):
+        for a in ends[0]:
+            for b in ends[1]:
+                ba, bb = raw_box(a), raw_box(b)
+                if not (_touches(space, ba, side) and _touches(space, bb, side)):
+                    continue
+                (a0, a1), (b0, b1) = _along(ba, side), _along(bb, side)
+                lo, hi = (a1, b0) if a1 <= b0 + _EPS else (b1, a0)
+                W = hi - lo - 0.004
+                if W < 0.3 or (best and W <= best[0]):
+                    continue
+                cx, cz, yaw = space.against(side, (lo + hi) / 2, W, D)
+                if space.fits(_aabb(cx, cz, W, D, yaw), _wall_height(piece, H), flush=True):
+                    best = (W, side, cx, cz, yaw)
+    if best is None:
+        return None
+    W, side, cx, cz, yaw = best
+    placed = Placed(item, piece, W, D, H, cx, cz, yaw, side)
+    space.placed.append(placed)
+    return placed
+
+
 def build_furniture(
     spec: dict | None,
     rooms: list[dict],
     openings: list[dict],
     models: list[dict] | None = None,
+    styles: list[dict] | None = None,
+    blocked: list[dict] | None = None,
 ) -> tuple[dict | None, list[str]]:
     """Furniture for every room, metres (the headset scales it).
 
     ``rooms`` are ``{"id", "name", "bounds"}`` as built, ``openings`` every door,
     window and opened-up wall cut in the walls, ``models`` the finished photo models
-    of kind "furniture". Returns ``({"meshes", "pieces", "models"}, notes)``, or
+    of kind "furniture", ``styles`` the saved kitchen styles
+    (``kitchen_style_service.ready_styles``), ``blocked`` floor nothing may stand on
+    (stairs, the hole they come up through). Returns ``({"meshes", "pieces", "models"}, notes)``, or
     ``(None, [])`` when the plan has no furniture.
     """
     if not spec or not rooms:
         return None, []
     listed = {k.strip().lower(): v for k, v in (spec.get("rooms") or {}).items()}
-    f = Furnishing(models)
+    f = Furnishing(models, styles)
     counts: dict[str, int] = {}
     for room in rooms:
         name = room["name"]
@@ -1708,7 +2431,14 @@ def build_furniture(
             ]
         if not items:
             continue
+        items = [{**it, "_i": n} for n, it in enumerate(items)]
+        f.room_name = name
         space = RoomSpace(name, b, openings)
+        for r in blocked or []:
+            if min(r["x1"], b["x1"]) > max(r["x0"], b["x0"]) and min(r["z1"], b["z1"]) > max(r["z0"], b["z0"]):
+                w, d = r["x1"] - r["x0"] + 0.2, r["z1"] - r["z0"] + 0.2  # and a step round it
+                space.placed.append(Placed({"type": "custom"}, PIECES["custom"], w, d, 3.0,
+                                           (r["x0"] + r["x1"]) / 2, (r["z0"] + r["z1"]) / 2, 0.0))
         before = len(f.pieces) + len(f.models)
         furnish_room(f, room["id"], space, items)
         counts[name] = len(f.pieces) + len(f.models) - before

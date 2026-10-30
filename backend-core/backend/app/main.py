@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, Depends
 from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -8,7 +8,6 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-import logging
 import os
 import time
 import uuid
@@ -27,6 +26,7 @@ from .api.v1.materials import router as materials_router
 from .api.v1.voice import router as voice_router
 from .api.v1.websocket import router as websocket_router
 from .api.v1.plants import furniture_router, router as plants_router
+from .api.v1.kitchen_styles import router as kitchen_styles_router
 from .api.v1.project_controls import router as project_controls_router
 from .api.v1.resources import router as resources_router
 from .api.v1.crm import router as crm_router
@@ -197,6 +197,12 @@ app.include_router(
     furniture_router,
     prefix="/api/v1/furniture",
     tags=["Furniture Models"]
+)
+
+app.include_router(
+    kitchen_styles_router,
+    prefix="/api/v1/kitchen-styles",
+    tags=["Kitchen Styles"]
 )
 
 app.include_router(

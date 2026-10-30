@@ -49,8 +49,3 @@ def run_migrations():
         base = ScriptDirectory.from_config(cfg).get_base()
         command.stamp(cfg, base)
     command.upgrade(cfg, "head")
-
-
-def drop_tables():
-    """Drop all database tables."""
-    Base.metadata.drop_all(bind=engine)

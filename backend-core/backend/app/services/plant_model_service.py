@@ -34,6 +34,7 @@ import sys
 import tempfile
 import time
 import uuid
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -43,10 +44,13 @@ from ..background import run_in_background
 from ..config import settings
 from ..database import SessionLocal
 from ..models.plant_model import PlantModel
+from . import model_colors
+from .vr_exterior import color_hex
 
 logger = logging.getLogger(__name__)
 
 KINDS = ("plant", "furniture")
+ORIGINAL_COLORS = "original.glb"  # in a model's folder once it has been recoloured
 MAX_PHOTO_BYTES = 15 * 1024 * 1024
 PHOTO_MAX_SIDE = 1024
 URL_PREFIX = "/plant_models"
@@ -180,6 +184,8 @@ class ReplicateProvider(Provider):
         if ":" in model:
             return model.split(":", 1)[1]
         r = await client.get(f"{self.API}/models/{model}", headers=self._headers())
+        if r.status_code in (401, 403):
+            raise PlantModelError(f"Replicate rejected REPLICATE_API_TOKEN ({r.status_code}); check it in the backend's .env")
         if r.status_code != 200:
             raise PlantModelError(f"Replicate has no model '{model}' ({r.status_code})")
         version = (r.json().get("latest_version") or {}).get("id")
@@ -390,6 +396,8 @@ def serialize(model: PlantModel) -> dict:
         "height_ft": model.height_ft,
         "aspect": model.aspect,
         "triangles": model.triangles,
+        "turn": model.turn or 0,
+        "recolored": (model_folder(model.id) / ORIGINAL_COLORS).exists(),
         "image_url": file_url(model.image_path),
         "model_url": file_url(model.model_path) if model.status == "ready" else None,
         "created_at": model.created_at.isoformat() if model.created_at else None,
@@ -410,16 +418,35 @@ def list_models(db: Session, kind: str | None = None) -> list[PlantModel]:
     return models
 
 
+@lru_cache(maxsize=64)
+def _footprint(path: str) -> tuple[float, float] | None:
+    """A model's size along x and z per metre of height (files are 1 m tall and never
+    rewritten in place, so the name is a safe cache key)."""
+    import trimesh
+
+    try:
+        size = trimesh.load(path, force="scene").extents
+    except Exception:
+        return None
+    return round(float(size[0] / size[1]), 3), round(float(size[2] / size[1]), 3)
+
+
 def ready_models(db: Session, kind: str = "plant") -> list[dict]:
     """The finished models of one kind, as ``vr_exterior.build_exterior`` (plants) and
-    ``vr_furniture.build_furniture`` (furniture) take them."""
-    return [
-        {"id": m.id, "name": m.name, "url": file_url(m.model_path), "aspect": m.aspect, "height_ft": m.height_ft}
-        for m in db.query(PlantModel)
-        .filter(PlantModel.status == "ready", PlantModel.kind == kind)
-        .order_by(PlantModel.id.desc()).all()
-        if m.model_path
-    ]
+    ``vr_furniture.build_furniture`` (furniture) take them. Furniture also carries its
+    ``footprint``, so it is placed at its real size."""
+    models = []
+    for m in (db.query(PlantModel).filter(PlantModel.status == "ready", PlantModel.kind == kind)
+              .order_by(PlantModel.id.desc()).all()):
+        if not m.model_path:
+            continue
+        model = {"id": m.id, "name": m.name, "url": file_url(m.model_path), "aspect": m.aspect,
+                 "height_ft": m.height_ft, "turn": m.turn or 0}
+        path = models_root() / m.model_path
+        if kind == "furniture" and path.exists():
+            model["footprint"] = _footprint(str(path))
+        models.append(model)
+    return models
 
 
 def create(
@@ -465,6 +492,62 @@ def delete(db: Session, model: PlantModel) -> None:
     db.delete(model)
     db.commit()
     shutil.rmtree(folder, ignore_errors=True)
+
+
+# --- Colours -----------------------------------------------------------------------
+# A recoloured model keeps the colours it was made with in ORIGINAL_COLORS (so
+# recolours stack and Reset undoes them all); a remake starts afresh.
+
+def _model_file(model: PlantModel) -> Path:
+    if model.status != "ready" or not model.model_path:
+        raise PlantModelError("its 3D model isn't ready yet")
+    path = models_root() / model.model_path
+    if not path.exists():
+        raise PlantModelError("its 3D model file is missing; remake it")
+    return path
+
+
+def colors(model: PlantModel) -> list[dict]:
+    """The colours the model's surface is mostly made of."""
+    return model_colors.palette(_model_file(model))
+
+
+def _switch_file(db: Session, model: PlantModel, name: str) -> None:
+    """Point the model at a new file (a new name, so the headset doesn't keep a cached copy)."""
+    old = models_root() / model.model_path
+    model.model_path = f"{model.id}/{name}"
+    db.commit()
+    old.unlink(missing_ok=True)
+
+
+def recolor(db: Session, model: PlantModel, from_color: str, to_color: str, tolerance: float = 0.5) -> float:
+    """Turn ``from_color`` (and the shades near it) ``to_color``; returns the share
+    of the surface that changed."""
+    current = _model_file(model)
+    source, target = color_hex(from_color, ""), color_hex(to_color, "")
+    if not source or not target:
+        raise PlantModelError("give both colours as #rrggbb or a colour name")
+    name = f"model-{uuid.uuid4().hex[:8]}.glb"
+    share = model_colors.recolor(current, current.parent / name, source, target, tolerance)
+    if share <= 0:
+        raise PlantModelError(f"no part of it is close to {source}; pick one of its colours or widen the match")
+    original = model_folder(model.id) / ORIGINAL_COLORS
+    if not original.exists():
+        shutil.copyfile(current, original)
+    _switch_file(db, model, name)
+    logger.info(f"🎨 Model {model.id} '{model.name}': {source} → {target} on {share:.0%} of it")
+    return share
+
+
+def reset_colors(db: Session, model: PlantModel) -> None:
+    """Back to the colours it was made with."""
+    _model_file(model)
+    original = model_folder(model.id) / ORIGINAL_COLORS
+    if not original.exists():
+        return
+    name = f"model-{uuid.uuid4().hex[:8]}.glb"
+    original.rename(original.parent / name)
+    _switch_file(db, model, name)
 
 
 def is_running(model_id: int) -> bool:
@@ -528,6 +611,7 @@ async def _make(model_id: int) -> None:
             return
         if old and old != f"{model_id}/{name}":
             (models_root() / old).unlink(missing_ok=True)
+        (folder / ORIGINAL_COLORS).unlink(missing_ok=True)  # a remake has its own colours
         logger.info(
             f"🌳 Plant model {model_id} '{model.name}' ready from {provider.name} in "
             f"{time.monotonic() - started:.0f}s ({info['triangles']} triangles)"

@@ -443,6 +443,49 @@ def test_deleting_a_project_archives_its_plan(project_id, pm):
     assert pm.call("export_project", project_id=pm_id)["project"]["status"] == "archived"
 
 
+def test_deleting_a_project_completely_removes_its_plan_and_images(project_id, pm, tmp_path, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "generated_images_dir", str(tmp_path))
+    mine, shared = tmp_path / "generated_mine_0.png", tmp_path / "generated_shared_0.png"
+    mine.write_bytes(b"png")
+    shared.write_bytes(b"png")
+    other_id = _new_project()
+    with TestingSessionLocal() as db:
+        pm_id = db.get(Project, project_id).pm_project_id
+        db.add(FloorPlan(project_id=project_id, version=1, name="A", change_type="generated", rooms=[],
+                         image_url="/generated_images/generated_mine_0.png"))
+        db.add(FloorPlan(project_id=project_id, version=2, name="A", change_type="edited", rooms=[],
+                         image_url="/generated_images/generated_shared_0.png"))
+        db.add(FloorPlan(project_id=other_id, version=1, name="B", change_type="generated", rooms=[],
+                         image_url="/generated_images/generated_shared_0.png"))
+        db.commit()
+
+    response = client.delete(f"/api/v1/projects/{project_id}?purge=true")
+    assert response.status_code == 200
+    assert response.json()["files_deleted"] == 1
+    assert not mine.exists() and shared.exists()  # the other project still shows it
+    assert pm_id not in [p["id"] for p in pm.call("list_projects")]
+    # (The test server outlives each database, so an earlier test's project may hold this id's link.)
+    links = pm.call("find_external", system=pm_client.SYSTEM, entity_type="project", entity_id=pm_id)
+    assert links == []
+
+
+def test_complete_delete_is_refused_while_pm_mcp_is_down(project_id):
+    class Down:
+        def call(self, tool, **arguments):
+            raise pm_client.PMUnavailable("connection refused")
+
+    app.dependency_overrides[pm_client.get_pm] = lambda: Down()
+    try:
+        response = client.delete(f"/api/v1/projects/{project_id}?purge=true")
+    finally:
+        del app.dependency_overrides[pm_client.get_pm]
+    assert response.status_code == 503
+    with TestingSessionLocal() as db:
+        assert db.get(Project, project_id) is not None  # nothing was deleted
+
+
 def test_crew_and_equipment(project_id):
     member = client.post("/api/v1/resources/crew", json={
         "name": "Ana", "role": "Carpenter", "hourly_rate": 48, "project_id": project_id,

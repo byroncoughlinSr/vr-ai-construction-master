@@ -101,14 +101,23 @@ const remove = () => {
   $q.dialog({
     title: 'Delete project?',
     message: `“${name}” is deleted with its floor plans, schedule, budget, permits and materials. Linked clients stay in the CRM. This can't be undone.`,
+    options: {
+      type: 'checkbox',
+      model: [],
+      items: [{
+        label: 'Delete completely: also remove its construction plan from the shared pm-mcp board (otherwise archived there) and its rendered images',
+        value: 'purge'
+      }]
+    },
     cancel: { flat: true, noCaps: true },
     ok: { unelevated: true, noCaps: true, color: 'negative', label: 'Delete' },
     persistent: true
-  }).onOk(async () => {
+  }).onOk(async (choices: string[]) => {
+    const purge = choices.includes('purge')
     try {
-      await projects.deleteProject(props.projectId)
+      await projects.deleteProject(props.projectId, purge)
       emit('update:modelValue', false)
-      $q.notify({ type: 'positive', message: `Deleted “${name}”` })
+      $q.notify({ type: 'positive', message: `Deleted “${name}”${purge ? ' completely' : ''}` })
     } catch (err) {
       $q.notify({ type: 'negative', message: errorMessage(err, 'Could not delete the project') })
     }

@@ -4,11 +4,15 @@ import json
 import re
 import time
 from typing import Optional, Dict, Any, List
+import anthropic
 import ollama
 import google.generativeai as genai
 from groq import APIStatusError, BadRequestError, Groq
 
 from ..config import settings
+from .layout_check import layout_problems
+from .vr_furniture import shown_furniture
+from .vr_geometry_service import LayoutError, layout_as_rects
 
 logger = logging.getLogger(__name__)
 
@@ -30,24 +34,51 @@ EXTERIOR_FORMAT = """{"roof": {"style": "gable"|"hip"|"flat"|"shed", "material":
   - Keep plants and rocks outside every room's rectangle (when the SITE lists them): "by" or "on each side of the front door" means the SITE's front_door "beside_it" spots (4 ft out from the door's wall, 5 ft to either side). A walkway to the front door runs from the street (z about -25) to the door. Space plants sensibly (trees 10+ ft apart, shrubs 3-4 ft apart); for "a row of" or "both sides of", list each plant."""
 
 
+# The floor plan's "layout", as every planning prompt describes it: one rectangle per
+# room. vr_geometry_service builds it (is_rect_layout) and layout_check.layout_problems
+# checks it — keep them in step.
+RECT_LAYOUT_FORMAT = """{"entry": "Room Name", "rects": [{"room": "Room Name", "x": 0, "z": 0, "length": 0, "width": 0}], "notes": ["..."]}
+- One rectangle per room, in feet, on the plan seen from above: "x" is its left edge, "z" its front edge, "length" its size left to right, "width" its size front to back. x runs left to right; z runs from the street side (z = 0, the front-most edge of the house) toward the back yard.
+- Directions: "to the left" means smaller x, "to the right" larger x; "behind", "past", "down the hall", "at the back" and "toward the backyard" mean larger z; "in front of", "toward the street" and "sticks out" (past the front of the house) mean smaller z.
+- Use the sizes the description gives. "10 x 13" names both sides but not their direction: turn the room whichever way lines it up with its neighbours.
+- Rooms never overlap. Rooms that touch share an edge exactly: one room's x + length is the next room's x (or its z + width is the next room's z). Rooms are only adjacent where their edges meet, and a doorway needs at least 4 ft of shared edge.
+- Work it out in order: the entry on the street side first, then its neighbours, then theirs, getting each corner by adding up the sizes before it. Then check every pair of rooms for overlaps and every doorway for a shared edge.
+- Whatever of the house's bounding box no room covers is outdoors: that is how the house gets an L, U or T shape, a courtyard or an inset porch. Inside the house leave no gap by accident: make the hallway or a room bigger, or add a closet.
+- A room that is not a rectangle (an L-shaped hallway) is two rooms, e.g. "Hallway" and "Hallway 2", each listing the other in "open_to" so no wall is drawn between them.
+- If the description can't fit as given (sizes that don't add up, a room that can't touch the one it should), make the smallest change that works and say so in "notes" ("Hallway narrowed to 3.5 ft to fit between the office and the kitchen"); leave "notes" out when nothing was changed.
+- "entry" names the room the front door opens into; no room may be in front of it (between it and the street). It is usually at z = 0, but another room, such as a garage, may stick out toward the street beside it: then that room starts at z = 0 and the entry further back.
+- More than one storey: give each upstairs rectangle "level": 1 (2 for a third floor; the ground floor is 0 and needs no "level"). Each floor is planned on its own (no overlaps on the same level) within the floor below's outline, in the same x/z. The stairs are a room named "Stairs" (about 4 x 12 ft, more is fine) on the lower floor with a room on the floor above over it, such as a "Landing" or hall, which the upstairs rooms open off. Rooms on different levels may sit over each other; doorways only join rooms on the same level."""
+
+
 # Furniture, as both planning prompts describe it. The backend cleans the result with
 # vr_furniture.furniture_spec and places the pieces itself — keep them in step.
 FURNITURE_FORMAT = """{"auto": true|false, "rooms": {"<exact room name>": [items]}}
 - "auto": true furnishes every room NOT in "rooms" as that kind of room usually is (bedroom: bed, nightstands, dresser; living: sofa, coffee table, armchair, TV; dining: table and chairs; kitchen: counters, fridge, stove, island; bathroom: toilet, vanity, tub). Use it for "furnish the house". A room in "rooms" gets exactly its items ([] = empty).
-- Item: {"type": "sofa"|"loveseat"|"sectional"|"armchair"|"recliner"|"dining chair"|"office chair"|"bar stool"|"bench"|"dining table"|"round table"|"coffee table"|"side table"|"console table"|"desk"|"bed"|"crib"|"nightstand"|"dresser"|"wardrobe"|"bookshelf"|"tv stand"|"sideboard"|"piano"|"counter"|"kitchen island"|"refrigerator"|"stove"|"toilet"|"vanity"|"bathtub"|"shower"|"washer"|"dryer"|"rug"|"floor lamp"|"potted plant", "name": "the person's words ('navy velvet sofa')", "color": "#rrggbb", "material": "oak"|"walnut"|..., "seats": n, "size": "king"|"queen"|"full"|"twin", "count": n, "place": "front"|"back"|"left"|"right"|"center"|"corner", "x": ft, "z": ft, "facing": side, "width"/"depth"/"height": ft}; only "type" is required. "seats" = chairs round a table or stools at an island (don't list them separately); "size" is a bed's.
-- Pieces are placed automatically (against free walls, clear of doorways and windows; nightstands by the bed, coffee table before the sofa). "place" picks the wall ("front" = street side) or center/corner; give "x"/"z" (feet from the room's front-left corner) only for an exact spot. SITE "furniture_models" have a 3D model from a photo: use that exact "name"."""
+- Item: {"type": "sofa"|"loveseat"|"sectional"|"armchair"|"recliner"|"dining chair"|"office chair"|"bar stool"|"bench"|"dining table"|"round table"|"coffee table"|"side table"|"console table"|"desk"|"bed"|"crib"|"nightstand"|"dresser"|"wardrobe"|"bookshelf"|"tv stand"|"sideboard"|"piano"|"counter"|"kitchen island"|"refrigerator"|"stove"|"toilet"|"vanity"|"bathtub"|"shower"|"washer"|"dryer"|"rug"|"floor lamp"|"potted plant", "name": "the person's words ('navy velvet sofa')", "color": "#rrggbb", "material": "oak"|"walnut"|..., "seats": n, "size": "king"|"queen"|"full"|"twin", "count": n, "place": "front"|"back"|"left"|"right"|"center"|"corner", "corner": "front-left"|"front-right"|"back-left"|"back-right", "between": [type, type], "style": "kitchen style name", "sink"/"range"/"uppers": true|false, "x": ft, "rotation": degrees, "z": ft, "facing": side, "width"/"depth"/"height": ft}; only "type" is required. "seats" = chairs round a table or stools at an island (don't list them separately); "size" is a bed's.
+- Pieces are placed automatically (against free walls, clear of doorways and windows; nightstands by the bed, coffee table before the sofa). "place" picks the wall ("front" = street side; an island backs onto that side, even one open to the next room, seats facing in) or center/corner; "facing" = the side its front (an island's seats) faces, so "turn it around" flips it; an island with "place" and "facing" both the open side has its stools in the next room ("stools on the family room side"); a counter run has the sink, and the range unless a "stove" is listed; a stove with "corner" sits diagonally across it; a counter with "between": ["stove", "refrigerator"] runs from one to the other ("width" sets that gap: the fridge moves; another counter, no "place", fills the wall past it); give "x"/"z" (feet from the room's front-left corner to the piece's centre) only for an exact spot, with "rotation" to turn it any way (degrees its front faces: 0 the back, 90 the left, 180 the street, 270 the right). To remove one stool or chair lower "seats"; "sink": false / "range": false / "uppers": false take those out of a counter ("sink": true on an island puts the sink there); to move a piece change its "place"/"corner" or give "x"/"z"; a removed piece is simply left out of the list. SITE "furniture_models" have a 3D model from a photo: use that exact "name". SITE "kitchen_styles" are saved kitchen looks: when the request names one ("in Farmhouse kitchen style"), put "style": "<that exact name>" on the kitchen's counters, island, stove and refrigerator."""
 
 
 class AIPlanningService:
     """Service for construction planning using LLM models."""
 
     def __init__(self):
+        self.claude_available = False
         self.groq_available = False
         self._ollama_up = False
         self._ollama_checked_at = 0.0
         self.gemini_available = False
 
-        # Initialize Groq client (primary planner) if API key is available
+        # Claude (primary planner) if an API key is set
+        self.claude_client = None
+        if settings.anthropic_api_key:
+            try:
+                self.claude_client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+                self.claude_available = True
+                logger.info(f"Claude API initialized (model: {settings.anthropic_model})")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Claude API: {e}")
+
+        # Groq client (first fallback) if API key is available
         self.groq_client = None
         if settings.groq_api_key:
             try:
@@ -119,6 +150,11 @@ class AIPlanningService:
             project_description, budget, timeline_weeks, constraints
         )
         result = await self._run_provider_chain(prompt, "Plan")
+        result = await self._check_floor_plan(
+            result,
+            self._project_brief(project_description, budget, timeline_weeks, constraints),
+            settings.planning_timeout_seconds - (time.monotonic() - started),
+        )
         # Groq sometimes answers a small building (a one-room shed) with the floor
         # plan alone: plan its construction for that layout in a second call.
         plan = result.get("plan") or {}
@@ -177,8 +213,9 @@ class AIPlanningService:
         ``"furniture"`` (only ``plan["exterior"]`` / ``plan["furniture"]``, the rooms
         that change), else ``plan["project_structure"]`` is the whole revised plan.
         """
+        started = time.monotonic()
         prompt = self._build_refine_prompt(structure, instruction, site)
-        result = await self._run_provider_chain(prompt, "Floor plan refinement")
+        result = await self._run_provider_chain(prompt, "Floor plan refinement", edit=True)
         # Groq sometimes answers a floor-plan change with only the "layout" (the
         # room list lost to its miscounted braces): unusable, so ask once more.
         plan = result.get("plan") or {}
@@ -189,22 +226,123 @@ class AIPlanningService:
             and not isinstance(revised.get("rooms"), list)
         ):
             logger.warning("Refined floor plan came back without its room list — asking again")
-            result = await self._run_provider_chain(prompt, "Floor plan refinement")
+            result = await self._run_provider_chain(prompt, "Floor plan refinement", edit=True)
+        if str((result.get("plan") or {}).get("scope") or "").strip().lower() not in ("exterior", "furniture"):
+            result = await self._check_floor_plan(
+                result,
+                f"REQUESTED CHANGE (already applied below): {instruction}\n",
+                settings.planning_timeout_seconds - (time.monotonic() - started),
+                edit=True,
+            )
         return result
 
-    async def _run_provider_chain(self, prompt: str, what: str) -> Dict[str, Any]:
-        """Send ``prompt`` to Groq, then Ollama, then Gemini until one returns
-        output that parses into a plan."""
+    # Below this many seconds of the planning budget, a floor plan's problems are
+    # shown with the house rather than sent back to the planner.
+    FIX_MIN_SECONDS = 20.0
+
+    async def _check_floor_plan(
+        self, result: Dict[str, Any], brief: str, budget_s: float, edit: bool = False,
+    ) -> Dict[str, Any]:
+        """Send a floor plan with problems (``layout_check.layout_problems``: overlaps,
+        sizes that don't add up, rooms left out, doorways between rooms that don't
+        touch) back to the planner once, and keep whichever version has fewer.
+        What is still wrong is shown with the house (``geometry.notes``)."""
+        plan = result.get("plan") or {}
+        structure = plan.get("project_structure")
+        if not result.get("success") or not isinstance(structure, dict):
+            return result
+        problems = layout_problems(structure)
+        if not problems:
+            return result
+        if budget_s < self.FIX_MIN_SECONDS:
+            logger.warning(f"📐 Floor plan has {len(problems)} problem(s) and no time is left to fix them")
+            return result
+        logger.warning(
+            f"📐 Floor plan has {len(problems)} problem(s) — asking for a fix: " + "; ".join(problems[:3])
+        )
+        prompt = self._build_fix_prompt(brief, structure, problems)
+        try:
+            fixed = await asyncio.wait_for(self._run_provider_chain(prompt, "Floor plan fix", edit=edit), timeout=budget_s)
+        except Exception as e:
+            logger.warning(f"📐 Floor plan fix failed, keeping the first answer: {e}")
+            return result
+        answer = fixed.get("plan") or {}
+        revised = answer.get("project_structure")
+        if not (isinstance(revised, dict) and revised.get("layout")) and isinstance(answer.get("layout"), dict):
+            revised = answer  # the layout without the "project_structure" wrapper
+        if not (isinstance(revised, dict) and isinstance(revised.get("layout"), dict)):
+            logger.warning(
+                "📐 Floor plan fix came back without a layout — keeping the first answer: "
+                + str(fixed.get("raw_response") or fixed.get("error") or "")[:300]
+            )
+            return result
+        candidate = {**structure, "layout": revised["layout"], "rooms": self._merge_rooms(
+            structure.get("rooms"), revised.get("rooms"))}
+        left = layout_problems(candidate)
+        if len(left) < len(problems):
+            plan["project_structure"] = candidate
+            logger.info(f"📐 Floor plan fixed: {len(problems)} → {len(left)} problem(s)")
+        else:
+            logger.warning(f"📐 Floor plan fix no better ({len(left)} problem(s)) — keeping the first answer")
+        return result
+
+    @staticmethod
+    def _merge_rooms(old: Any, new: Any) -> List[Any]:
+        """The fixed room list: the fix's rooms by name, in place of the old ones; rooms
+        the fix leaves out are kept as they were (a fix often sends only the layout)."""
+        old = [r for r in old or [] if isinstance(r, dict)]
+        new = [r for r in new or [] if isinstance(r, dict) and r.get("name")] if isinstance(new, list) else []
+        if not new:
+            return old
+        by_name = {str(r["name"]).strip().lower(): r for r in new}
+        merged = [by_name.pop(str(r.get("name", "")).strip().lower(), r) for r in old]
+        return merged + list(by_name.values())
+
+    def _build_fix_prompt(self, brief: str, structure: Dict[str, Any], problems: List[str]) -> str:
+        """Prompt for correcting a floor plan's ``problems`` (``layout_problems``)."""
+        layout = structure.get("layout")
+        try:
+            layout = layout_as_rects(layout)
+        except LayoutError:
+            pass
+        current = json.dumps({"layout": layout, "rooms": structure.get("rooms", [])}, separators=(",", ":"))
+        listed = "\n".join(f"- {p}" for p in problems)
+        return f"""You are a residential architect. The floor plan below was drawn for this house but has problems; fix them.
+
+{brief}
+FLOOR PLAN (JSON, all sizes in feet):
+{current}
+
+PROBLEMS:
+{listed}
+
+Layout format:
+{RECT_LAYOUT_FORMAT}
+
+Fix every problem with the smallest change that still follows the description; keep everything else (room names, materials, "connects_to", "open_to", "no_door_to", "solid_walls", windows, bay windows, outside doors) as it is. Each room's "dimensions" must match its rectangle. If a size from the description can't be kept, change it and say so in "notes".
+
+Reply with ONLY a JSON object (no markdown, no explanation): {{"project_structure": {{"layout": {{...}}, "rooms": [...]}}}} with the whole layout; "rooms" needs only the rooms you change (the rest are kept as they are)."""
+
+    # Provider order: a new house goes to Claude first; a change to an existing one
+    # (refine, and its floor-plan fix) to Groq first, Claude last.
+    PLAN_ORDER = ("Claude", "Groq", "Ollama", "Gemini")
+    EDIT_ORDER = ("Groq", "Ollama", "Gemini", "Claude")
+
+    async def _run_provider_chain(self, prompt: str, what: str, edit: bool = False) -> Dict[str, Any]:
+        """Send ``prompt`` to each provider in ``PLAN_ORDER`` (``EDIT_ORDER`` for a
+        change to an existing house) until one returns output that parses into a plan."""
         # One time budget for the whole chain, so falling back from a slow Groq
         # to a slower Ollama can't outlast the client waiting for the plan.
         deadline = time.monotonic() + settings.planning_timeout_seconds
         # Availability is read lazily: checking Ollama is a network probe, wasted
-        # whenever Groq answers first.
-        providers = [
-            ("Groq", lambda: self.groq_available, self._generate_with_groq),
-            ("Ollama", lambda: self.ollama_available, self._generate_with_ollama),
-            ("Gemini", lambda: self.gemini_available, self._generate_with_gemini),
-        ]
+        # whenever an earlier provider answers first.
+        known = {
+            "Claude": (lambda: self.claude_available, self._generate_with_claude),
+            "Groq": (lambda: self.groq_available, self._generate_with_groq),
+            "Ollama": (lambda: self.ollama_available, self._generate_with_ollama),
+            "Gemini": (lambda: self.gemini_available, self._generate_with_gemini),
+        }
+        providers = [(name, *known[name]) for name in (self.EDIT_ORDER if edit else self.PLAN_ORDER)]
         last_error: Optional[Exception] = None
         failures: List[str] = []
         for name, available, generate in providers:
@@ -236,8 +374,52 @@ class AIPlanningService:
             raise Exception("All planners failed — " + "; ".join(failures))
         raise Exception("No AI services available for planning")
 
+    async def _generate_with_claude(self, prompt: str) -> Dict[str, Any]:
+        """Generate a construction plan with Claude (primary planner)."""
+        logger.info(f"Generating construction plan with Claude ({settings.anthropic_model})...")
+        try:
+            # Streamed: a big house with thinking runs long, and streaming keeps
+            # the SDK from refusing a large max_tokens. A safety-classifier decline
+            # is re-run server-side on Anthropic's recommended model ("default").
+            async def _stream():
+                async with self.claude_client.beta.messages.stream(
+                    model=settings.anthropic_model,
+                    max_tokens=32000,
+                    output_config={"effort": settings.anthropic_effort},
+                    betas=["server-side-fallback-2026-07-01"],
+                    fallbacks="default",
+                    messages=[{"role": "user", "content": prompt}],
+                ) as stream:
+                    return await stream.get_final_message()
+
+            message = await asyncio.wait_for(_stream(), timeout=settings.anthropic_timeout_seconds)
+        except asyncio.TimeoutError:
+            logger.error(f"Claude generation timed out after {settings.anthropic_timeout_seconds:.0f}s")
+            raise Exception("Claude generation timed out")
+        except anthropic.AuthenticationError as e:
+            # Loud, not a quiet fallback: an expired or revoked key otherwise only
+            # shows up as Groq's worse layouts.
+            logger.error(f"❌ Claude API key rejected (expired or revoked?): {e}")
+            raise
+        except anthropic.APIError as e:
+            logger.error(f"Claude generation failed: {e}")
+            raise
+
+        if message.stop_reason == "refusal":
+            raise Exception(f"Claude declined the request ({getattr(message.stop_details, 'category', None)})")
+        if message.stop_reason == "max_tokens":
+            logger.warning("Claude hit max_tokens — the plan may be cut off; repairing what came back")
+
+        content = "".join(b.text for b in message.content if b.type == "text")
+        usage = message.usage
+        logger.info(
+            f"Claude response received ({message.model}, {usage.input_tokens} in / "
+            f"{usage.output_tokens} out tokens, {message.id})"
+        )
+        return self._parse_structured_plan(content, "claude")
+
     async def _generate_with_groq(self, prompt: str) -> Dict[str, Any]:
-        """Generate construction plan using the Groq cloud API (primary planner)."""
+        """Generate construction plan using the Groq cloud API (first fallback)."""
         try:
             logger.info(f"Generating construction plan with Groq ({settings.groq_model})...")
 
@@ -551,7 +733,7 @@ Return ONLY the project name, nothing else."""
 
 Reply with ONLY a JSON object (no markdown, no explanation). Use this exact structure with 4-5 phases, 2 tasks per phase, and 6-8 materials:
 
-{"project_structure":{"total_area_sqft":0,"layout":{"length":0,"width":0,"entry":"Room","split":"z","parts":[{"size":0,"room":"Room"},{"size":0,"split":"x","parts":[{"size":0,"room":"Other Room"}]}]},"rooms":[{"name":"Room","dimensions":{"length":0,"width":0,"height":9},"floor_material":"carpet","wall_material":"drywall","connects_to":["Other Room"]}]},"phases":[{"name":"Phase","duration_weeks":2,"description":"desc","tasks":[{"name":"Task","duration_days":5,"description":"desc","estimated_cost":0}],"estimated_cost":0}],"total_cost":0,"total_duration_weeks":0,"material_list":[{"name":"Material","material_type":"wood","quantity":0,"unit":"sqft","unit_cost":0,"total_cost":0,"supplier_type":"local"}]}
+{"project_structure":{"total_area_sqft":0,"layout":{"entry":"Room","rects":[{"room":"Room","x":0,"z":0,"length":0,"width":0},{"room":"Other Room","x":0,"z":0,"length":0,"width":0}]},"rooms":[{"name":"Room","dimensions":{"length":0,"width":0,"height":9},"floor_material":"carpet","wall_material":"drywall","connects_to":["Other Room"]}]},"phases":[{"name":"Phase","duration_weeks":2,"description":"desc","tasks":[{"name":"Task","duration_days":5,"description":"desc","estimated_cost":0}],"estimated_cost":0}],"total_cost":0,"total_duration_weeks":0,"material_list":[{"name":"Material","material_type":"wood","quantity":0,"unit":"sqft","unit_cost":0,"total_cost":0,"supplier_type":"local"}]}
 
 Fill in realistic values based on the project description above. Include room dimensions for VR. Always fill in "phases", "total_cost" and "material_list", also for a small building such as a shed or a single room.
 
@@ -560,15 +742,10 @@ FLOOR PLAN DESIGN (all sizes in feet):
 - Include every space a real home of this kind needs: an entry, circulation (hallway) where rooms would otherwise be cut off, and kitchen/bathroom/storage as appropriate.
 - Zone the house: public spaces (entry, living, dining, kitchen) together; private spaces (bedrooms, bathrooms) grouped away from the entry; kitchen next to dining; bathrooms reachable from bedrooms and from the hallway.
 - Use realistic residential sizes (e.g. bedroom 10-14 ft, living room 14-20 ft, bathroom 5-9 ft, hallway 4-5 ft wide).
-- "layout" is the floor plan, drawn by repeatedly dividing the house's rectangular footprint:
-  - "length" is the footprint's left-to-right size and "width" its front-to-back depth. The front (street side, where the front door is) is at the start of the depth.
-  - A split node has "split": "x" (parts placed left to right) or "z" (parts placed front to back, first part at the street), and a list of "parts".
-  - Each part has a "size" in feet along that split, and is either a room ({"size": n, "room": "Name"}), an open outdoor area ({"size": n, "open": true}), or another split.
-  - The house is a plain rectangle unless the description asks for another shape. For an L, U or T shape, a courtyard or an inset porch, mark the parts outside the house as open; walls, windows and doors go around them.
-  - A part spans the full extent of its parent in the other direction, so nest splits to get rooms of different depths. For example, a full-length hallway between a front zone and a back zone is a "z" split of [front zone, hallway, back zone], with each zone split by "x" into rooms.
-  - The sizes of a node's parts should add up to its parent's extent. Every room appears in the layout exactly once.
-  - "entry" is the name of the room the front door opens into; it must have an outside wall (the edge of the footprint or of an open area), preferably facing the street.
-- "rooms" lists every room in the layout with the same names, its height, materials, and "connects_to".
+- "layout" is the floor plan:
+""" + RECT_LAYOUT_FORMAT + """
+- The house is a plain rectangle unless the description asks for another shape.
+- "rooms" lists every room in the layout with the same names, its "dimensions" (the size its rectangle has, and the height), materials, and "connects_to".
 - DOORWAYS: "connects_to" lists the exact names of the rooms this room opens into through a doorway. Only connect rooms whose rectangles share a wall. Design the circulation: guests walk from the entry into the living area, bedrooms open off a hallway or the living area (never through another bedroom), and a bathroom opens off a hallway or the bedroom it serves. Every room must be reachable from the entry. Each connection only needs listing once.
 - OPEN PLAN: when the description asks for rooms open to each other (an open kitchen, living and dining), list them in "open_to" instead of "connects_to": the wall between them is left out. They must share a wall.
 - WALLS FOR COUNTERS AND FURNITURE: windows and doors are placed automatically. A room may list "solid_walls": ["back", ...] (sides "front"|"back"|"left"|"right") that must stay free of any window, door or doorway; a kitchen keeps one long wall for counters, stove and cabinets, so give the kitchen one solid wall that doesn't face its entry or the dining area.
@@ -629,12 +806,20 @@ Fill in realistic values for this building: quantities from its sizes, costs in 
     ) -> str:
         """Prompt for changing an existing house. Uses the same layout and exterior
         formats as ``_build_planning_prompt`` — change both together."""
+        layout = structure.get("layout")
+        if isinstance(layout, dict):
+            # Older plans are nested-split trees: show them as the rectangles they draw,
+            # the one format the AI is asked to answer in.
+            try:
+                layout = layout_as_rects(layout)
+            except LayoutError:
+                pass
         current = json.dumps(
-            {"layout": structure.get("layout"), "rooms": structure.get("rooms", [])},
+            {"layout": layout, "rooms": structure.get("rooms", [])},
             separators=(",", ":"),
         )
         exterior = json.dumps(structure.get("exterior"), separators=(",", ":"))
-        furniture = json.dumps(structure.get("furniture"), separators=(",", ":"))
+        furniture = json.dumps(shown_furniture(structure.get("furniture"), structure.get("rooms")), separators=(",", ":"))
         site_json = json.dumps(site or {}, separators=(",", ":"))
         return f"""You are a residential architect and landscape designer revising an existing house.
 
@@ -661,9 +846,10 @@ First decide what the change is about:
 Apply the requested change and nothing else: keep everything the change does not affect.
 
 FLOOR PLAN format (for "floor_plan" or "both"):
-- "layout" is the footprint ("length" left to right, "width" front to back, street side first) recursively divided by "split": "x" (left to right) or "z" (front to back) into "parts". Each part has a "size" in feet along that split and is either a room ({{"size": n, "room": "Name"}}), an open outdoor area ({{"size": n, "open": true}}; this is how the house gets an L, U or T shape, a courtyard or an inset porch) or another split. Part sizes should add up to the parent's extent. Every room appears in the layout exactly once. "entry" names the room the front door opens into.
-- To make a room bigger or smaller, change its part's "size" and the neighbouring parts (or the footprint) so the sizes still add up.
-- "rooms" lists every room in the layout with the same names, its "dimensions" (height 8-10), "floor_material", "wall_material" and "connects_to" (names of rooms it opens into through a doorway; only rooms that share a wall). Keep the plan livable — every room reachable from the entry, bedrooms never only reachable through another bedroom.
+- "layout" (always in this format):
+{RECT_LAYOUT_FORMAT}
+- To make a room bigger or smaller, change its rectangle and move the rooms beside it so nothing overlaps and no gap opens up; keep every room the change doesn't need to move where it is. "notes" lists only what this change had to adjust.
+- "rooms" lists every room in the layout with the same names, its "dimensions" (its rectangle's length and width, height 8-10), "floor_material", "wall_material" and "connects_to" (names of rooms it opens into through a doorway; only rooms that share a wall). Keep the plan livable — every room reachable from the entry, bedrooms never only reachable through another bedroom.
 - To remove a doorway (or make a wall solid), drop each room from the other's "connects_to" AND add it to the room's "no_door_to" list (e.g. "no_door_to": ["Hallway"]); a doorway in SITE "doorways" that no "connects_to" lists was added automatically and only "no_door_to" removes it. If that leaves rooms unreachable, connect them another way through "connects_to" (e.g. the hallway to a room beside it). Keep existing "no_door_to" entries unless the change asks for that doorway back; to add a doorway, remove the pair from "no_door_to".
 - WALLS: to make a wall clean (no window, door or doorway in it, e.g. for kitchen counters or a bed), add its side to the room's "solid_walls" list (["back", "left"]; "front" is the street side, left/right along the layout's length; SITE rooms' "walls" show which side has what). A solid wall overrides doors, doorways and windows on it; if a doorway in it is the only way into a room, connect that room another way through "connects_to". To allow openings in it again, remove the side from "solid_walls".
 - WINDOWS are placed automatically, one per room (none in hallways and closets): "window": false removes the room's window, "window": {{"side": "left"}} puts it on that side. To remove a room's windows, ALWAYS set "window": false — also when its window is a bay window (then leave "bay_window" out too); without it the ordinary window comes back. To move or remove only one particular opening, "solid_walls" on its side is usually what is meant.

@@ -31,7 +31,8 @@ android {
         val collabToken = (project.findProperty("collabToken") as String?) ?: ""
         buildConfigField("String", "SERVER_URL", "\"http://$serverHost:8000\"")
         buildConfigField("String", "WS_URL", "\"ws://$serverHost:8000/api/v1/ws\"")
-        buildConfigField("String", "DASHBOARD_URL", "\"http://$serverHost:3001\"")
+        // The built dashboard behind Apache (deploy/apache/vr-construction.conf).
+        buildConfigField("String", "DASHBOARD_URL", "\"http://$serverHost:8081\"")
         buildConfigField("String", "COLLAB_TOKEN", "\"$collabToken\"")
     }
 

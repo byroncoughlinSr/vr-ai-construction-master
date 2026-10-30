@@ -1,6 +1,8 @@
 #!/bin/bash
-# Start pm-mcp (:8765, the construction plan), backend (uvicorn :8000) and
-# dashboard (Vite :3001) together. Ctrl+C stops what this script started.
+# Start pm-mcp (:8765, the construction plan) and the backend (uvicorn :8000), and
+# build the dashboard, which Apache serves on :8081 (deploy/apache/vr-construction.conf).
+# DASHBOARD_DEV=1 runs the Vite dev server on :3001 instead of building.
+# Ctrl+C stops what this script started.
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BACKEND_DIR="$ROOT/backend-core/backend"
@@ -90,14 +92,23 @@ for _ in $(seq 1 120); do
 done
 echo "   ✓ Backend up on http://0.0.0.0:8000 (docs: /docs)"
 
-echo "4. Starting dashboard..."
 cd "$DASHBOARD_DIR" || exit 1
-npm run dev &
-DASH_PID=$!
+if [ "${DASHBOARD_DEV:-0}" = "1" ]; then
+    echo "4. Starting dashboard dev server on :3001..."
+    npm run dev &
+    DASH_PID=$!
+else
+    echo "4. Building dashboard for Apache..."
+    if npm run build >/dev/null 2>&1; then
+        echo "   ✓ Dashboard on http://$(hostname -I | awk '{print $1}'):8081 (Apache serves dist/)"
+    else
+        echo "⚠️  Dashboard build failed (run npm run build in $DASHBOARD_DIR); Apache serves the last build"
+    fi
+fi
 
 echo ""
 echo "✅ Running — backend log: tail -f $BACKEND_LOG"
-echo "   Press Ctrl+C to stop both"
+echo "   Press Ctrl+C to stop"
 
-# Exit (and clean up) as soon as either process dies.
-wait -n "$BACKEND_PID" "$DASH_PID"
+# Exit (and clean up) as soon as the backend (or the dev server) dies.
+wait -n "$BACKEND_PID" $DASH_PID

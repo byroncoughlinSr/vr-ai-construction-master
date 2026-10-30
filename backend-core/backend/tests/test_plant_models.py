@@ -62,6 +62,7 @@ class FakeProvider(Provider):
             raise PlantModelError(self.fail)
         box = trimesh.creation.box(extents=[0.5, 0.4, 2.0])
         box.apply_translation([3.0, 1.0, 5.0])
+        box.visual.vertex_colors = [180, 155, 120, 255]  # tan, for recolouring
         out = workdir / "raw.glb"
         out.write_bytes(trimesh.Scene(box).export(file_type="glb"))
         return out
@@ -178,6 +179,60 @@ def test_bad_requests_are_refused(provider, started, form, detail):
     assert response.status_code == 422
     assert detail in response.json()["detail"]
     assert started == []
+
+
+def test_a_model_can_be_turned(provider, started):
+    model_id = _add().json()["id"]
+    assert client.get(f"/api/v1/plants/models/{model_id}").json()["turn"] == 0
+    response = client.patch(f"/api/v1/plants/models/{model_id}", json={"turn": 180})
+    assert response.status_code == 200 and response.json()["turn"] == 180
+    assert client.patch(f"/api/v1/plants/models/{model_id}", json={"turn": 45}).status_code == 422
+
+
+def test_a_model_can_be_recoloured_and_reset(provider, started):
+    model_id = _add().json()["id"]
+    _run(model_id)
+    base = f"/api/v1/plants/models/{model_id}"
+    first = client.get(base).json()
+    colors = client.get(f"{base}/colors").json()["colors"]
+    assert colors and not first["recolored"]
+
+    response = client.post(f"{base}/recolor", json={"from_color": colors[0]["color"], "to_color": "white"})
+    assert response.status_code == 200 and response.json()["changed"] > 0.9
+    recolored = response.json()
+    assert recolored["recolored"] and recolored["model_url"] != first["model_url"]  # a new file: no stale cache
+    assert client.get(f"{base}/colors").json()["colors"][0]["color"] == "#ffffff"
+    assert client.post(f"{base}/recolor", json={"from_color": "#2050e0", "to_color": "red"}).status_code == 422
+
+    reset = client.post(f"{base}/reset-colors").json()
+    assert not reset["recolored"]
+    assert client.get(f"{base}/colors").json()["colors"][0]["color"] == colors[0]["color"]
+
+
+def test_a_remake_forgets_the_recolouring(provider, started):
+    model_id = _add().json()["id"]
+    _run(model_id)
+    base = f"/api/v1/plants/models/{model_id}"
+    color = client.get(f"{base}/colors").json()["colors"][0]["color"]
+    client.post(f"{base}/recolor", json={"from_color": color, "to_color": "white"})
+    assert client.post(f"{base}/retry").status_code == 202
+    _run(model_id)
+    assert not client.get(base).json()["recolored"]
+
+
+def test_adding_and_retrying_start_the_job_on_the_event_loop(monkeypatch, provider):
+    # A sync route runs in a worker thread with no event loop, where starting the job fails
+    loops = []
+
+    def run_in_background(coro, name=None):
+        coro.close()
+        loops.append(asyncio.get_running_loop())
+
+    monkeypatch.setattr(plant_model_service, "run_in_background", run_in_background)
+    model_id = _add().json()["id"]
+    plant_model_service._active.discard(model_id)
+    assert client.post(f"/api/v1/plants/models/{model_id}/retry").status_code == 202
+    assert len(loops) == 2
 
 
 def test_nothing_is_started_without_a_provider(monkeypatch, started):

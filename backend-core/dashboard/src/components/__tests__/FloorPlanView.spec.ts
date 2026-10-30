@@ -175,6 +175,76 @@ describe('FloorPlanView', () => {
     expect(x + w).toBeCloseTo(10 + 1.2)
   })
 
+  it('edits a rectangle plan: rename, resize, add and remove rooms', async () => {
+    get.mockReset()
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.endsWith('/floor-plan')
+        ? { data: { ...JSON.parse(JSON.stringify(floorPlan)), layout: {
+            entry: 'Entry Foyer',
+            rects: [
+              { room: 'Entry Foyer', x: 0, z: 0, length: 8, width: 12 },
+              { room: 'Living Room', x: 8, z: 0, length: 16, width: 12 }
+            ]
+          } } }
+        : { data: { success: true, geometry: savedGeometry } }
+    ))
+    put.mockResolvedValue({ data: { floor_plan: { ...floorPlan, version: 3 }, geometry: savedGeometry } })
+    const wrapper = mountPlan()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.startEditing()
+    await flushPromises()
+    expect(wrapper.text()).toContain('Rooms (ft)')
+    expect(wrapper.text()).not.toContain('Footprint (ft)')
+
+    vm.renameRoom(vm.draft.layout.rects[0], 'Front Hall')
+    vm.draft.layout.rects[1].length = 18
+    vm.addRect()
+    expect(vm.draft.layout.rects[2]).toEqual({ room: 'Room 3', x: 26, z: 0, length: 10, width: 10 })
+    vm.removeRect(vm.draft.layout.rects[1])
+    expect(vm.draft.rooms.map((r: any) => r.name)).toEqual(['Front Hall', 'Room 3'])
+    expect(vm.draft.rooms[0].connects_to).toEqual([])
+
+    await vm.saveDraft()
+    const [, body] = put.mock.calls.at(-1)
+    expect(body.layout.entry).toBe('Front Hall')
+    expect(body.layout.rects.map((r: any) => r.room)).toEqual(['Front Hall', 'Room 3'])
+  })
+
+  it('puts a rectangle room on another floor and adds rooms beside that floor\'s rooms', async () => {
+    get.mockReset()
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.endsWith('/floor-plan')
+        ? { data: { ...JSON.parse(JSON.stringify(floorPlan)), layout: {
+            entry: 'Entry Foyer',
+            rects: [
+              { room: 'Entry Foyer', x: 0, z: 0, length: 8, width: 12 },
+              { room: 'Living Room', x: 8, z: 0, length: 16, width: 12 }
+            ]
+          } } }
+        : { data: { success: true, geometry: savedGeometry } }
+    ))
+    put.mockResolvedValue({ data: { floor_plan: { ...floorPlan, version: 3 }, geometry: savedGeometry } })
+    const wrapper = mountPlan()
+    await flushPromises()
+    const vm = wrapper.vm as any
+    vm.startEditing()
+    await flushPromises()
+    expect(wrapper.find('[aria-label="Floor of Living Room"]').exists()).toBe(true)
+
+    vm.setFloor(vm.draft.layout.rects[1], 1)
+    vm.addRect()
+    // The ground floor now ends at the foyer, so the new room goes beside it.
+    expect(vm.draft.layout.rects[2]).toEqual({ room: 'Room 3', x: 8, z: 0, length: 10, width: 10 })
+    vm.setFloor(vm.draft.layout.rects[2], 2)
+    vm.setFloor(vm.draft.layout.rects[1], 0)
+    expect(vm.draft.layout.rects[1]).not.toHaveProperty('level')
+
+    await vm.saveDraft()
+    const [, body] = put.mock.calls.at(-1)
+    expect(body.layout.rects.map((r: any) => r.level ?? 0)).toEqual([0, 0, 2])
+  })
+
   it('turns a room into an open area and back', async () => {
     savedProject()
     const wrapper = mountPlan()
@@ -383,5 +453,24 @@ describe('FloorPlanView', () => {
     expect(wrapper.text()).toContain('1 doorways')
     expect(wrapper.text()).toContain('1 to the yard')
     expect(wrapper.text()).toContain('Entry Foyer has no left outside wall for a french door')
+  })
+
+  it('draws a house of two storeys a floor at a time', async () => {
+    get.mockReset()
+    get.mockResolvedValue({ data: { geometry: {
+      ...geometry,
+      rooms: [...geometry.rooms, { id: 3, name: 'Master Bedroom', level: 1, bounds: { x0: 0, x1: 7.315, z0: 0, z1: 3.658 }, dimensions: { length: 7.315, width: 3.658, height: 2.438 }, connects_to: [] }],
+      levels: [{ level: 0, y: 0, rooms: [1, 2] }, { level: 1, y: 2.74, rooms: [3] }]
+    } } })
+    const wrapper = mount(FloorPlanView, { props: { projectId: 9 }, global: { plugins: [Quasar] } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Ground floor')
+    expect(wrapper.text()).toContain('Living Room')
+    expect(wrapper.text()).not.toContain('Master Bedroom')
+    ;(wrapper.vm as any).level = 1
+    await flushPromises()
+    expect(wrapper.text()).toContain('Master Bedroom')
+    expect(wrapper.text()).not.toContain('Living Room')
+    wrapper.unmount()
   })
 })

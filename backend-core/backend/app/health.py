@@ -7,7 +7,6 @@ import psutil
 from typing import Dict, Any
 from sqlalchemy.orm import Session
 
-from .database import get_db
 from .config import settings
 from .logging_config import get_logger
 

@@ -251,6 +251,7 @@ def _save_project(prompt: str, budget: Optional[float], project_data: dict) -> d
 def _model_name(source: str) -> str:
     """The configured model behind a planner source name."""
     return {
+        "claude": settings.anthropic_model,
         "groq": settings.groq_model,
         "ollama": settings.ollama_model,
     }.get(source, source)
