@@ -137,6 +137,14 @@
                 :stroke-width="WALL"
               />
 
+              <!-- Paint (vr_paint.py): a band along the inside of each painted wall -->
+              <g v-for="room in paintedRooms" :key="`p${room.id}`">
+                <line
+                  v-for="band in paintBands(room)" :key="band.side" v-bind="band.line"
+                  :stroke="band.color" :stroke-width="PAINT_BAND" stroke-linecap="square"
+                ><title>{{ room.name }}: {{ band.side }} wall {{ band.color }}</title></line>
+              </g>
+
               <!-- Furniture (vr_furniture.py), seen from above; rugs first, under the rest -->
               <polygon
                 v-for="(piece, i) in furnitureToDraw" :key="`f${i}`"
@@ -401,6 +409,40 @@
               </template>
             </div>
 
+            <div class="text-subtitle2 q-mt-md">Paint</div>
+            <div class="text-caption text-grey-7 q-mb-xs">
+              Each room is painted on its own side of a wall, so rooms side by side can differ.
+              Unpainted walls and ceilings are white.
+            </div>
+            <div v-for="(room, i) in draft.rooms" :key="`paint${i}`" class="row items-center q-gutter-xs q-mb-xs">
+              <div class="ellipsis" style="width: 120px">{{ room.name }}</div>
+              <template v-for="field in PAINT_FIELDS" :key="field.key">
+                <label class="paint-pick">
+                  <input
+                    type="color" :value="paintValue(room, field.key)"
+                    :aria-label="`${field.label} colour for ${room.name}`"
+                    @input="e => (room[field.key] = (e.target as HTMLInputElement).value)"
+                  >
+                  {{ field.label }}
+                </label>
+                <q-btn
+                  v-if="room[field.key]" flat dense round size="xs" icon="close"
+                  :aria-label="`Clear the ${field.label.toLowerCase()} colour of ${room.name}`"
+                  @click="delete room[field.key]"
+                ><q-tooltip>Back to white</q-tooltip></q-btn>
+              </template>
+              <q-select
+                :model-value="room.accent_wall?.side ?? 'none'"
+                :options="BAY_SIDES" emit-value map-options dense outlined style="width: 90px"
+                label="Accent" :aria-label="`Accent wall side for ${room.name}`"
+                @update:model-value="side => setAccentSide(room, side)"
+              />
+              <input
+                v-if="room.accent_wall" v-model="room.accent_wall.color" type="color"
+                class="paint-swatch" :aria-label="`Accent wall colour for ${room.name}`"
+              >
+            </div>
+
             <div class="row q-gutter-sm q-mt-md">
               <q-btn color="primary" icon="save" label="Save as new version" :loading="saving" @click="saveDraft" />
               <q-btn flat label="Cancel" :disable="saving" @click="cancelEditing" />
@@ -438,6 +480,7 @@ import { apiClient } from 'src/services/api'
 
 interface Point { x: number; y: number; z: number }
 interface Bounds { x0: number; x1: number; z0: number; z1: number }
+type Side = 'front' | 'back' | 'left' | 'right'
 interface PlanRoom {
   id: number
   name: string
@@ -445,6 +488,8 @@ interface PlanRoom {
   dimensions: { length: number; width: number; height: number }
   connects_to?: number[]
   bay_window?: { outline: { x: number; z: number }[] } | null
+  // Hex colours as built (vr_paint.py), or null when nothing is painted.
+  paint?: { walls: string | null; accent: { side: Side; color: string } | null; ceiling: string | null } | null
 }
 // The outside of the house (vr_exterior.py): parts in metres, the spec in feet.
 interface ExteriorPart {
@@ -527,6 +572,9 @@ interface PlanRoomSpec {
   no_door_to?: string[]
   open_to?: string[]
   bay_window?: BayWindowSpec
+  wall_color?: string
+  ceiling_color?: string
+  accent_wall?: { side: Side; color: string }
   [key: string]: unknown
 }
 interface FloorPlan {
@@ -555,6 +603,8 @@ const emit = defineEmits<{
 
 // Wall stroke width in plan units (metres).
 const WALL = 0.2
+// Width of the band that shows a painted wall's colour, inside the wall.
+const PAINT_BAND = 0.14
 const MARGIN = 1.2
 
 const loading = ref(false)
@@ -655,6 +705,23 @@ const wallLine = (o: OpenWall) => ({ x1: o.start.x, y1: svgY(o.start.z), x2: o.e
 const baysToDraw = computed(() => rooms.value.filter(r => r.bay_window?.outline?.length))
 const bayPoints = (room: PlanRoom) =>
   (room.bay_window?.outline ?? []).map(p => `${p.x},${svgY(p.z)}`).join(' ')
+
+const paintedRooms = computed(() => rooms.value.filter(r => r.paint?.walls || r.paint?.accent))
+/** One band per painted wall, just inside it: the accent wall in its own colour. */
+const paintBands = (room: PlanRoom) => {
+  const b = room.bounds
+  const i = WALL / 2 + PAINT_BAND / 2
+  const lines: Record<Side, { x1: number; y1: number; x2: number; y2: number }> = {
+    front: { x1: b.x0 + i, y1: svgY(b.z0 + i), x2: b.x1 - i, y2: svgY(b.z0 + i) },
+    back: { x1: b.x0 + i, y1: svgY(b.z1 - i), x2: b.x1 - i, y2: svgY(b.z1 - i) },
+    left: { x1: b.x0 + i, y1: svgY(b.z0 + i), x2: b.x0 + i, y2: svgY(b.z1 - i) },
+    right: { x1: b.x1 - i, y1: svgY(b.z0 + i), x2: b.x1 - i, y2: svgY(b.z1 - i) }
+  }
+  const accent = room.paint?.accent
+  return (Object.keys(lines) as Side[])
+    .map(side => ({ side, line: lines[side], color: accent?.side === side ? accent.color : room.paint?.walls }))
+    .filter((band): band is { side: Side; line: typeof band.line; color: string } => !!band.color)
+}
 
 const span = (o: Opening) => {
   const { dx, dz } = along(o)
@@ -860,6 +927,23 @@ const BAY_STYLES = [
   { label: 'Box', value: 'box' }
 ]
 
+// Wall and ceiling colours a room may be painted (vr_paint.py); unpainted is white.
+const PAINT_FIELDS = [
+  { key: 'wall_color', label: 'Walls' },
+  { key: 'ceiling_color', label: 'Ceiling' }
+] as const
+const UNPAINTED = '#f4f4f0'
+const paintValue = (room: PlanRoomSpec, key: 'wall_color' | 'ceiling_color') => room[key] ?? UNPAINTED
+
+/** Add, move or remove a room's accent wall. */
+const setAccentSide = (room: PlanRoomSpec, side: string) => {
+  if (side === 'none') {
+    delete room.accent_wall
+    return
+  }
+  room.accent_wall = { color: '#24344d', ...room.accent_wall, side: side as Side }
+}
+
 /** Add, move or remove a room's bay window. */
 const setBaySide = (room: PlanRoomSpec, side: string) => {
   if (side === 'none') {
@@ -1034,6 +1118,23 @@ defineExpose({ reload: load, refineWith })
   width: 100%;
   max-height: 480px;
   display: block;
+}
+.paint-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+.paint-pick input,
+.paint-swatch {
+  width: 28px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
 }
 .room-name,
 .room-size {

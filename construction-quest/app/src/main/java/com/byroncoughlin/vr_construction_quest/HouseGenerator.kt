@@ -84,7 +84,9 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
     private var groundY = 0f
     private val furniture = FurnitureBuilder(activity)
     /** Floor finishes (planks, tiles, carpet) over the floor slabs: "finishes" (vr_floors.py). */
-    private val finishes = MeshInstances(activity, "finish", roughness = 0.6f)
+    private val finishes = MeshInstances(activity, "finish", roughness = 0.6f, walkable = true)
+    /** Paint on each room's side of its walls and on its ceiling: "paint" (vr_paint.py). */
+    private val paint = MeshInstances(activity, "paint", roughness = 0.85f)
     private var spawnPosition = Vector3(0f, 1.6f, -3.0f)
 
     /**
@@ -283,6 +285,16 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
             val meshes = f.optJSONObject("meshes") ?: JSONObject()
             val pieces = f.optJSONArray("pieces")
             for (i in 0 until (pieces?.length() ?: 0)) roomEntities += finishes.buildInstance(pieces!!.getJSONObject(i), meshes)
+        }
+        // Painted walls and ceilings: hidden with the walls in x-ray.
+        geometry.optJSONObject("paint")?.let { p ->
+            val meshes = p.optJSONObject("meshes") ?: JSONObject()
+            val pieces = p.optJSONArray("pieces")
+            for (i in 0 until (pieces?.length() ?: 0)) {
+                val painted = paint.buildInstance(pieces!!.getJSONObject(i), meshes)
+                roomEntities += painted
+                wallCeilingEntities += painted
+            }
         }
         geometry.optJSONObject("furniture")?.let { furniture.build(it) }
 
@@ -716,6 +728,7 @@ class HouseGenerator(private val serverUrl: String, activity: AppSystemActivity)
         exterior.clear()
         furniture.clear()
         finishes.clear()
+        paint.clear()
     }
 
     private fun slabArea(slab: JSONObject): FloatArray {

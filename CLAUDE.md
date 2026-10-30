@@ -204,6 +204,16 @@ select per room (`setFloor`, level 0 = no key) and "Add room" adds to the floor 
 **Floor finishes** (`services/vr_floors.py`): a room's `floor_material` in words ("white oak hardwood", "gray 24 inch
 tile", "carpet") → `floor_finish` (planks / tiles / plain, colour words tint it) → one thin mesh per floor slab in
 `geometry.finishes` (`{meshes, pieces}` like the furniture's, drawn by a `MeshInstances` in `HouseGenerator`).
+**Paint** (`services/vr_paint.py`): a room may carry `wall_color`, `accent_wall: {side, color}` and `ceiling_color` (words
+or hex → `paint_color`, interior names in `PAINT_COLORS` before the exterior's `NAMED_COLORS`; stored as hex by
+`clean_paint` in `validate_structure`). Every room has its own wall pieces, so a shared wall is drawn twice in one place:
+`build_paint` puts each room's paint just in front of its own wall face (`WALL_T + OFFSET` toward the room, clipped inside
+the corners) and under its ceiling slabs, so neighbours can differ. It runs in the `build_geometry_from_rooms` dispatcher
+after either path (lifted rooms, cut ceilings) → `geometry.paint` (`{meshes, pieces}`, one mesh per painted room) and each
+room's `paint` (or null). Refine scope `"paint"` (`{"Room": {fields}}`, null removes one) updates the current version in
+place (`floor_plan_service.update_paint` / `apply_paint`); beside a room change it is applied to the new version. Headset:
+a `paint` `MeshInstances` in `HouseGenerator`, its entities in `wallCeilingEntities` (hidden by x-ray). Dashboard: a band
+inside each painted wall on the plan, and a "Paint" section in the editor (colour pickers, accent side).
 If the tree is missing or malformed (`LayoutError`), it falls back to the old grid:
 `compute_packed_positions` packs rooms 3 per row in list order, rows share their max depth, and room 0
 is the entry. `geometry.metadata.layout` says which one ran (`"split"` / `"grid"`).

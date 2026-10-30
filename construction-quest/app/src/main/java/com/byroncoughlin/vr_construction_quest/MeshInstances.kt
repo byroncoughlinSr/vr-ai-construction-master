@@ -12,6 +12,7 @@ import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.Material
 import com.meta.spatial.toolkit.Mesh
 import com.meta.spatial.toolkit.Scale
+import com.meta.spatial.toolkit.SupportsLocomotion
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.Visible
 import org.json.JSONObject
@@ -25,11 +26,14 @@ import kotlin.math.sqrt
  * and shared by every instance of the mesh; [clear] unregisters them. "models" are
  * .glb files made from photos (plant_model_service.py), loaded from the backend by
  * URL. Positions are metres, scaled by [HouseGenerator.SCALE] like the rest of the house.
+ * [walkable] instances take the SDK's teleport (floor finishes: they lie over the floor
+ * slab, so without it the teleport ray stops on them and finds nowhere to land).
  */
 class MeshInstances(
     private val activity: AppSystemActivity,
     private val prefix: String,
     private val roughness: Float = 0.95f,
+    private val walkable: Boolean = false,
 ) {
     companion object {
         private const val TAG = "MeshInstances"
@@ -62,6 +66,7 @@ class MeshInstances(
                 setComponent(Transform(pose))
                 setComponent(Scale(scale))
                 setComponent(Visible(true))
+                if (walkable) setComponent(SupportsLocomotion())
             }
         }
     }

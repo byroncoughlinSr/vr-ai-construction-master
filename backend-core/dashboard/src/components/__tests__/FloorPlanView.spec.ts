@@ -245,6 +245,42 @@ describe('FloorPlanView', () => {
     expect(body.layout.rects.map((r: any) => r.level ?? 0)).toEqual([0, 0, 2])
   })
 
+  it('draws painted walls inside each room and edits the paint', async () => {
+    get.mockReset()
+    get.mockImplementation((url: string) => Promise.resolve(
+      url.endsWith('/floor-plan')
+        ? { data: JSON.parse(JSON.stringify(floorPlan)) }
+        : { data: { success: true, geometry: { ...savedGeometry, rooms: [
+            { ...geometry.rooms[0], paint: { walls: '#a7b59a', accent: null, ceiling: null } },
+            { ...geometry.rooms[1], paint: { walls: null, accent: { side: 'back', color: '#24344d' }, ceiling: '#f3eee2' } }
+          ] } } }
+    ))
+    put.mockResolvedValue({ data: { floor_plan: { ...floorPlan, version: 3 }, geometry: savedGeometry } })
+    const wrapper = mountPlan()
+    await flushPromises()
+    // Four sage walls in the foyer; only the living room's back (accent) wall.
+    const bands = wrapper.findAll('line[stroke="#a7b59a"]')
+    expect(bands).toHaveLength(4)
+    const accent = wrapper.findAll('line[stroke="#24344d"]')
+    expect(accent).toHaveLength(1)
+    expect(accent[0].attributes('y1')).toBe(accent[0].attributes('y2'))
+
+    const vm = wrapper.vm as any
+    vm.startEditing()
+    await flushPromises()
+    expect(wrapper.find('[aria-label="Walls colour for Living Room"]').exists()).toBe(true)
+    const room = vm.draft.rooms[1]
+    room.wall_color = '#c8e3cf'
+    vm.setAccentSide(room, 'left')
+    expect(room.accent_wall).toEqual({ side: 'left', color: '#24344d' })
+    vm.setAccentSide(room, 'none')
+    expect(room.accent_wall).toBeUndefined()
+    await vm.saveDraft()
+    const [, body] = put.mock.calls.at(-1)
+    expect(body.rooms[1].wall_color).toBe('#c8e3cf')
+    expect(body.rooms[0].wall_color).toBeUndefined()
+  })
+
   it('turns a room into an open area and back', async () => {
     savedProject()
     const wrapper = mountPlan()

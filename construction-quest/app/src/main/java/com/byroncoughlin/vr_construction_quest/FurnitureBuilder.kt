@@ -8,6 +8,7 @@ import com.meta.spatial.core.Vector3
 import com.meta.spatial.toolkit.AppSystemActivity
 import com.meta.spatial.toolkit.Grabbable
 import com.meta.spatial.toolkit.GrabbableType
+import com.meta.spatial.toolkit.SupportsLocomotion
 import com.meta.spatial.toolkit.Transform
 import com.meta.spatial.toolkit.TransformParent
 import org.json.JSONArray
@@ -48,6 +49,8 @@ class FurnitureBuilder(activity: AppSystemActivity) {
         for (i in 0 until pieces.length()) {
             val piece = pieces.getJSONObject(i)
             val parts = instances.buildInstance(piece, meshes)
+            // A rug lies on the floor: the teleport ray stops on it, so it must take the teleport.
+            if (piece.optString("type") == "rug") parts.forEach { it.setComponent(SupportsLocomotion()) }
             entities += parts
             movableFrom(piece, parts)
         }
